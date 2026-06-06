@@ -1,0 +1,25 @@
+name: verb-test-orchestrator
+purpose: Verify behavior per test-* command
+inputs:
+  domain:
+    required: false
+  intent:
+    required: true
+outputs:
+  report:
+    type: markdown
+success_criteria:
+  - All policies loaded
+  - domain inventory loaded when slug resolves
+  - relevant tests executed or gap reported
+  - fallow check_changed when files were fixed per intent
+failure_conditions:
+  - claim pass without running tests when tests exist
+dependencies:
+  skills: [discovery, planning, testing, verification, reporting]
+  policies: [master-rules, implementation, mcp-and-deploy]
+  docs:
+    - docs/master_rules.md
+verification:
+  - run_tests
+  - fallow_check_changed

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "description": "Governance gates — approval/checkpoints, not work phases. Composed into runtime after plan, before execute.",
+  "stacks": {
+    "pre_execute": [
+      "validate",
+      "impact_analysis",
+      "dependency_graph",
+      "fitness_functions",
+      "rollback"
+    ],
+    "pre_execute_minimal": [
+      "validate",
+      "impact_analysis",
+      "dependency_graph",
+      "fitness_functions"
+    ],
+    "release": ["validate"]
+  },
+  "gate_rules": {
+    "rollback": {
+      "required_when": ["object_maturity:protected", "impact.blast_radius:high"]
+    },
+    "human_approval": {
+      "trigger_when": [
+        "confidence below threshold",
+        "fitness fail on security or layer_boundaries",
+        "impact proceed false",
+        "rollback unverified",
+        "user intent contains requires approval"
+      ],
+      "run_fields": {
+        "status": "blocked",
+        "awaiting_approval": true,
+        "blocked_reason": "string"
+      }
+    }
+  }
+}

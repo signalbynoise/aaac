@@ -1,0 +1,161 @@
+orchestrators:
+  update-doc:
+    path: skills/shared/documentation/orchestrator
+    requires: [discovery, documentation, reporting]
+    readonly: true
+
+  review-incident:
+    path: skills/shared/investigation/orchestrator
+    requires: [discovery, investigation, reporting]
+    optional: [execution]
+
+  review-module:
+    path: skills/shared/architecture/orchestrator
+    requires: [discovery, architecture, reporting]
+    readonly: true
+
+  verb-check:
+    path: skills/shared/verbs/check/orchestrator
+    requires: [check, reporting]
+    readonly: true
+
+  test-function:
+    path: skills/shared/testing/orchestrator
+    requires: [discovery, testing, verification, reporting]
+
+  release-app:
+    path: skills/shared/platform-release/orchestrator
+    requires: [testing, verification, execution, reporting]
+
+  verb-create:
+    path: skills/shared/verbs/create/orchestrator
+    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, module-authoring]
+
+  verb-update:
+    path: skills/shared/verbs/update/orchestrator
+    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
+
+  verb-fix:
+    path: skills/shared/verbs/fix/orchestrator
+    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
+
+  verb-review:
+    path: skills/shared/verbs/review/orchestrator
+    requires: [discovery, architecture, reporting]
+    readonly: true
+
+  verb-test:
+    path: skills/shared/verbs/test/orchestrator
+    requires: [discovery, planning, testing, verification, reporting]
+
+  verb-release:
+    path: skills/shared/verbs/release/orchestrator
+    requires: [testing, verification, execution, reporting]
+
+  verb-remove:
+    path: skills/shared/verbs/remove/orchestrator
+    requires: [discovery, remove, execution, testing, verification, reporting]
+
+{{INJECT_OBJECT_BLOCKS}}
+
+skills:
+  discovery:
+    path: skills/shared/discovery
+    agents: [discovery-inventory, discovery-boundaries, discovery-ssot]
+  planning:
+    path: skills/shared/planning
+    agents: [plan-layer-map, plan-state-machines]
+  execution:
+    path: skills/shared/execution
+    depends: [governance/implementation]
+  testing:
+    path: skills/shared/testing
+    agents: [unit-test-run, fallow-check-changed]
+  verification:
+    path: skills/shared/verification
+  reporting:
+    path: skills/shared/reporting
+  architecture:
+    path: skills/shared/architecture
+    agents: [boundary-review, dependency-analysis, system-decomposition]
+  documentation:
+    path: skills/shared/documentation
+  investigation:
+    path: skills/shared/investigation
+  investigation-lite:
+    path: skills/shared/investigation-lite
+  root-cause:
+    path: skills/shared/root-cause
+  validation:
+    path: skills/shared/validation
+  impact-analysis:
+    path: skills/shared/impact-analysis
+    agents: [impact-analysis]
+  dependency-graph:
+    path: skills/shared/dependency-graph
+    agents: [dependency-analysis]
+  fitness-functions:
+    path: skills/shared/fitness-functions
+  rollback:
+    path: skills/shared/rollback
+  run:
+    path: skills/shared/run
+  check:
+    path: skills/shared/check
+    agents: [discovery-inventory, discovery-ssot, check-capability-trace]
+  component:
+    path: skills/shared/component
+  model:
+    path: skills/shared/model
+  migration:
+    path: skills/shared/migration
+  domain:
+    path: skills/shared/domain
+  schema:
+    path: skills/shared/schema
+  workflow:
+    path: skills/shared/workflow
+  integration:
+    path: skills/shared/integration
+  remove:
+    path: skills/shared/remove
+  module-authoring:
+    path: skills/shared/module-authoring
+  platform-release:
+    path: skills/shared/platform-release
+  governance/implementation:
+    path: skills/shared/governance/implementation
+
+agents:
+  discovery-inventory:
+    path: agents/discovery-inventory.md
+  discovery-boundaries:
+    path: agents/discovery-boundaries.md
+  discovery-ssot:
+    path: agents/discovery-ssot.md
+  plan-layer-map:
+    path: agents/plan-layer-map.md
+  plan-state-machines:
+    path: agents/plan-state-machines.md
+  boundary-review:
+    path: agents/boundary-review.md
+  dependency-analysis:
+    path: agents/dependency-analysis.md
+  system-decomposition:
+    path: agents/system-decomposition.md
+  unit-test-run:
+    path: agents/unit-test-run.md
+  fallow-check-changed:
+    path: agents/fallow-check-changed.md
+  check-capability-trace:
+    path: agents/check-capability-trace.md
+  impact-analysis:
+    path: agents/impact-analysis.md
+  release-git:
+    path: agents/release-git.md
+    wave: 1
+    blocking: true
+
+policies:
+  - policies/master-rules.md
+  - policies/implementation.md

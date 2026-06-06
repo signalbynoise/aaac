@@ -1,0 +1,219 @@
+{
+  "verbs": {
+    "create": "create something new",
+    "update": "modify existing thing",
+    "fix": "repair something broken",
+    "review": "analyze and give feedback",
+    "check": "validate or inspect",
+    "test": "verify behavior",
+    "release": "deploy or ship",
+    "remove": "delete or retire"
+  },
+  "layers": {
+    "code": {
+      "order": 1,
+      "objects": ["function", "component", "module"],
+      "description": "Variables up through bounded code units"
+    },
+    "data": {
+      "order": 2,
+      "objects": ["schema", "model", "migration"],
+      "description": "Persistence shape and change"
+    },
+    "product": {
+      "order": 3,
+      "objects": ["feature", "workflow", "integration"],
+      "description": "User-visible capability and cross-system flow"
+    },
+    "system": {
+      "order": 4,
+      "objects": ["app", "domain", "architecture"],
+      "description": "Application, bounded context, and system structure"
+    }
+  },
+  "objects": {
+    "function": {
+      "layer": "code",
+      "description": "Function, method, or hook — specific behavior",
+      "maturity": "evolving"
+    },
+    "component": {
+      "layer": "code",
+      "description": "UI component, view, or composable unit",
+      "maturity": "evolving"
+    },
+    "module": {
+      "layer": "code",
+      "description": "Bounded domain package (service, library, plugin)",
+      "maturity": "critical"
+    },
+    "schema": {
+      "layer": "data",
+      "description": "Tables, RLS, database contracts",
+      "maturity": "protected"
+    },
+    "model": {
+      "layer": "data",
+      "description": "Entity, type, or shared data shape in code",
+      "maturity": "critical"
+    },
+    "migration": {
+      "layer": "data",
+      "description": "Schema migration or data change script",
+      "maturity": "protected"
+    },
+    "feature": {
+      "layer": "product",
+      "description": "User-facing capability",
+      "maturity": "stable"
+    },
+    "workflow": {
+      "layer": "product",
+      "description": "Multi-step business process or state machine",
+      "maturity": "stable"
+    },
+    "integration": {
+      "layer": "product",
+      "description": "API, endpoint, webhook, MCP, or external adapter",
+      "maturity": "critical"
+    },
+    "app": {
+      "layer": "system",
+      "description": "Whole application deployable unit",
+      "maturity": "critical"
+    },
+    "domain": {
+      "layer": "system",
+      "description": "Bounded context / product domain",
+      "maturity": "critical"
+    },
+    "architecture": {
+      "layer": "system",
+      "description": "Boundaries, capabilities, architecture docs",
+      "maturity": "protected"
+    }
+  },
+  "verb_lifecycle_ref": "aaac/lifecycle/lifecycle.json",
+  "object_capabilities": {
+    "function": [],
+    "component": ["component-model", "layer-boundaries", "ui-design"],
+    "module": ["layer-boundaries"],
+    "schema": ["schema-model", "database-design", "security"],
+    "model": ["data-model", "schema-model"],
+    "migration": ["migration-model", "schema-model", "database-design", "security"],
+    "feature": ["workflow-model", "ux-design"],
+    "workflow": ["workflow-model", "ux-design"],
+    "integration": ["integration-model", "api-design"],
+    "app": ["layer-boundaries", "infrastructure"],
+    "domain": ["domain-model", "layer-boundaries"],
+    "architecture": ["layer-boundaries", "documentation"]
+  },
+  "object_capability_verbs": {
+    "module": {
+      "create": ["module-authoring"],
+      "review": ["layer-boundaries"]
+    },
+    "feature": {
+      "create": ["module-authoring"]
+    }
+  },
+  "confidence": {
+    "architecture": 0.9,
+    "requirements": 0.8,
+    "scope": 0.8
+  },
+  "object_maturity": {
+    "function": "evolving",
+    "component": "evolving",
+    "module": "critical",
+    "schema": "protected",
+    "model": "critical",
+    "migration": "protected",
+    "feature": "stable",
+    "workflow": "stable",
+    "integration": "critical",
+    "app": "critical",
+    "domain": "critical",
+    "architecture": "protected"
+  },
+  "maturity_rules": {
+    "protected": {
+      "requires_phases": ["impact_analysis", "dependency_graph", "rollback"],
+      "investigation": "lite_on_create_update_deep_on_fix"
+    },
+    "critical": {
+      "requires_phases": ["impact_analysis", "dependency_graph"],
+      "investigation": "lite_on_create_update_deep_on_fix"
+    },
+    "stable": {
+      "requires_phases": ["impact_analysis"],
+      "investigation": "lite_on_create_update_deep_on_fix"
+    },
+    "evolving": {
+      "requires_phases": [],
+      "investigation": "lite_on_create_update_deep_on_fix"
+    }
+  },
+  "invalid_pairs": [
+    ["release", "function"],
+    ["release", "component"],
+    ["release", "module"],
+    ["release", "schema"],
+    ["release", "model"],
+    ["release", "migration"],
+    ["release", "workflow"],
+    ["release", "architecture"],
+    ["release", "domain"]
+  ],
+  "domain_optional_suffixes": ["-function"],
+  "command_overrides": {
+    "fix-bug": { "orchestrator": "verb-fix", "object": "feature" },
+    "update-architecture": { "orchestrator": "update-doc" },
+    "review-module": { "orchestrator": "review-module" },
+    "review-incident": { "orchestrator": "review-incident" },
+    "test-function": { "orchestrator": "test-function" },
+    "release-app": { "orchestrator": "release-app" },
+    "module-update": { "alias": "update-module" },
+    "update-doc": { "alias": "update-architecture" },
+    "architecture": { "alias": "update-architecture" },
+    "swarm-check": { "alias": "review-incident" },
+    "refactor": { "alias": "review-module" }
+  },
+  "command_aliases": {
+    "update-api": "update-integration",
+    "create-api": "create-integration",
+    "fix-api": "fix-integration",
+    "check-api": "check-integration",
+    "test-api": "test-integration",
+    "review-api": "review-integration",
+    "remove-api": "remove-integration",
+    "update-spec": "update-architecture",
+    "create-spec": "create-architecture",
+    "review-spec": "review-architecture",
+    "fix-hook": "fix-function",
+    "create-hook": "create-function",
+    "review-hook": "review-function",
+    "check-hook": "check-function",
+    "create-endpoint": "create-integration",
+    "update-endpoint": "update-integration",
+    "fix-webhook": "fix-integration",
+    "fix-query": "fix-model",
+    "create-plugin": "create-module",
+    "review-service": "review-module",
+    "check-boundary": "check-architecture",
+    "review-graph": "review-architecture",
+    "check-inventory": "check-module",
+    "create-skill": "create-module",
+    "update-agent": "update-module",
+    "review-dashboard": "review-component",
+    "fix-pipeline": "fix-workflow",
+    "release-pipeline": "release-app",
+    "create-policy": "create-architecture",
+    "update-policy": "update-architecture",
+    "review-runbook": "review-architecture",
+    "create-form": "create-component",
+    "update-page": "update-component",
+    "review-flow": "review-workflow",
+    "update-flow": "update-workflow"
+  }
+}

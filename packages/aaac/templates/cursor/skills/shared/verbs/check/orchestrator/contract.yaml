@@ -1,0 +1,24 @@
+name: verb-check-orchestrator
+purpose: Validate or inspect capability per check-* command
+inputs:
+  domain:
+    required: false
+  intent:
+    required: true
+outputs:
+  report:
+    type: markdown
+success_criteria:
+  - All policies loaded
+  - check swarm completed (3+ readonly agents)
+  - answer is yes, no, or partial with conditions
+  - evidence includes path:line citations
+  - no file edits
+failure_conditions:
+  - code changes during check
+dependencies:
+  skills: [check, reporting]
+  policies: [master-rules, implementation, mcp-and-deploy]
+  docs:
+    - docs/architecture.md
+verification: []

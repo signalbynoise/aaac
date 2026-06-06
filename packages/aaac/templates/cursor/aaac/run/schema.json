@@ -1,0 +1,83 @@
+{
+  "$schema": "aaac run — primary execution object",
+  "version": 1,
+  "description": "Every command executes within a Run. No standalone execution or logging.",
+  "run": {
+    "run_id": "run_{timestamp}_{slug}",
+    "command": "string",
+    "verb": "string",
+    "object": "string | null",
+    "domain": "string | null",
+    "intent": "string",
+    "orchestrator": "string",
+    "status": "pending | running | blocked | completed | failed",
+    "phase": "string | null",
+    "phase_kind": "work | gate | null",
+    "awaiting_approval": false,
+    "blocked_reason": "string | null",
+    "completed": [],
+    "pending": [],
+    "decisions": [],
+    "artifacts": {},
+    "checkpoints": [],
+    "log": [],
+    "capabilities_resolved": {},
+    "confidence": {
+      "architecture": null,
+      "requirements": null,
+      "scope": null
+    },
+    "gates": {
+      "stack": "string | null",
+      "results": {}
+    },
+    "created_at": "iso8601",
+    "updated_at": "iso8601"
+  },
+  "storage": {
+    "root": "aaac/state/runs/{run_id}/",
+    "manifest": "run.json",
+    "artifacts_dir": "artifacts/",
+    "checkpoints_dir": "checkpoints/"
+  },
+  "decision_entry": {
+    "at": "iso8601",
+    "phase": "string",
+    "decision": "string",
+    "reason": "string",
+    "evidence": "string"
+  },
+  "log_entry": {
+    "at": "iso8601",
+    "phase": "string",
+    "phase_kind": "work | gate",
+    "skill": "string | null",
+    "event": "phase_start | phase_complete | gate_pass | gate_fail | blocked | resumed",
+    "detail": "string"
+  },
+  "checkpoint_entry": {
+    "phase": "string",
+    "at": "iso8601",
+    "artifact_refs": [],
+    "outputs_summary": "string"
+  },
+  "artifact_keys": [
+    "plan",
+    "investigation",
+    "root_cause",
+    "impact",
+    "dependency_graph",
+    "fitness",
+    "rollback",
+    "report"
+  ],
+  "resume": {
+    "read_manifest": "state/runs/{run_id}/run.json",
+    "continue_from": "phase field when status running or blocked with user approval"
+  },
+  "human_approval": {
+    "when_blocked": "Set awaiting_approval true; do not execute until user approves in chat",
+    "on_approve": "status running; retry failed gate or continue pending",
+    "record_decision": "User approved gate {phase}: {reason}"
+  }
+}

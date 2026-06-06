@@ -1,0 +1,14 @@
+name: validation
+purpose: Confidence gates before execute
+outputs:
+  validation:
+    type: enum
+    values: [pass, fail]
+    required: true
+  scores:
+    type: object
+    required: true
+  clarification_questions:
+    type: list
+    required_when: validation fail
+gate: true

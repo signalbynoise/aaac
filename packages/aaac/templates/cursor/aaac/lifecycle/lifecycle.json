@@ -1,0 +1,78 @@
+{
+  "version": 2,
+  "description": "Work lifecycle only. Gates are in governance/gates.json. Runtime = work through plan → gate stack → execute through report.",
+  "verbs": {
+    "create": {
+      "work_phases": [
+        "discover",
+        "investigate_lite",
+        "plan",
+        "execute",
+        "verify",
+        "report"
+      ],
+      "gate_stack": "pre_execute"
+    },
+    "update": {
+      "work_phases": [
+        "discover",
+        "investigate_lite",
+        "plan",
+        "execute",
+        "verify",
+        "report"
+      ],
+      "gate_stack": "pre_execute"
+    },
+    "fix": {
+      "work_phases": [
+        "discover",
+        "investigate",
+        "root_cause",
+        "plan",
+        "execute",
+        "verify",
+        "report"
+      ],
+      "gate_stack": "pre_execute"
+    },
+    "review": {
+      "work_phases": ["discover", "plan", "report"],
+      "gate_stack": null
+    },
+    "check": {
+      "work_phases": ["discover", "report"],
+      "gate_stack": "pre_execute_minimal"
+    },
+    "test": {
+      "work_phases": ["discover", "plan", "verify", "report"],
+      "gate_stack": null
+    },
+    "release": {
+      "work_phases": ["execute", "verify", "report"],
+      "gate_stack": "release"
+    },
+    "remove": {
+      "work_phases": [
+        "discover",
+        "investigate_lite",
+        "plan",
+        "execute",
+        "verify",
+        "report"
+      ],
+      "gate_stack": "pre_execute"
+    }
+  },
+  "investigation_depth": {
+    "create": "lite",
+    "update": "lite",
+    "fix": "deep",
+    "remove": "lite"
+  },
+  "runtime_compose": "work_phases before execute + gate_stack + work_phases from execute onward",
+  "escalation": {
+    "on_gate_fail": "STOP_REQUEST_CLARIFICATION",
+    "on_human_approval_required": "blocked"
+  }
+}

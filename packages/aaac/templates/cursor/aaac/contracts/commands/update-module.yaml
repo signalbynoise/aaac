@@ -1,0 +1,28 @@
+name: update-module
+purpose: Modify an existing domain module
+inputs:
+  domain:
+    required: true
+    enum: [cms, ui, database]
+  intent:
+    required: true
+outputs:
+  plan:
+    type: markdown
+    required: true
+  implementation:
+    type: code_changes
+  verification:
+    type: markdown
+    required: true
+  report:
+    type: markdown
+    required: true
+lifecycle_verb: update
+success_criteria:
+  - investigation_lite completed
+  - validation passed
+  - inventory Section 3 synced after execute
+failure_conditions:
+  - skip investigation_lite
+  - execute without validate gate pass

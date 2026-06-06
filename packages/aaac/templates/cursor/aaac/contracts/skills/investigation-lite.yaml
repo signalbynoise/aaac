@@ -1,0 +1,17 @@
+name: investigation-lite
+purpose: Lightweight pre-change investigation for create and update
+outputs:
+  exists:
+    type: list
+    required: true
+  depends_on:
+    type: list
+    required: true
+  constraints:
+    type: list
+    required: true
+  confidence:
+    type: object
+    required: true
+    fields: [architecture, requirements, scope]
+readonly: true

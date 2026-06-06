@@ -1,0 +1,106 @@
+{
+  "version": 2,
+  "capabilities": {
+    "ui-design": {
+      "description": "Design tokens, component CSS, presentational UI",
+      "providers": [
+        { "id": "component", "type": "skill", "path": "skills/shared/component" }
+      ]
+    },
+    "ux-design": {
+      "description": "User flows, readability, navigation clarity",
+      "providers": [
+        { "id": "workflow", "type": "skill", "path": "skills/shared/workflow" }
+      ]
+    },
+    "api-design": {
+      "description": "Contracts and validation at boundaries",
+      "providers": [
+        { "id": "integration", "type": "skill", "path": "skills/shared/integration" }
+      ]
+    },
+    "database-design": {
+      "description": "Schema, migrations, persistence contracts",
+      "providers": [
+        { "id": "schema", "type": "skill", "path": "skills/shared/schema" },
+        { "id": "migration", "type": "skill", "path": "skills/shared/migration" }
+      ]
+    },
+    "security": {
+      "description": "Auth, secrets, access control — extend with project skills",
+      "providers": [
+        { "id": "architecture", "type": "skill", "path": "skills/shared/architecture" }
+      ]
+    },
+    "infrastructure": {
+      "description": "Deploy, hosting, environment",
+      "providers": [
+        { "id": "platform-release", "type": "skill", "path": "skills/shared/platform-release" }
+      ]
+    },
+    "layer-boundaries": {
+      "description": "SSOT, import direction, module layers",
+      "providers": [
+        { "id": "architecture", "type": "skill", "path": "skills/shared/architecture" }
+      ]
+    },
+    "component-model": {
+      "description": "Presentational UI components",
+      "providers": [
+        { "id": "component", "type": "skill", "path": "skills/shared/component" }
+      ]
+    },
+    "schema-model": {
+      "description": "Database schema contracts",
+      "providers": [
+        { "id": "schema", "type": "skill", "path": "skills/shared/schema" }
+      ]
+    },
+    "data-model": {
+      "description": "Entity and type shapes in code",
+      "providers": [
+        { "id": "model", "type": "skill", "path": "skills/shared/model" }
+      ]
+    },
+    "migration-model": {
+      "description": "Migration scripts and apply procedure",
+      "providers": [
+        { "id": "migration", "type": "skill", "path": "skills/shared/migration" }
+      ]
+    },
+    "workflow-model": {
+      "description": "Multi-step processes and state machines",
+      "providers": [
+        { "id": "workflow", "type": "skill", "path": "skills/shared/workflow" }
+      ]
+    },
+    "integration-model": {
+      "description": "API routes, webhooks, MCP adapters",
+      "providers": [
+        { "id": "integration", "type": "skill", "path": "skills/shared/integration" }
+      ]
+    },
+    "domain-model": {
+      "description": "Bounded context structure",
+      "providers": [
+        { "id": "domain", "type": "skill", "path": "skills/shared/domain" }
+      ]
+    },
+    "documentation": {
+      "description": "Architecture and runbook docs",
+      "providers": [
+        { "id": "documentation", "type": "skill", "path": "skills/shared/documentation" }
+      ]
+    },
+    "module-authoring": {
+      "description": "Bootstrap new domain modules",
+      "providers": [
+        { "id": "module-authoring", "type": "skill", "path": "skills/shared/module-authoring" }
+      ]
+    }
+  },
+  "resolution": {
+    "graph_skill_keys": "providers where type=skill → id maps to graph skills key",
+    "run_record": "all providers including type=mcp recorded on Run.capabilities_resolved and decisions"
+  }
+}

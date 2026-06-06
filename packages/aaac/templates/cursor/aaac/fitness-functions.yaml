@@ -1,0 +1,34 @@
+# Architecture fitness functions — scored before execute, re-checked in verify.
+
+version: 1
+
+functions:
+  api_first:
+    description: Contracts and validation at boundaries; no ad-hoc API shapes
+    skill: integration
+    applies_to: [integration, feature, workflow, module, function]
+
+  layer_boundaries:
+    description: SSOT, import direction, module size budgets
+    skill: architecture
+    applies_to: [module, component, feature, domain, app]
+
+  component_quality:
+    description: Presentational components, reusable props, accessible markup
+    skill: component
+    applies_to: [component, module]
+
+  data_contracts:
+    description: Schema and model alignment at persistence boundaries
+    skill: schema
+    applies_to: [schema, model, migration]
+
+  performance:
+    description: Deterministic builds, no unnecessary fetch in UI layers
+    skill: architecture
+    applies_to: [module, component, feature, app]
+
+scoring:
+  pass: meets criteria
+  warning: minor gap — document in report, may proceed if user intent clear
+  fail: blocking — STOP before execute unless user explicitly accepts risk

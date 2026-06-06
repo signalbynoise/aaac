@@ -1,0 +1,20 @@
+name: update-doc-orchestrator
+purpose: Write or refresh plain-language architecture doc for a product module
+inputs:
+  domain:
+    required: true
+  intent:
+    required: true
+outputs:
+  report:
+    type: markdown
+success_criteria:
+  - docs/architecture_<slug>.md follows write-arch-doc.md
+  - investigation was readonly until write
+failure_conditions:
+  - ambiguous module name without user clarification
+dependencies:
+  skills: [discovery, documentation, reporting]
+  policies: [master-rules]
+verification:
+  - doc_structure_check

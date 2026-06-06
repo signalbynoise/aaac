@@ -1,0 +1,17 @@
+name: investigation
+purpose: Deep investigation for fix paths and incidents
+outputs:
+  findings:
+    type: list
+    required: true
+  risks:
+    type: list
+    required: true
+  recommendations:
+    type: list
+    required: true
+  confidence:
+    type: object
+    required: true
+    fields: [architecture, requirements, scope]
+readonly: true

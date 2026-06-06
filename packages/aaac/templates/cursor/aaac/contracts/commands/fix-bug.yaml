@@ -1,0 +1,32 @@
+name: fix-bug
+purpose: Repair broken behavior in a domain
+inputs:
+  domain:
+    required: false
+  intent:
+    required: true
+outputs:
+  findings:
+    type: markdown
+    required: true
+  root_cause:
+    type: markdown
+    required: true
+  plan:
+    type: markdown
+    required: true
+  implementation:
+    type: code_changes
+  verification:
+    type: markdown
+    required: true
+  report:
+    type: markdown
+    required: true
+lifecycle_verb: fix
+success_criteria:
+  - deep investigation and root_cause before plan
+  - impact_analysis proceed yes or rollback defined
+failure_conditions:
+  - root_cause confidence below 0.7
+  - symptom patch without root cause frame

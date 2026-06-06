@@ -1,0 +1,28 @@
+name: create-module
+purpose: Create a new bounded module in a domain
+inputs:
+  domain:
+    required: true
+  intent:
+    required: true
+outputs:
+  plan:
+    type: markdown
+    required: true
+  implementation:
+    type: code_changes
+    required: true
+  verification:
+    type: markdown
+    required: true
+  report:
+    type: markdown
+    required: true
+lifecycle_verb: create
+success_criteria:
+  - validation confidence gates passed
+  - fitness security and layer_boundaries pass
+  - inventory synced when domain slug present
+failure_conditions:
+  - confidence below threshold without user risk acceptance
+  - execute without rollback on protected object

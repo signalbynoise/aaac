@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "description": "Phase id to skill mapping. gate:true phases are governance gates, not lifecycle work.",
+  "phases": {
+    "discover": { "skill": "discovery", "readonly": true },
+    "investigate_lite": { "skill": "investigation-lite", "readonly": true },
+    "investigate": { "skill": "investigation", "readonly": true },
+    "root_cause": { "skill": "root-cause", "readonly": true },
+    "plan": { "skill": "planning" },
+    "validate": { "skill": "validation", "gate": true },
+    "impact_analysis": { "skill": "impact-analysis", "gate": true },
+    "dependency_graph": { "skill": "dependency-graph", "gate": true },
+    "fitness_functions": { "skill": "fitness-functions", "gate": true },
+    "rollback": { "skill": "rollback", "gate": true },
+    "execute": { "skill": "execution" },
+    "verify": { "skills": ["testing", "verification"] },
+    "report": { "skill": "reporting" }
+  }
+}

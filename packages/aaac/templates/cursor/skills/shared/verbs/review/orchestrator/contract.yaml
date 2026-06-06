@@ -1,0 +1,25 @@
+name: verb-review-orchestrator
+purpose: Analyze and report on code or docs per review-* command
+inputs:
+  domain:
+    required: false
+  intent:
+    required: true
+outputs:
+  report:
+    type: markdown
+success_criteria:
+  - All policies loaded
+  - domain inventory loaded when slug resolves
+  - object skills from graph loaded
+  - no file edits performed
+  - findings cite path:line evidence
+failure_conditions:
+  - code changes without explicit user fix request
+dependencies:
+  skills: [discovery, architecture, reporting]
+  policies: [master-rules, implementation, mcp-and-deploy]
+  docs:
+    - docs/master_rules.md
+    - docs/architecture.md
+verification: []

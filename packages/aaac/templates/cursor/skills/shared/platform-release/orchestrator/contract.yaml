@@ -1,0 +1,29 @@
+name: release-app-orchestrator
+purpose: Ship to main with phased expert subagents (git, then parallel integrations)
+inputs:
+  domain:
+    required: false
+    default: production
+  intent:
+    required: false
+outputs:
+  commit_sha:
+    type: string
+  deploy_status:
+    type: string
+  report:
+    type: markdown
+success_criteria:
+  - git push to main succeeded
+  - render deploy reached live or build failure reported with logs
+  - posthog and linear agents run after git (parallel wave)
+failure_conditions:
+  - git push failed
+  - wave 2 started before commit_sha known
+dependencies:
+  skills: [platform-release, testing, verification, reporting]
+  policies: [master-rules, mcp-and-deploy]
+verification:
+  - git_pushed
+  - render_polled
+  - agent_wave_order_respected

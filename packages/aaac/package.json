@@ -1,0 +1,38 @@
+{
+  "name": "@ludecker/aaac",
+  "version": "1.0.0",
+  "description": "Agentic Architecture as Code (AAAC) — installable Cursor agent framework",
+  "type": "module",
+  "license": "MIT",
+  "author": "Hans-Erik Lydecker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eriklydecker/ludecker.git",
+    "directory": "packages/aaac"
+  },
+  "homepage": "https://ludecker.com/guide/install-aaac",
+  "bugs": {
+    "url": "https://github.com/eriklydecker/ludecker/issues"
+  },
+  "keywords": [
+    "aaac",
+    "agentic-architecture",
+    "cursor",
+    "ai-agents",
+    "skills",
+    "commands"
+  ],
+  "bin": {
+    "aaac": "./src/cli.mjs"
+  },
+  "files": [
+    "src/",
+    "templates/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

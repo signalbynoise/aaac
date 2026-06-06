@@ -1,5 +1,5 @@
 name: release-app-orchestrator
-purpose: Ship to main with phased expert subagents (git, then parallel integrations)
+purpose: Ship to main with preflight, git push, optional conditional package publish, mandatory Render deploy poll, smoke check, report
 inputs:
   domain:
     required: false
@@ -9,21 +9,41 @@ inputs:
 outputs:
   commit_sha:
     type: string
+  package_publish_skipped:
+    type: boolean
+  package_version:
+    type: string
+  package_tag:
+    type: string
+  package_publish_status:
+    type: string
   deploy_status:
     type: string
+  deploy_id:
+    type: string
+  smoke_http_code:
+    type: number
   report:
     type: markdown
 success_criteria:
-  - git push to main succeeded
-  - render deploy reached live or build failure reported with logs
-  - posthog and linear agents run after git (parallel wave)
+  - pnpm typecheck passed
+  - git push to main succeeded (or HEAD already on remote)
+  - when package changes detected, ship checks passed and version published
+  - render deploy reached live for commit_sha
+  - smoke check returned 200
 failure_conditions:
+  - typecheck failed
   - git push failed
-  - wave 2 started before commit_sha known
+  - wave 1.5 or 2 started before commit_sha known
+  - package ship checks failed when triggered
+  - package publish monitor timeout when triggered
+  - render build_failed or poll timeout
+  - smoke check not 200
 dependencies:
   skills: [platform-release, testing, verification, reporting]
   policies: [master-rules, mcp-and-deploy]
 verification:
+  - typecheck_passed
   - git_pushed
-  - render_polled
-  - agent_wave_order_respected
+  - render_polled_until_live
+  - smoke_200

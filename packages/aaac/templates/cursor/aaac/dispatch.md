@@ -2,9 +2,21 @@
 
 Agents running any AAAC command **must** follow this sequence.
 
+**Enforcement (runtime):** Cursor hooks in [.cursor/hooks.json](../hooks.json) create Runs and **block code edits** until the `execute` phase. See [.cursor/rules/aaac-enforcement.mdc](../rules/aaac-enforcement.mdc). Applies to **all** AAAC slash commands.
+
 **Path convention:** In [graph.yaml](graph.yaml), paths under `agents/`, `policies/`, `skills/`, and `domains/` are relative to **`.cursor/`**.
 
 **Primary execution object:** Every command runs inside a **Run** — see [run/RUN.md](run/RUN.md) and [run/schema.json](run/schema.json).
+
+## 0. Hook-initiated Run (automatic)
+
+On submit, hooks call [scripts/run-engine/init-run.mjs](../scripts/run-engine/init-run.mjs). Follow `run.json` phases. `preToolUse` denies Write/StrReplace/Delete outside allowed phases.
+
+Advance after swarm + artifacts:
+
+```bash
+node .cursor/aaac/scripts/run-engine/advance-phase.mjs <run_id> <completed_phase>
+```
 
 ## 1. Parse input
 
@@ -20,6 +32,8 @@ From `$ARGUMENTS` and the user message:
 If intent contains `Sync inventory only` (case-insensitive), orchestrator runs **sync_inventory** phase only (no execution).
 
 **Resume:** If user references `run_{id}`, load `state/runs/{run_id}/run.json` and continue from `phase`.
+
+**Workflow exceptions:** Commands like `write-article` use `command_workflows.<command>` in graph (not `verb_runtime`). `fix-module` and `fix-bug` also have explicit workflows matching the fix verb runtime. No governance gate stack unless orchestrator specifies one.
 
 **Aliases:** `commands.<name>.alias` → resolve canonical command (e.g. `update-api` → `update-integration`) and continue.
 
@@ -39,7 +53,8 @@ Read [graph.yaml](graph.yaml) and [ontology.json](ontology.json).
 - **Maturity:** read `object_maturity.<object>` and apply `maturity_rules.<level>` (may require extra gate phases)
 - **Capabilities:** resolve `object_capabilities.<object>` via [capabilities/registry.json](capabilities/registry.json) — record all providers (skill + mcp) on Run
 - **Dependencies:** [dependencies.yaml](dependencies.yaml)
-- **Fitness:** [fitness-functions.yaml](fitness-functions.yaml)
+- **Fitness:** [fitness-functions.yaml](fitness-functions.yaml) — includes `minimal_complexity` for create/update/fix
+- **Complexity:** [complexity.yaml](complexity.yaml) + [minimal-complexity.md](../policies/minimal-complexity.md) for create/update/fix
 - **Contracts:** validate against [contracts/commands/](contracts/commands/) and [contracts/skills/](contracts/skills/)
 
 ## 2.5 Create or resume Run
@@ -47,7 +62,7 @@ Read [graph.yaml](graph.yaml) and [ontology.json](ontology.json).
 Before loading orchestrator:
 
 1. **Create** `state/runs/{run_id}/run.json` per [run/schema.json](run/schema.json)
-2. Set `pending` from `verb_runtime.<verb>` in graph (work + gates composed)
+2. Set `pending` from `command_workflows.<command>` when present, else `verb_runtime.<verb>`
 3. Set `status: running`, first `phase`, `phase_kind: work`
 4. Record resolved orchestrator, object, domain, intent on Run
 
@@ -63,6 +78,7 @@ All state and observability live on the Run — **no** standalone execution-stat
   - [master-rules.md](../policies/master-rules.md)
   - [implementation.md](../policies/implementation.md)
   - [mcp-and-deploy.md](../policies/mcp-and-deploy.md)
+  - [minimal-complexity.md](../policies/minimal-complexity.md) — **create / update / fix only**
 - Read [verbs/_dispatch-utils.md](../skills/shared/verbs/_dispatch-utils.md) for inventory + investigation rules
 - Read [run/SKILL.md](../skills/shared/run/SKILL.md) for Run update protocol
 
@@ -89,10 +105,10 @@ Gates run after `plan`, before `execute` (or before `report` when verb has no ex
 
 | Gate | Skill |
 |------|-------|
-| **validate** | [validation/SKILL.md](../skills/shared/validation/SKILL.md) |
+| **validate** | [validation/SKILL.md](../skills/shared/validation/SKILL.md) — confidence + **complexity plan** |
 | **impact_analysis** | [impact-analysis/SKILL.md](../skills/shared/impact-analysis/SKILL.md) |
 | **dependency_graph** | [dependency-graph/SKILL.md](../skills/shared/dependency-graph/SKILL.md) |
-| **fitness_functions** | [fitness-functions/SKILL.md](../skills/shared/fitness-functions/SKILL.md) |
+| **fitness_functions** | [fitness-functions/SKILL.md](../skills/shared/fitness-functions/SKILL.md) — **`minimal_complexity` blocks on fail** |
 | **rollback** | [rollback/SKILL.md](../skills/shared/rollback/SKILL.md) when maturity or blast radius requires |
 
 ### Human approval at gate boundaries
@@ -121,7 +137,16 @@ Do **not** proceed until user approves in chat. On approval: log decision, set `
 |------|----------------|
 | create | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) |
 | update | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) |
-| fix | [investigation](../skills/shared/investigation/SKILL.md) → [root-cause](../skills/shared/root-cause/SKILL.md) |
+| fix | [investigation](../skills/shared/investigation/SKILL.md) Mode A (7-agent swarm) → [root-cause](../skills/shared/root-cause/SKILL.md) |
+
+### Fix swarm (mandatory on fix verb / fix_mode)
+
+1. **discover** — 4–6 parallel Task agents per [discovery/SKILL.md](../skills/shared/discovery/SKILL.md)
+2. **investigate_swarm** — 7 parallel Task agents per investigation Mode A — **one message**
+3. **root_cause** — artifact required; confidence ≥ 0.7 before plan
+4. **verify** — fix verify swarm (3 parallel) per [testing/SKILL.md](../skills/shared/testing/SKILL.md); fail if `repro_status: not_fixed`
+
+Skipping swarms because the issue "looks simple" is a **contract violation** for `fix-module` / `fix-bug` / `fix_mode`.
 
 ## 5. Report
 

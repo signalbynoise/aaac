@@ -1,0 +1,98 @@
+# Complexity governance — SSOT for create / update / fix (code-changing verbs)
+# Policy: .cursor/policies/minimal-complexity.md
+# Scored in plan; validated at validate gate; enforced at fitness_functions gate.
+
+version: 1
+
+mutating_verbs: [create, update, fix]
+
+optimization:
+  target: "maximum outcome / minimum structure"
+  default_verb_when_ambiguous: update
+
+strategy_priority:
+  - reuse_existing
+  - extend_existing
+  - modify_existing
+  - create_new
+
+scoring:
+  description: Sum weights for every net-new artifact in the plan (not edits to existing files).
+  weights:
+    new_file: 1
+    new_component: 1
+    new_function: 1
+    new_hook: 1
+    new_module: 3
+    new_service: 5
+    new_api_endpoint: 2
+    new_table: 3
+    new_migration: 2
+    new_state_machine: 4
+    new_queue_or_bus: 5
+    new_abstraction_layer: 4
+    new_orchestrator: 4
+    new_skill: 2
+    new_dependency: 2
+
+thresholds:
+  fix: 5
+  update: 8
+  create: 12
+
+yagni:
+  rule: Future requirements do not exist unless the user stated them.
+  reject_without_user_evidence:
+    - maybe later
+    - might need
+    - future-proof
+    - future proof
+    - scalability
+    - extensibility
+    - plugin system
+    - event bus
+    - generic framework
+    - abstraction layer
+    - for flexibility
+    - potential use case
+
+plan_artifact:
+  path: Run.artifacts.plan
+  required_for_verbs: [create, update, fix]
+  required_fields:
+    requirement_map:
+      description: Each stated requirement mapped to satisfying artifacts
+      item_shape:
+        requirement: string
+        satisfies_with: list
+    complexity_score: number
+    complexity_breakdown: object
+    reuse:
+      description: Existing artifacts to reuse or extend (preferred)
+      type: list
+    modify:
+      description: Existing artifacts to change in place
+      type: list
+    create:
+      description: Net-new artifacts — each must cite requirement_map entry
+      item_shape:
+        artifact: string
+        kind: string
+        requirement_ref: string
+        why_not_reuse: string
+    rejected_alternatives:
+      description: Higher-complexity options considered and rejected
+      type: list
+
+gate_rules:
+  validate:
+    fail_when:
+      - missing required plan fields for mutating verb
+      - create entry without requirement_ref or why_not_reuse
+      - yagni phrase in plan without user intent evidence
+  fitness_functions:
+    function: minimal_complexity
+    fail_when:
+      - complexity_score above threshold for verb
+      - speculative create not justified
+    blocking: true

@@ -19,7 +19,8 @@ Lifecycle Layer (work)
 
 Governance Layer (gates + rules)
 ├─ Gate stacks                 .cursor/aaac/governance/gates.json
-├─ Policies                    .cursor/policies/
+├─ Complexity SSOT             .cursor/aaac/complexity.yaml
+├─ Policies                    .cursor/policies/ (incl. minimal-complexity.md)
 ├─ Rules                       .cursor/rules/
 ├─ Dependencies                .cursor/aaac/dependencies.yaml
 ├─ Fitness functions           .cursor/aaac/fitness-functions.yaml
@@ -56,6 +57,7 @@ Contracts Layer (cross-cutting)
 | Graph | Control | Execution routing |
 | Lifecycle | Lifecycle | **Work** phase configuration |
 | Gate stacks | Governance | **Approval** checkpoints |
+| Complexity | Governance | Reuse-first, score limits (create/update/fix) |
 | Run | Run | Primary execution object; state + observability |
 | Domain orchestrators | Execution | Domain coordination |
 | Shared pipeline skills | Execution | Phase execution |

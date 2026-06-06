@@ -35,6 +35,67 @@ const invalid = new Set(invalid_pairs.map(([v, o]) => `${v}-${o}`));
 const KEEP_EXTRA = new Set(projectConfig.manual_commands ?? []);
 
 const CONTENT_WRITER_CANONICAL = "write-article";
+const FIX_MODULE_CANONICAL = "fix-module";
+
+function isFixCommand(cmd, entry) {
+  const canonical = entry?.alias ?? cmd;
+  return (
+    canonical === FIX_MODULE_CANONICAL ||
+    canonical === "fix-bug" ||
+    cmd === "module-fix" ||
+    cmd === "bug-fix"
+  );
+}
+
+function writeFixCmd(cmd, entry = null) {
+  const canonical = entry?.alias ?? cmd;
+  const isBug = canonical === "fix-bug" || cmd === "bug-fix";
+  const resolver = isBug ? "fix-bug-by-slug" : "fix-domain-by-slug";
+  const domainRequired = isBug
+    ? "Domain slug **recommended** (`cms`, `ui`, `database`, `aaac`)."
+    : "**Domain slug required** (`cms`, `ui`, `database`, `aaac`).";
+  const aliasLine =
+    cmd !== canonical
+      ? `\n\n> Alias → \`/${canonical}\`. See [${canonical}.md](${canonical}.md).\n`
+      : isBug
+        ? "\n\nAliases: `/bug-fix` → same command.\n"
+        : "\n\nAliases: `/module-fix` → same command.\n";
+  const body = `# ${cmd}
+
+AAAC: \`/${cmd} <domain> "<intent>"\`
+
+**Layer:** ${isBug ? "product" : "code"}  
+**Repair something broken** a **${isBug ? "bug" : "module"}** — full fix swarm (discovery + 7-agent investigate_swarm + root cause + gates + repro verify).${aliasLine}
+
+## Dispatch
+
+1. [.cursor/aaac/dispatch.md](../aaac/dispatch.md)
+2. [.cursor/aaac/graph.yaml](../aaac/graph.yaml) — **\`${canonical}\`**
+3. resolver **\`${resolver}\`** → \`cms-fix-bug\` | \`ui-fix-bug\` | \`database-fix-bug\` | \`aaac-fix-bug\`
+4. [investigation/SKILL.md](../skills/shared/investigation/SKILL.md) Mode A + domain \`fix_mode\`
+
+${domainRequired}
+
+## Swarm (mandatory)
+
+| Phase | Agents | Parallel |
+|-------|--------|----------|
+| discover | discovery-inventory, discovery-boundaries, discovery-ssot | 4–6 |
+| investigate_swarm | fix-repro, fix-code-path, fix-recent-changes, fix-test-failures, fix-regression-scope, fix-runtime-evidence, fix-inventory-confirm | **7** |
+| root_cause | parent + optional fix-hypothesis-validate | 0–1 |
+| verify | fix-repro-verify, unit-test-run, fallow-check-changed | **3** |
+
+Contract: [${canonical}.yaml](../aaac/contracts/commands/${canonical}.yaml)
+
+## Example
+
+\`\`\`text
+/${cmd} cms "Getting Started nav missing published guides"
+/${cmd} ui "DocsNav section state lost on route change"
+\`\`\`
+`;
+  fs.writeFileSync(path.join(commandsDir, `${cmd}.md`), body);
+}
 
 function isContentWriter(cmd, entry) {
   const canonical = entry?.alias ?? cmd;
@@ -81,6 +142,10 @@ const EXCEPTION_CMD = {
     layer: "system",
     description: "production incident investigation",
   },
+  "publish-aaac": {
+    layer: "product",
+    description: "npm publish @ludecker/aaac with init smoke test and git tag",
+  },
 };
 
 function objectMeta(object, cmd) {
@@ -101,7 +166,9 @@ function orchestratorHint(cmd, entry) {
     const fallback =
       cmd === "fix-bug"
         ? " — unknown slug → `verb-fix` + object `feature`"
-        : "";
+        : cmd === "fix-module"
+          ? " — unknown slug → `verb-fix` + object `module`"
+          : "";
     return `resolver \`${entry.resolver}\`${fallback}`;
   }
   const verb = cmd.split("-")[0];
@@ -112,6 +179,7 @@ function orchestratorHint(cmd, entry) {
     "review-incident",
     "test-function",
     "release-app",
+    "aaac-publish",
     "write-article",
   ]);
   if (cmd === "update-architecture" || (orch && dedicated.has(orch))) {
@@ -123,7 +191,7 @@ function orchestratorHint(cmd, entry) {
 }
 
 function domainLine(cmd) {
-  if (cmd === "review-incident" || cmd.endsWith("-function")) {
+  if (cmd === "review-incident" || cmd.endsWith("-function") || cmd === "publish-aaac") {
     return "Domain optional.";
   }
   if (cmd.endsWith("-domain") || cmd.endsWith("-module")) {
@@ -135,6 +203,10 @@ function domainLine(cmd) {
 function writeCmd(cmd, entry = null) {
   if (isContentWriter(cmd, entry)) {
     writeContentWriterCmd(cmd, entry);
+    return;
+  }
+  if (isFixCommand(cmd, entry)) {
+    writeFixCmd(cmd, entry);
     return;
   }
   const parts = cmd.split("-");
@@ -150,7 +222,9 @@ function writeCmd(cmd, entry = null) {
     ? ` (alias \`${cmd}\` → \`${entry.alias}\`)`
     : "";
   const domainArg =
-    cmd === "review-incident" || cmd.endsWith("-function") ? "" : " <domain>";
+    cmd === "review-incident" || cmd.endsWith("-function") || cmd === "publish-aaac"
+      ? ""
+      : " <domain>";
   const layerLine = layer ? `**Layer:** ${layer}  \n` : "";
   const body = `# ${cmd}
 

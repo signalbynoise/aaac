@@ -21,7 +21,7 @@ Orchestrator phase `execute` after approved plan.
 ## Actions
 
 - Edit files per plan and implementation skill
-- `apply_migration` for new/changed `supabase/migrations/` (project `hjadkzfemzuvhpwbixbt`)
+- `apply_migration` for new/changed `supabase/migrations/` (project `anseivwusnyiwopihnqu` — see [supabase-mcp.mdc](../../../rules/supabase-mcp.mdc))
 - `track()` for user-facing mutations
 - Structured logging on server async paths
 

@@ -1,7 +1,20 @@
 name: investigation
-purpose: Deep investigation for fix paths and incidents
+purpose: Deep investigation swarm for fix paths and incidents
 outputs:
+  investigation_frame:
+    type: object
+    required: true
   findings:
+    type: list
+    required: true
+  repro_steps:
+    type: list
+    required: true
+  repro_confirmed:
+    type: string
+    required: true
+    enum: [yes, partial, no]
+  suspect_files:
     type: list
     required: true
   risks:
@@ -14,4 +27,12 @@ outputs:
     type: object
     required: true
     fields: [architecture, requirements, scope]
+swarm:
+  fix_path:
+    prerequisite: discovery
+    agents: 7
+    parallel: mandatory
+  incident_path:
+    agents: 4
+    parallel: mandatory
 readonly: true

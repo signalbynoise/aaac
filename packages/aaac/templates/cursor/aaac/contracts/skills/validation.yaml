@@ -1,5 +1,6 @@
 name: validation
-purpose: Confidence gates before execute
+purpose: Confidence and complexity gates before execute (mutating verbs)
+applies_to_verbs: [create, update, fix]
 outputs:
   validation:
     type: enum
@@ -8,6 +9,13 @@ outputs:
   scores:
     type: object
     required: true
+  complexity:
+    type: object
+    required_for_verbs: [create, update, fix]
+    fields:
+      score: number
+      threshold: number
+      pass: boolean
   clarification_questions:
     type: list
     required_when: validation fail

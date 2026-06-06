@@ -6,28 +6,42 @@ inputs:
   intent:
     required: true
 outputs:
+  investigation:
+    type: markdown
+    required: true
+  root_cause:
+    type: markdown
+    required: true
   code_changes:
     type: boolean
   inventory_synced:
     type: boolean
+  repro_status:
+    type: string
+    required: true
+    enum: [fixed, partial, not_fixed]
   report:
     type: markdown
 success_criteria:
   - All policies loaded before execute
-  - investigation completed before planning
+  - discovery swarm completed (4-6 parallel agents)
+  - investigate_swarm completed (7 parallel fix agents)
+  - root_cause_confidence at least 0.7 before plan
   - domain inventory loaded when domains/<slug>/update/inventory exists
   - object skills from graph object_skills / object_skill_verbs loaded
   - governance/implementation followed for all edits
+  - repro_status fixed or partial with documented follow-up
   - fallow check_changed clean on touched files
   - user intent satisfied per verification
 failure_conditions:
   - execute without approved plan
-  - skip investigation phase
+  - skip discover or investigate_swarm phase
   - skip governance/implementation on code changes
   - skip domain inventory when slug resolves to inventory file
+  - repro_status not_fixed while claiming success
 dependencies:
-  skills: [investigation, discovery, planning, execution, testing, verification, reporting]
-  policies: [master-rules, implementation, mcp-and-deploy]
+  skills: [discovery, investigation, root-cause, planning, execution, testing, verification, reporting]
+  policies: [master-rules, implementation, mcp-and-deploy, minimal-complexity]
   docs:
     - docs/master_rules.md
     - docs/architecture.md
@@ -35,4 +49,5 @@ dependencies:
 verification:
   - sync_inventory
   - run_tests
+  - fix_repro_verify_swarm
   - fallow_check_changed

@@ -24,7 +24,9 @@
     "human_approval": {
       "trigger_when": [
         "confidence below threshold",
-        "fitness fail on security or layer_boundaries",
+        "fitness fail on security or layer_boundaries or minimal_complexity",
+        "complexity score above verb threshold",
+        "plan missing requirement_map or unjustified create",
         "impact proceed false",
         "rollback unverified",
         "user intent contains requires approval"

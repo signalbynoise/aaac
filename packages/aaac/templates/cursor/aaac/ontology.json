@@ -122,6 +122,13 @@
     "requirements": 0.8,
     "scope": 0.8
   },
+  "complexity_ref": "aaac/complexity.yaml",
+  "complexity_strategy": {
+    "optimization": "capability_per_complexity",
+    "default_verb_when_ambiguous": "update",
+    "mutating_verbs": ["create", "update", "fix"],
+    "priority": ["reuse", "extend", "modify", "create"]
+  },
   "object_maturity": {
     "function": "evolving",
     "component": "evolving",
@@ -214,6 +221,8 @@
     "create-form": "create-component",
     "update-page": "update-component",
     "review-flow": "review-workflow",
-    "update-flow": "update-workflow"
+    "update-flow": "update-workflow",
+    "module-fix": "fix-module",
+    "bug-fix": "fix-bug"
   }
 }

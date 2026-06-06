@@ -150,7 +150,7 @@ const governanceGateStacksBlock = Object.entries(gates.stacks ?? {})
 
 const commandWorkflowsBlock = Object.entries(lifecycle.workflows ?? {})
   .map(([cmd, def]) => {
-    const phases = def.work_phases ?? [];
+    const phases = composeRuntimePhases(def);
     return `  ${cmd}: [${phases.join(", ")}]`;
   })
   .join("\n");
@@ -231,6 +231,7 @@ ${maturityRulesBlock}
 lifecycle: aaac/lifecycle/lifecycle.json
 lifecycle_phases: aaac/lifecycle/phases.json
 governance_gates: aaac/governance/gates.json
+complexity: aaac/complexity.yaml
 run: aaac/run/schema.json
 capabilities: aaac/capabilities/registry.json
 dependencies: aaac/dependencies.yaml
@@ -251,3 +252,8 @@ if (tail.includes(INJECT_MARKER)) {
 const out = `${header}${commandsBlock}\n\n${tail}\n`;
 fs.writeFileSync(path.join(aaac, "graph.yaml"), out);
 console.log("Wrote graph.yaml");
+
+const registryScript = path.join(aaac, "scripts", "generate-runtime-registry.mjs");
+if (fs.existsSync(registryScript)) {
+  execSync(`${process.execPath} "${registryScript}"`, { stdio: "inherit" });
+}

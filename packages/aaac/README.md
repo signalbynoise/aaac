@@ -24,7 +24,8 @@ npx @ludecker/aaac@latest init --yes --dir /path/to/your/repo
 
 ## What you get
 
-- `.cursor/aaac/` — ontology, graph, lifecycle, run model, generators config
+- `.cursor/hooks.json` — runtime enforcement (enable in Cursor Settings → Hooks)
+- `.cursor/aaac/` — ontology, graph, lifecycle, run model, enforcement
 - `.cursor/skills/shared/` — full pipeline (discovery → execute → verify → report)
 - `.cursor/agents/` — 13 generic subagent specs
 - `.cursor/commands/` — ~130 generated slash commands
@@ -53,8 +54,8 @@ Authenticate with a registry token in `.npmrc` (used by pnpm, not the `npm` CLI)
 
 ```bash
 pnpm --filter @ludecker/aaac publish --access public --no-git-checks
-git tag aaac-v1.0.0
-git push origin aaac-v1.0.0
+git tag aaac-v1.1.0
+git push origin aaac-v1.1.0
 ```
 
 CI publishes on `aaac-v*` tags via `.github/workflows/publish-aaac.yml` (`NPM_TOKEN` secret).

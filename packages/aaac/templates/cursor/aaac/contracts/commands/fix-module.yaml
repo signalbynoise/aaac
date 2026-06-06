@@ -1,0 +1,41 @@
+name: fix-module
+purpose: Repair broken behavior in a bounded domain module
+inputs:
+  domain:
+    required: true
+    enum: [cms, ui, database, aaac]
+  intent:
+    required: true
+outputs:
+  investigation:
+    type: markdown
+    required: true
+  root_cause:
+    type: markdown
+    required: true
+  plan:
+    type: markdown
+    required: true
+  implementation:
+    type: code_changes
+  verification:
+    type: markdown
+    required: true
+  report:
+    type: markdown
+    required: true
+lifecycle_verb: fix
+workflow: fix-module
+success_criteria:
+  - discovery swarm completed (4-6 agents)
+  - fix investigation swarm completed (7 parallel agents)
+  - root_cause confidence at least 0.7
+  - repro_status fixed after execute
+  - domain inventory Section 3 synced after execute
+  - complexity_score at most 5
+failure_conditions:
+  - skip discovery or investigate_swarm phase
+  - plan or execute before root_cause artifact
+  - symptom patch without root cause frame
+  - repro_status not_fixed while claiming success
+  - domain slug missing for resolver commands

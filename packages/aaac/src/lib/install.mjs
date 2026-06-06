@@ -55,6 +55,7 @@ export function installAaac({
   copyDirRecursive(cursorSrc, cursorDest);
   ensureDir(path.join(cursorDest, "commands"));
   ensureDir(path.join(aaacDest, "state", "runs"));
+  ensureDir(path.join(aaacDest, "state", "active-runs"));
 
   const docsDest = path.join(resolvedTarget, docsRoot);
   ensureDir(docsDest);

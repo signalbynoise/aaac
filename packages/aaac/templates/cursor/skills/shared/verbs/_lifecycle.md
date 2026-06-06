@@ -30,7 +30,8 @@ Everything executes within a Run. Observability (`decisions`, `log`, `checkpoint
 |-------|------|-------|
 | `discover` | work | discovery |
 | `investigate_lite` | work | investigation-lite |
-| `investigate` | work | investigation |
+| `investigate` | work | investigation (legacy id; use investigate_swarm) |
+| `investigate_swarm` | work | investigation Mode A |
 | `root_cause` | work | root-cause |
 | `plan` | work | planning |
 | `validate` | gate | validation |
@@ -48,7 +49,7 @@ Everything executes within a Run. Observability (`decisions`, `log`, `checkpoint
 |------|------|------------|
 | create | discover → investigate_lite → plan → execute → verify → report | pre_execute |
 | update | same | pre_execute |
-| fix | discover → investigate → root_cause → plan → execute → verify → report | pre_execute |
+| fix | discover → investigate_swarm → root_cause → plan → execute → verify → report | pre_execute |
 | review | discover → plan → report | none |
 | check | discover → report | pre_execute_minimal |
 | test | discover → plan → verify → report | none |

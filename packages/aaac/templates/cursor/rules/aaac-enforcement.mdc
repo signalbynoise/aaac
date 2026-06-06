@@ -1,0 +1,42 @@
+---
+description: AAAC pipeline enforcement — hooks block edits until Run reaches execute phase. Applies to ALL slash commands.
+alwaysApply: true
+---
+
+# AAAC enforcement (mandatory)
+
+**Runtime SSOT:** [.cursor/hooks.json](../hooks.json), [.cursor/aaac/enforcement.json](../aaac/enforcement.json)
+
+Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …) **must** execute inside a **Run**. This is not optional.
+
+## Prerequisites
+
+1. **Cursor Hooks enabled** — Settings → Hooks; restart Cursor after `.cursor/hooks.json` changes
+2. **Registry current** — `node .cursor/aaac/generate-graph.mjs`
+
+## Hook behavior (automatic)
+
+| Hook | Effect |
+|------|--------|
+| `beforeSubmitPrompt` | Detects `/command` → creates Run scoped to **`conversation_id`** (this chat only) |
+| `preToolUse` | **Denies** Write/StrReplace/Delete for **this chat only** until execute phase |
+| `subagentStart` | Counts Task launches for swarm phase validation |
+| `stop` | Follow-up if Run not `completed` |
+
+## Agent obligations
+
+1. **First action** after AAAC command: confirm Run exists for **this chat** (`.cursor/aaac/state/active-runs/{conversation_id}.json`). If missing, the `beforeSubmitPrompt` hook creates it automatically.
+2. **Never skip phases.** Complete swarms, write Run artifacts, then advance:
+   ```bash
+   node .cursor/aaac/scripts/run-engine/advance-phase.mjs <run_id> <phase>
+   ```
+3. **Swarm minimums** (enforced by advance-phase):
+   - `discover`: 4 Task agents
+   - `investigate_swarm`: 7 Task agents
+   - `research_swarm`: 6 Task agents
+4. **Code edits only in `execute`** (hook-enforced). Before execute: artifacts only under `.cursor/aaac/state/runs/`.
+5. **Complete the Run** — advance through `report`, set status completed.
+
+## If edit is denied
+
+Continue the pipeline — do not work around hooks. Full dispatch: [.cursor/aaac/dispatch.md](../aaac/dispatch.md)

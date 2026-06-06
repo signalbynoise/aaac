@@ -18,6 +18,25 @@ Read before any phase:
 1. [.cursor/policies/master-rules.md](../../../policies/master-rules.md)
 2. [.cursor/policies/implementation.md](../../../policies/implementation.md)
 3. [.cursor/policies/mcp-and-deploy.md](../../../policies/mcp-and-deploy.md)
+4. [.cursor/policies/minimal-complexity.md](../../../policies/minimal-complexity.md) — **required for create / update / fix**
+
+## Minimal complexity (create / update / fix)
+
+SSOT: [complexity.yaml](../../../aaac/complexity.yaml), [minimal-complexity.md](../../../policies/minimal-complexity.md)
+
+| Phase | Responsibility |
+|-------|----------------|
+| **plan** | `requirement_map`, `complexity_score`, reuse/modify/create, rejected alternatives → Run `artifacts.plan` |
+| **validate** | Confidence + plan fields + score ≤ threshold + YAGNI |
+| **fitness_functions** | `minimal_complexity` pass (blocking) |
+
+Optimization: **capability / complexity**, not capability alone. Default to reuse → extend → modify → create.
+
+| Verb | Max complexity score |
+|------|----------------------|
+| fix | 5 |
+| update | 8 |
+| create | 12 |
 
 ## Confidence gates
 
@@ -49,7 +68,7 @@ When `$DOMAIN` slug maps to `domains/<slug>/update/inventory/SKILL.md`:
 1. Read inventory **first** (constraints, out-of-scope, file map)
 2. Pass inventory constraints into discovery, investigation-lite/investigation, planning, validation, execution, verification
 
-If inventory missing and command is `fix-bug` / `create-feature` / `update-module`:
+If inventory missing and command is `fix-bug` / `fix-module` / `create-feature` / `update-module`:
 
 - Run [module-authoring](../../module-authoring/SKILL.md) discovery to bootstrap domain, **or**
 - Tell user to use generic verb command with intent

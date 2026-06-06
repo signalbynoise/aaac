@@ -17,6 +17,9 @@ Read [_dispatch-utils.md](../_dispatch-utils.md) first.
 3. **load_inventory** — when domain slug maps to inventory
 4. **object_skills** — from graph `object_skills.<object>`
 5. [check](../../check/SKILL.md) — swarm per check skill
-6. [reporting](../../reporting/SKILL.md) — **Answer** (yes/no/partial) then **How**
+6. **contract_checks** — `pnpm --filter @ludecker/aaac test` and `pnpm --filter @ludecker/aaac test:e2e` (includes `check-verb.check.spec.ts`); launch [playwright-check-run](../../../agents/playwright-check-run.md) at report phase
+7. [reporting](../../reporting/SKILL.md) — **Answer** (yes/no/partial) then **How**
 
 No code changes. For test runs use `test-*`; for fixes use `fix-*`.
+
+Debug blocked runs: [aaac-log-debug](../../../agents/aaac-log-debug.md) — `debug-run`, `log-dump`, `log-trace`.

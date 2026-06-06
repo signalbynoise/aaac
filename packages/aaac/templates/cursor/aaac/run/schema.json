@@ -71,6 +71,15 @@
     "rollback",
     "report"
   ],
+  "plan_complexity_fields": [
+    "requirement_map",
+    "complexity_score",
+    "complexity_breakdown",
+    "reuse",
+    "modify",
+    "create",
+    "rejected_alternatives"
+  ],
   "resume": {
     "read_manifest": "state/runs/{run_id}/run.json",
     "continue_from": "phase field when status running or blocked with user approval"

@@ -18,8 +18,8 @@ Lifecycle: graph `verb_runtime.update` (work + gates on Run)
 2. **load_inventory** — when domain inventory exists
 3. **discover** — [discovery](../../discovery/SKILL.md)
 4. **investigate_lite** — [investigation-lite](../../investigation-lite/SKILL.md) — **mandatory** (what exists, depends on, constraints)
-5. **plan** — [planning](../../planning/SKILL.md)
-6. **validate** — [validation](../../validation/SKILL.md)
+5. **plan** — [planning](../../planning/SKILL.md) — **requirement_map + complexity_score** (max 8)
+6. **validate** — [validation](../../validation/SKILL.md) — confidence + complexity gates
 7. **impact_analysis** — [impact-analysis](../../impact-analysis/SKILL.md)
 8. **dependency_graph** — [dependency-graph](../../dependency-graph/SKILL.md)
 9. **fitness_functions** — [fitness-functions](../../fitness-functions/SKILL.md)

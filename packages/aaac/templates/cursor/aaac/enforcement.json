@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "description": "AAAC runtime enforcement — SSOT for hooks and run engine",
+  "edit_phases": ["execute", "sync_inventory", "persist", "write"],
+  "artifact_write_phases": ["plan", "report"],
+  "swarm_min_agents": {
+    "discover": 4,
+    "investigate_swarm": 7,
+    "research_swarm": 6,
+    "verify_fix": 3
+  },
+  "phase_artifacts": {
+    "investigate_swarm": ["artifacts/investigation.md"],
+    "root_cause": ["artifacts/root_cause.yaml"],
+    "plan": ["artifacts/plan.yaml"],
+    "report": ["artifacts/report.md"]
+  },
+  "allowed_path_prefixes": {
+    "run_artifacts": [".cursor/aaac/state/runs/", "aaac/state/runs/"]
+  },
+  "fix_commands": ["fix-module", "fix-bug", "module-fix", "bug-fix"]
+}

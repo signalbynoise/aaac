@@ -2,6 +2,8 @@
 
 **Every AAAC command executes within a Run.** There is no standalone lifecycle execution or standalone logging.
 
+**Hook enforcement:** [.cursor/hooks.json](../../hooks.json) + [enforcement.json](../enforcement.json) block code edits until `execute`. Registry: [runtime-registry.json](../runtime-registry.json).
+
 Schema: [schema.json](schema.json)
 
 ## Create Run (dispatch step 2.5 — after graph resolve, before orchestrator)

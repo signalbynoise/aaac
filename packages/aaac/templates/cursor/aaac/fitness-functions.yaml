@@ -28,6 +28,14 @@ functions:
     skill: architecture
     applies_to: [module, component, feature, app]
 
+  minimal_complexity:
+    description: Reuse-first plan, complexity score within verb threshold, YAGNI — no speculative architecture
+    policy: minimal-complexity
+    config: aaac/complexity.yaml
+    applies_to: [function, component, module, schema, model, migration, feature, workflow, integration, app, domain, architecture]
+    applies_to_verbs: [create, update, fix]
+    blocking: true
+
 scoring:
   pass: meets criteria
   warning: minor gap — document in report, may proceed if user intent clear

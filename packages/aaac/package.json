@@ -1,6 +1,6 @@
 {
   "name": "@ludecker/aaac",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Agentic Architecture as Code (AAAC) — installable Cursor agent framework",
   "type": "module",
   "license": "MIT",
@@ -29,6 +29,18 @@
     "src/",
     "templates/"
   ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:node": "node --test tests/log.test.mjs",
+    "test:e2e": "pnpm exec playwright test",
+    "test:e2e:ui": "pnpm exec playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "vitest": "^3.2.4",
+    "yaml": "^2.8.0"
+  },
   "engines": {
     "node": ">=18"
   },

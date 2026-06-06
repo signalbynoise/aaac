@@ -15,8 +15,16 @@ disable-model-invocation: true
 
 ## Phases
 
-1. [investigation](../SKILL.md) — layman report
-2. If fix requested: discovery → planning → execution → testing → verification
-3. [reporting](../reporting/SKILL.md)
+1. **discover** (optional, 2 agents max) when domain unknown
+2. [investigation](../SKILL.md) **Mode B** — **4 parallel** agents in one message (repro, code-path, runtime, recent-changes)
+3. [reporting](../../reporting/SKILL.md) — layman first; set Run `status: completed` unless fix path active
 
-Stop after report unless fix path active.
+## Fix escalation
+
+If intent includes `--fix`, explicit "fix this", or user approves after report:
+
+1. Switch command workflow to `fix-module` / `fix-bug` lifecycle on same Run
+2. Run investigation **Mode A** (full 7-agent swarm) if not already done
+3. Continue: root_cause → plan → gates → execute → verify (fix verify swarm) → report
+
+Do not execute code changes on incident path without explicit fix request or approval.

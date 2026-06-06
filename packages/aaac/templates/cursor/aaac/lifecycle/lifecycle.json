@@ -27,7 +27,7 @@
     "fix": {
       "work_phases": [
         "discover",
-        "investigate",
+        "investigate_swarm",
         "root_cause",
         "plan",
         "execute",
@@ -74,5 +74,45 @@
   "escalation": {
     "on_gate_fail": "STOP_REQUEST_CLARIFICATION",
     "on_human_approval_required": "blocked"
+  },
+  "workflows": {
+    "write-article": {
+      "description": "CMS content swarm — exception command, not verb×object matrix",
+      "work_phases": [
+        "parse",
+        "research_swarm",
+        "write",
+        "review",
+        "persist",
+        "report"
+      ],
+      "gate_stack": null
+    },
+    "fix-module": {
+      "description": "Domain module repair — resolver + full fix swarm",
+      "work_phases": [
+        "discover",
+        "investigate_swarm",
+        "root_cause",
+        "plan",
+        "execute",
+        "verify",
+        "report"
+      ],
+      "gate_stack": "pre_execute"
+    },
+    "fix-bug": {
+      "description": "Alias workflow for defect repair — same as fix-module",
+      "work_phases": [
+        "discover",
+        "investigate_swarm",
+        "root_cause",
+        "plan",
+        "execute",
+        "verify",
+        "report"
+      ],
+      "gate_stack": "pre_execute"
+    }
   }
 }

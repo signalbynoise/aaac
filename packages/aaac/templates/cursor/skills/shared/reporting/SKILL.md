@@ -21,7 +21,8 @@ disable-model-invocation: true
 - Tests: …
 - Intent: …
 - Confidence: architecture / requirements / scope
-- Fitness: pass/warning/fail summary
+- Complexity: score / threshold / pass (create/update/fix only)
+- Fitness: pass/warning/fail summary (include minimal_complexity)
 - Impact: blast_radius, affected domains
 
 ### Rollback (if applicable)

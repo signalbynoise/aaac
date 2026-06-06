@@ -1,0 +1,60 @@
+# AAAC telemetry — observability on Run
+
+version: 2
+
+description: >-
+  All observability attaches to the Run manifest (run/schema.json).
+  No standalone markdown logs.
+
+run_manifest: aaac/state/runs/{run_id}/run.json
+
+log_on:
+  - command_parsed
+  - run_created
+  - run_resumed
+  - graph_resolved
+  - phase_start
+  - phase_complete
+  - gate_pass
+  - gate_fail
+  - gate_blocked
+  - human_approval_required
+  - human_approval_received
+  - capability_resolved
+  - skill_loaded
+  - doc_loaded
+  - agent_spawned
+  - execute_start
+  - execute_complete
+  - run_completed
+  - run_failed
+
+run_fields:
+  decisions: routing, capability, gate outcomes, user approvals
+  log: phase and skill events (see schema log_entry)
+  checkpoints: resume points with artifact refs
+  artifacts: plan, investigation, impact, fitness, rollback, report
+  gates.results: per-gate pass/fail
+
+required_log_fields:
+  - at
+  - run_id
+  - phase
+  - phase_kind
+  - event
+  - detail
+
+required_decision_fields:
+  - at
+  - phase
+  - decision
+  - reason
+  - evidence
+
+questions_answered:
+  - Why did it do this?
+  - Which skill ran?
+  - Which docs were loaded?
+  - Why was a route chosen?
+  - Which capabilities resolved to which providers?
+  - Why is the run blocked?

@@ -14,6 +14,8 @@ After `testing`. Before `report`.
 
 ## Checks
 
+- **Playwright verb checks** (create / update / fix): launch [playwright-check-run](../../../agents/playwright-check-run.md) — `pnpm --filter @ludecker/aaac test:e2e` must pass; set `PLAYWRIGHT_BASE_URL` for public-route smoke
+- Run artifact `artifacts.testing.repro_status` is **fixed** or **partial** with documented follow-up (fix paths)
 - Orchestrator `contract.yaml` `success_criteria`
 - Graph `object_skills` / `object_skill_verbs` skills were loaded for command object + verb
 - User instruction satisfied (spot-check 2–3 behaviors in code or tests)

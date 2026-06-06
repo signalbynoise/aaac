@@ -1,0 +1,170 @@
+# AAAC verb-specific debug profiles — expected phases and log events
+
+version: 1
+
+create:
+  description: Create verbs — discover → investigate_lite → plan → gates → execute → verify → report.
+  phases:
+    - discover
+    - investigate_lite
+    - plan
+    - validate
+    - impact_analysis
+    - dependency_graph
+    - fitness_functions
+    - rollback
+    - execute
+    - verify
+    - report
+  swarm_minimums:
+    discover: 4
+  expected_events:
+    discover:
+      - command_parsed
+      - run_created
+      - graph_resolved
+      - phase_start
+      - agent_spawned
+      - phase_complete
+    investigate_lite:
+      - phase_start
+      - skill_loaded
+      - phase_complete
+    plan:
+      - phase_start
+      - skill_loaded
+      - phase_complete
+    validate:
+      - phase_start
+      - gate_pass
+      - phase_complete
+    execute:
+      - phase_start
+      - execute_start
+      - edit_allowed
+      - execute_complete
+      - phase_complete
+
+update:
+  description: Update verbs mirror create — discover → investigate_lite → plan → gates → execute.
+  phases:
+    - discover
+    - investigate_lite
+    - plan
+    - validate
+    - impact_analysis
+    - dependency_graph
+    - fitness_functions
+    - rollback
+    - execute
+    - verify
+    - report
+  swarm_minimums:
+    discover: 4
+  expected_events:
+    discover:
+      - command_parsed
+      - run_created
+      - graph_resolved
+      - phase_start
+      - agent_spawned
+      - phase_complete
+    investigate_lite:
+      - phase_start
+      - skill_loaded
+      - phase_complete
+    plan:
+      - phase_start
+      - skill_loaded
+      - phase_complete
+    validate:
+      - phase_start
+      - gate_pass
+      - phase_complete
+    execute:
+      - phase_start
+      - execute_start
+      - edit_allowed
+      - execute_complete
+      - phase_complete
+
+fix:
+  description: Fix verbs — investigate_swarm → root_cause → plan → gates → execute → verify_fix swarm.
+  phases:
+    - discover
+    - investigate_swarm
+    - root_cause
+    - plan
+    - validate
+    - impact_analysis
+    - dependency_graph
+    - fitness_functions
+    - rollback
+    - execute
+    - verify
+    - report
+  swarm_minimums:
+    discover: 4
+    investigate_swarm: 7
+    verify: 3
+  expected_events:
+    discover:
+      - command_parsed
+      - run_created
+      - graph_resolved
+      - phase_start
+      - agent_spawned
+      - phase_complete
+    investigate_swarm:
+      - phase_start
+      - agent_spawned
+      - skill_loaded
+      - phase_complete
+    root_cause:
+      - phase_start
+      - skill_loaded
+      - phase_complete
+    verify:
+      - phase_start
+      - agent_spawned
+      - phase_complete
+    execute:
+      - phase_start
+      - execute_start
+      - edit_allowed
+      - edit_denied
+      - execute_complete
+      - phase_complete
+
+check:
+  description: Check verbs — readonly discover → gates → report (no execute).
+  phases:
+    - discover
+    - validate
+    - impact_analysis
+    - dependency_graph
+    - fitness_functions
+    - report
+  swarm_minimums:
+    discover: 4
+    check_swarm: 3
+  expected_events:
+    discover:
+      - command_parsed
+      - run_created
+      - graph_resolved
+      - phase_start
+      - agent_spawned
+      - phase_complete
+    validate:
+      - phase_start
+      - gate_pass
+      - phase_complete
+    report:
+      - phase_start
+      - skill_loaded
+      - phase_complete
+  readonly: true
+  notes: >-
+    Orchestrator runs check_swarm (3 explore agents) during discover.
+    Edits always denied — no execute phase.

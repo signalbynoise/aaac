@@ -5,6 +5,7 @@
     "discover": { "skill": "discovery", "readonly": true },
     "investigate_lite": { "skill": "investigation-lite", "readonly": true },
     "investigate": { "skill": "investigation", "readonly": true },
+    "investigate_swarm": { "skill": "investigation", "readonly": true },
     "root_cause": { "skill": "root-cause", "readonly": true },
     "plan": { "skill": "planning" },
     "validate": { "skill": "validation", "gate": true },

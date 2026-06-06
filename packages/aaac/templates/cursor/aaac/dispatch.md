@@ -51,7 +51,7 @@ Read [graph.yaml](graph.yaml) and [ontology.json](ontology.json).
 - **Lifecycle (work):** [lifecycle/lifecycle.json](lifecycle/lifecycle.json) `verbs.*.work_phases`
 - **Gates (approval):** [governance/gates.json](governance/gates.json) — composed into runtime per `verb_runtime` in graph
 - **Maturity:** read `object_maturity.<object>` and apply `maturity_rules.<level>` (may require extra gate phases)
-- **Capabilities:** resolve `object_capabilities.<object>` via [capabilities/registry.json](capabilities/registry.json) — record all providers (skill + mcp) on Run
+- **Capabilities:** resolve `object_capabilities.<object>` via [capabilities/registry.json](capabilities/registry.json) — `init-run.mjs` records providers on `Run.capabilities_resolved`; on completion `capability-evidence.mjs` aggregates evidence into [state/capability-stats.json](state/capability-stats.json) and evaluates [capabilities/promotion-rules.json](capabilities/promotion-rules.json)
 - **Dependencies:** [dependencies.yaml](dependencies.yaml)
 - **Fitness:** [fitness-functions.yaml](fitness-functions.yaml) — includes `minimal_complexity` for create/update/fix
 - **Complexity:** [complexity.yaml](complexity.yaml) + [minimal-complexity.md](../policies/minimal-complexity.md) for create/update/fix
@@ -144,7 +144,7 @@ Do **not** proceed until user approves in chat. On approval: log decision, set `
 1. **discover** — 4–6 parallel Task agents per [discovery/SKILL.md](../skills/shared/discovery/SKILL.md)
 2. **investigate_swarm** — 7 parallel Task agents per investigation Mode A — **one message**
 3. **root_cause** — artifact required; confidence ≥ 0.7 before plan
-4. **verify** — fix verify swarm (3 parallel) per [testing/SKILL.md](../skills/shared/testing/SKILL.md); fail if `repro_status: not_fixed`
+4. **verify** — fix verify swarm (3 parallel) per [testing/SKILL.md](../skills/shared/testing/SKILL.md); **website build gate** (`verify-website-build.mjs`) must pass for create/update/fix; fail if `repro_status: not_fixed`
 
 Skipping swarms because the issue "looks simple" is a **contract violation** for `fix-module` / `fix-bug` / `fix_mode`.
 

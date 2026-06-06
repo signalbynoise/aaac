@@ -29,7 +29,9 @@
         "plan missing requirement_map or unjustified create",
         "impact proceed false",
         "rollback unverified",
-        "user intent contains requires approval"
+        "user intent contains requires approval",
+        "capability runtime require_approval",
+        "capability state deprecated"
       ],
       "run_fields": {
         "status": "blocked",

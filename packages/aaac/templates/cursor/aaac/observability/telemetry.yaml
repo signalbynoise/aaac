@@ -21,6 +21,9 @@ log_on:
   - human_approval_required
   - human_approval_received
   - capability_resolved
+  - evidence_aggregated
+  - capability_promoted
+  - evidence_aggregation_failed
   - skill_loaded
   - doc_loaded
   - agent_spawned

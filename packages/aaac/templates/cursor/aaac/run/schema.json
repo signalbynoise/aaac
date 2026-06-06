@@ -22,6 +22,8 @@
     "checkpoints": [],
     "log": [],
     "capabilities_resolved": {},
+    "capability_evidence_processed": false,
+    "capability_evidence_outcomes": [],
     "confidence": {
       "architecture": null,
       "requirements": null,

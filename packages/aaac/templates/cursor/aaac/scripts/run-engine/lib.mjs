@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const CURSOR_ROOT = path.resolve(__dirname, "../../..");
+export const REPO_ROOT = path.resolve(CURSOR_ROOT, "..");
 export const AAAC_ROOT = path.join(CURSOR_ROOT, "aaac");
 export const STATE_ROOT = path.join(AAAC_ROOT, "state");
 export const RUNS_ROOT = path.join(STATE_ROOT, "runs");
@@ -12,6 +13,10 @@ export const ACTIVE_RUN_PATH = path.join(STATE_ROOT, "active-run.json");
 export const ACTIVE_RUNS_DIR = path.join(STATE_ROOT, "active-runs");
 export const REGISTRY_PATH = path.join(AAAC_ROOT, "runtime-registry.json");
 export const ENFORCEMENT_PATH = path.join(AAAC_ROOT, "enforcement.json");
+export const ONTOLOGY_PATH = path.join(AAAC_ROOT, "ontology.json");
+export const CAPABILITY_REGISTRY_PATH = path.join(AAAC_ROOT, "capabilities", "registry.json");
+export const PROMOTION_RULES_PATH = path.join(AAAC_ROOT, "capabilities", "promotion-rules.json");
+export const CAPABILITY_STATS_PATH = path.join(STATE_ROOT, "capability-stats.json");
 
 export function readJson(filePath, fallback = null) {
   try {

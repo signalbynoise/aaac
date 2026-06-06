@@ -49,7 +49,10 @@ export async function simulateVerbFlow(prompt, conversationId) {
     await satisfySwarm(conversationId, phase, manifest.command, manifest.verb);
     await satisfyArtifacts(runId, phase);
 
-    const result = await advancePhase(runId, phase);
+    const forceExecute =
+      phase === 'rollback' &&
+      (manifest.pending?.[0] === 'execute' || manifest.pending?.includes?.('execute'));
+    const result = await advancePhase(runId, phase, forceExecute);
     if (result.code !== 0) {
       throw new Error(
         `advance ${phase} failed (code ${result.code}): ${result.stderr || result.stdout}`,

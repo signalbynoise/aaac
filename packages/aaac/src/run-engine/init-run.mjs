@@ -15,6 +15,11 @@ import {
   promptFromHook,
 } from "./lib.mjs";
 import { recordLog, recordDecision } from "./log.mjs";
+import {
+  resolveCapabilitiesWithRuntime,
+  evaluateCapabilityRuntimePolicy,
+  loadObjectMaturity,
+} from "./capability-evidence.mjs";
 
 async function readStdin() {
   return new Promise((resolve) => {
@@ -64,6 +69,14 @@ const runId = `run_${date}_${slugify(parsed.command + (parsed.domain ? `-${parse
 const entry = registry.commands[parsed.command];
 fs.mkdirSync(runDir(runId), { recursive: true });
 
+const runObject = entry.object ?? null;
+const runVerb = entry.verb ?? parsed.command.split("-")[0];
+const objectMaturity = loadObjectMaturity(runObject);
+const capabilitiesResolved = resolveCapabilitiesWithRuntime(runObject, runVerb);
+const capabilityRuntimePolicy = evaluateCapabilityRuntimePolicy(capabilitiesResolved, {
+  object_maturity: objectMaturity,
+});
+
 const manifest = {
   run_id: runId,
   conversation_id: conversationId,
@@ -84,7 +97,9 @@ const manifest = {
   artifacts: {},
   checkpoints: [],
   log: [],
-  capabilities_resolved: {},
+  capabilities_resolved: capabilitiesResolved,
+  capability_runtime: capabilityRuntimePolicy,
+  capability_runtime_approved: false,
   confidence: { architecture: null, requirements: null, scope: null },
   gates: { stack: entry.gate_stack ?? null, results: {} },
   swarm: { task_launches_this_phase: 0, phase: pending[0] },
@@ -129,6 +144,41 @@ recordDecision(manifest, {
   decision: "run_created",
   reason: "Hook-initiated Run (conversation-scoped)",
   evidence: parsed.raw,
+});
+
+for (const [capabilityId, resolution] of Object.entries(manifest.capabilities_resolved)) {
+  recordLog(manifest, {
+    event: "capability_resolved",
+    phase: "dispatch",
+    phase_kind: "work",
+    detail: `${capabilityId}:${(resolution.providers ?? []).map((p) => p.id).join(",")} state=${resolution.runtime?.state ?? "experimental"}`,
+    level: "debug",
+  });
+}
+
+recordLog(manifest, {
+  event: "capability_runtime_evaluated",
+  phase: "dispatch",
+  phase_kind: "work",
+  detail: `action=${capabilityRuntimePolicy.action} maturity=${objectMaturity}`,
+  level: "info",
+});
+
+if (capabilityRuntimePolicy.action === "warn") {
+  recordLog(manifest, {
+    event: "capability_runtime_warn",
+    phase: "dispatch",
+    phase_kind: "work",
+    detail: capabilityRuntimePolicy.reasons.join("; "),
+    level: "warn",
+  });
+}
+
+recordDecision(manifest, {
+  phase: "dispatch",
+  decision: "capability_runtime",
+  reason: capabilityRuntimePolicy.action,
+  evidence: capabilityRuntimePolicy.reasons.join("; ") || "allow",
 });
 
 recordLog(manifest, {

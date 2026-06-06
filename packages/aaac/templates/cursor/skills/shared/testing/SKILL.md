@@ -18,6 +18,11 @@ Phase `verify` (and `test_only` orchestrators). On **fix** paths, run fix verify
 2. Invoke [unit-test-run.md](../../../agents/unit-test-run.md) pattern for targeted vitest
 3. Fallow MCP → `check_changed` on touched files when configured
 4. `ReadLints` on edited paths
+5. **Website build gate (mandatory on create / update / fix):** before advancing `verify`, run:
+   ```bash
+   node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id <run_id>
+   ```
+   This checks `index.html` static asset paths resolve under `apps/website/public/` (or project root for Vite dev) and runs `pnpm --filter @ludecker/website build`. `advance-phase.mjs verify` **blocks** until this passes and writes `artifacts/verify.yaml`.
 
 ## Fix verify swarm (mandatory on fix verb / fix_mode)
 

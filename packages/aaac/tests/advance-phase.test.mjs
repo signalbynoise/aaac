@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import fs from 'node:fs';
+import path from 'node:path';
 import {
   seedRun,
   cleanupRun,
@@ -17,6 +18,7 @@ import {
   recordTaskLaunch,
 } from './fixtures/run-engine-spawn.mjs';
 import { loadEnforcement } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import { REPO_ROOT } from './fixtures/paths.mjs';
 
 describe('advance-phase', () => {
   const runs = [];
@@ -104,6 +106,13 @@ describe('advance-phase', () => {
       'fitness_functions',
     ];
     manifest.pending = ['execute', 'verify', 'report'];
+    manifest.capabilities_resolved = {
+      'layer-boundaries': {
+        providers: [{ id: 'architecture', type: 'skill' }],
+        source: 'object module',
+        runtime: { state: 'trusted', invocations: 50, success_rate: 0.95, avg_fitness: 90 },
+      },
+    };
     writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
@@ -112,5 +121,77 @@ describe('advance-phase', () => {
     expect(result.code).toBe(0);
     expect(result.json?.phase).toBe('execute');
     expect(result.json?.edit_allowed).toBe(true);
+  });
+
+  it('blocks execute when capability runtime policy requires approval', async () => {
+    const conversationId = uniqueConversationId('advance-cap-runtime');
+    const runId = nextRunId('advance-cap-runtime');
+    const manifest = createModuleManifest('rollback', runId, conversationId);
+    manifest.completed = [
+      'discover',
+      'investigate_lite',
+      'plan',
+      'validate',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+    ];
+    manifest.pending = ['execute', 'verify', 'report'];
+    manifest.capabilities_resolved = {
+      'layer-boundaries': {
+        providers: [{ id: 'architecture', type: 'skill' }],
+        source: 'object module',
+        runtime: { state: 'experimental', invocations: 0, success_rate: null, avg_fitness: null },
+      },
+    };
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const result = await advancePhase(runId, 'rollback');
+    expect(result.code).toBe(2);
+    expect(result.stderr).toMatch(/Capability runtime require_approval/);
+
+    const updated = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
+    expect(updated.status).toBe('blocked');
+    expect(updated.awaiting_approval).toBe(true);
+  });
+
+  it('blocks verify advance when website verify fails', async () => {
+    const conversationId = uniqueConversationId('advance-verify-fail');
+    const runId = nextRunId('advance-verify-fail');
+    const manifest = createModuleManifest('verify', runId, conversationId);
+    manifest.verb = 'create';
+    manifest.completed = [
+      'discover',
+      'investigate_lite',
+      'plan',
+      'validate',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+      'rollback',
+      'execute',
+    ];
+    manifest.pending = ['report'];
+    writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const indexPath = path.join(REPO_ROOT, 'apps/website/index.html');
+    const backup = `${indexPath}.bak-advance-test`;
+    fs.renameSync(indexPath, backup);
+    fs.writeFileSync(
+      indexPath,
+      '<link rel="icon" href="/missing-for-advance-test.svg" />',
+    );
+
+    try {
+      const result = await advancePhase(runId, 'verify');
+      expect(result.code).toBe(2);
+      expect(result.stderr).toMatch(/Website verify failed/);
+    } finally {
+      fs.unlinkSync(indexPath);
+      fs.renameSync(backup, indexPath);
+    }
   });
 });

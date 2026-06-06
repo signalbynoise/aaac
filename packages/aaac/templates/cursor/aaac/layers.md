@@ -36,6 +36,8 @@ Execution Layer
 ├─ Verb orchestrators          .cursor/skills/shared/verbs/*/orchestrator/
 ├─ Shared pipeline skills      .cursor/skills/shared/
 ├─ Capability registry         .cursor/aaac/capabilities/registry.json
+├─ Capability promotion rules  .cursor/aaac/capabilities/promotion-rules.json
+├─ Capability stats (derived)  .cursor/aaac/state/capability-stats.json
 ├─ Agent specs                 .cursor/agents/
 
 Knowledge Layer
@@ -87,6 +89,7 @@ Policies → Ontology → Graph → Create Run
 → Lifecycle (work) + Gates (composed into Run.pending)
 → Orchestrator → Capabilities resolved (recorded on Run)
 → Execute phases → Update Run → Report
+→ Run completes → capability-evidence.mjs → update capability-stats.json + evaluate promotion
 ```
 
 ## Deprecated

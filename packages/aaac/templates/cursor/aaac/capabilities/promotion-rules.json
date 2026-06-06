@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "description": "Evidence-driven capability lifecycle promotion thresholds. State belongs to capability, not provider.",
+  "states": ["experimental", "validated", "trusted", "canonical", "deprecated"],
+  "default_state": "experimental",
+  "thresholds": {
+    "validated": {
+      "min_invocations": 10
+    },
+    "trusted": {
+      "min_invocations": 25,
+      "min_success_rate": 0.8,
+      "max_rollback_rate": 0.05,
+      "max_gate_failure_rate": 0.2
+    },
+    "canonical": {
+      "min_invocations": 100,
+      "min_success_rate": 0.95,
+      "max_rollback_rate": 0.01,
+      "max_gate_failure_rate": 0.1,
+      "manual_approval": true
+    }
+  },
+  "demotion": {
+    "from_trusted": {
+      "min_invocations": 20,
+      "min_success_rate_below": 0.7
+    },
+    "to_deprecated": {
+      "manual_only": true
+    }
+  },
+  "fitness_scoring": {
+    "pass": 100,
+    "warning": 75,
+    "fail": 0
+  },
+  "runtime": {
+    "by_state": {
+      "experimental": {
+        "warn": true,
+        "require_approval_on": ["critical", "protected"]
+      },
+      "validated": {},
+      "trusted": {},
+      "canonical": {},
+      "deprecated": {
+        "block_execute": true
+      }
+    },
+    "evidence_triggers": [
+      {
+        "min_invocations": 5,
+        "min_success_rate_below": 0.5,
+        "action": "require_approval"
+      },
+      {
+        "min_invocations": 10,
+        "min_avg_fitness_below": 60,
+        "action": "require_approval"
+      }
+    ]
+  }
+}

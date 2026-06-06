@@ -40,7 +40,12 @@ describe('enforcement.json', () => {
 
   it('requires plan and report artifacts for all verb flows', () => {
     expect(enforcement.phase_artifacts.plan).toEqual(['artifacts/plan.yaml']);
+    expect(enforcement.phase_artifacts.verify).toEqual(['artifacts/verify.yaml']);
     expect(enforcement.phase_artifacts.report).toEqual(['artifacts/report.md']);
+  });
+
+  it('requires website verify gate for create update fix verbs', () => {
+    expect(enforcement.verify_verbs).toEqual(['create', 'update', 'fix']);
   });
 
   it('lists fix commands for verify_fix swarm routing', () => {

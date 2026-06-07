@@ -31,4 +31,4 @@ jobs:
       - name: Publish with pnpm (no npm CLI)
         run: pnpm --filter @ludecker/aaac publish --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}

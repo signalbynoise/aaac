@@ -11,6 +11,11 @@ import {
   phaseKind,
   writeJson,
   saveActiveRun,
+  loadActiveRun,
+  loadRunManifest,
+  clearActiveRun,
+  cancelRunManifest,
+  isUserStopIntent,
   conversationIdFromHook,
   promptFromHook,
 } from "./lib.mjs";
@@ -41,6 +46,42 @@ try {
 
 const prompt = process.argv[2] ?? promptFromHook(hook);
 const conversationId = conversationIdFromHook(hook);
+
+if (isUserStopIntent(prompt) && conversationId) {
+  const active = loadActiveRun(conversationId);
+  let cancelledRunId = null;
+  if (active?.run_id) {
+    const existing = loadRunManifest(active.run_id);
+    if (
+      existing &&
+      existing.status !== "completed" &&
+      existing.status !== "cancelled"
+    ) {
+      cancelRunManifest(existing, prompt.trim());
+      recordLog(existing, {
+        event: "run_cancelled",
+        phase: existing.phase,
+        phase_kind: existing.phase_kind,
+        detail: `user stop: ${prompt.trim()}`,
+        level: "info",
+      });
+      recordDecision(existing, {
+        phase: existing.phase ?? "dispatch",
+        decision: "user_stop",
+        reason: "User requested stop",
+        evidence: prompt.trim(),
+      });
+      writeJson(`${runDir(active.run_id)}/run.json`, existing);
+      cancelledRunId = active.run_id;
+    }
+    clearActiveRun(conversationId);
+  }
+  console.log(
+    JSON.stringify({ ok: true, aaac: false, cancelled: cancelledRunId }),
+  );
+  process.exit(0);
+}
+
 const parsed = parseAaacPrompt(prompt);
 
 if (!parsed) {

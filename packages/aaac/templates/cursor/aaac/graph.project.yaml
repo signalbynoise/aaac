@@ -1,127 +1,7 @@
-resolvers:
-  update-module-by-slug:
-    map:
-      cms: cms-update
-      ui: ui-update
-      database: database-update
-      aaac: aaac-update
-  update-component-by-scope:
-    map:
-      cms: cms-design-update
-      ui: ui-design-update
-  create-feature-by-slug:
-    map:
-      cms: cms-create-feature
-      aaac: aaac-create-feature
-  fix-bug-by-slug:
-    map:
-      cms: cms-fix-bug
-      ui: ui-fix-bug
-      database: database-fix-bug
-      aaac: aaac-fix-bug
-    default: verb-fix
-    default_object: feature
-  fix-domain-by-slug:
-    map:
-      cms: cms-fix-bug
-      ui: ui-fix-bug
-      database: database-fix-bug
-      aaac: aaac-fix-bug
-    default: verb-fix
-    default_object: module
-  fix-component-by-scope:
-    map:
-      cms: cms-fix-bug
-      ui: ui-fix-bug
-    default: verb-fix
-    default_object: component
-  fix-data-by-slug:
-    map:
-      database: database-fix-bug
-    default: database-fix-bug
-    default_object: schema
-  fix-integration-by-slug:
-    map:
-      cms: cms-fix-bug
-      ui: ui-fix-bug
-      database: database-fix-bug
-      aaac: aaac-fix-bug
-    default: verb-fix
-    default_object: integration
-  test-module-by-slug:
-    map:
-      cms: cms-test-module
-      ui: ui-test-module
-      database: database-test-module
-      aaac: aaac-test-module
+# Generic AAAC project overlay — verb orchestrators + exception commands only.
+# Add domain resolvers, orchestrators, and project skills in your repo after init.
 
 orchestrators:
-  cms-update:
-    domain: cms
-    path: domains/cms/update/orchestrator
-    inventory: domains/cms/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    phases: [load_inventory, discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  ui-update:
-    domain: ui
-    path: domains/ui/update/orchestrator
-    inventory: domains/ui/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    phases: [load_inventory, discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  database-update:
-    domain: database
-    path: domains/database/update/orchestrator
-    inventory: domains/database/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    phases: [load_inventory, discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  cms-design-update:
-    domain: cms
-    path: domains/cms/update/orchestrator
-    inventory: domains/cms/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    design_mode: true
-
-  ui-design-update:
-    domain: ui
-    path: domains/ui/update/orchestrator
-    inventory: domains/ui/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    design_mode: true
-
-  cms-create-feature:
-    domain: cms
-    path: domains/cms/update/orchestrator
-    inventory: domains/cms/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, module-authoring]
-    create_mode: true
-
-  cms-fix-bug:
-    domain: cms
-    path: domains/cms/update/orchestrator
-    inventory: domains/cms/update/inventory
-    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    fix_mode: true
-    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  ui-fix-bug:
-    domain: ui
-    path: domains/ui/update/orchestrator
-    inventory: domains/ui/update/inventory
-    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    fix_mode: true
-    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  database-fix-bug:
-    domain: database
-    path: domains/database/update/orchestrator
-    inventory: domains/database/update/inventory
-    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    fix_mode: true
-    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
   update-doc:
     path: skills/shared/documentation/orchestrator
     requires: [discovery, documentation, reporting]
@@ -130,7 +10,7 @@ orchestrators:
   review-incident:
     path: skills/shared/investigation/orchestrator
     requires: [discovery, investigation, reporting]
-    optional: [execution, ludecker-infrastructure]
+    optional: [execution]
 
   review-module:
     path: skills/shared/architecture/orchestrator
@@ -146,73 +26,9 @@ orchestrators:
     path: skills/shared/testing/orchestrator
     requires: [discovery, testing, verification, reporting]
 
-  cms-test-module:
-    domain: cms
-    path: domains/cms/update/orchestrator
-    inventory: domains/cms/update/inventory
-    requires: [testing, verification, reporting]
-    test_only: true
-
-  ui-test-module:
-    domain: ui
-    path: domains/ui/update/orchestrator
-    inventory: domains/ui/update/inventory
-    requires: [testing, verification, reporting]
-    test_only: true
-
-  database-test-module:
-    domain: database
-    path: domains/database/update/orchestrator
-    inventory: domains/database/update/inventory
-    requires: [testing, verification, reporting]
-    test_only: true
-
-  aaac-update:
-    domain: aaac
-    path: domains/aaac/update/orchestrator
-    inventory: domains/aaac/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, integration]
-    phases: [load_inventory, discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  aaac-create-feature:
-    domain: aaac
-    path: domains/aaac/update/orchestrator
-    inventory: domains/aaac/update/inventory
-    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, module-authoring, integration]
-    create_mode: true
-
-  aaac-fix-bug:
-    domain: aaac
-    path: domains/aaac/update/orchestrator
-    inventory: domains/aaac/update/inventory
-    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, integration]
-    fix_mode: true
-    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
-
-  aaac-test-module:
-    domain: aaac
-    path: domains/aaac/update/orchestrator
-    inventory: domains/aaac/update/inventory
-    requires: [testing, verification, reporting, integration]
-    test_only: true
-
-  aaac-publish:
-    domain: aaac
-    path: domains/aaac/update/orchestrator
-    inventory: domains/aaac/update/inventory
-    requires: [testing, verification, execution, reporting, integration]
-    publish_mode: true
-
-  write-article:
-    domain: content
-    path: domains/content/write/orchestrator
-    requires: [run, reporting]
-    workflow: write-article
-    phases: [parse, research_swarm, write, review, persist, report]
-
   release-app:
     path: skills/shared/platform-release/orchestrator
-    requires: [testing, verification, execution, reporting, ludecker-infrastructure]
+    requires: [testing, verification, execution, reporting]
 
   verb-create:
     path: skills/shared/verbs/create/orchestrator
@@ -322,18 +138,6 @@ skills:
     path: skills/shared/platform-release
   governance/implementation:
     path: skills/shared/governance/implementation
-  ludecker-design-system:
-    path: skills/ludecker/design-system
-  ludecker-database-schema:
-    path: skills/ludecker/database-schema
-  ludecker-api-first:
-    path: skills/ludecker/api-first
-  ludecker-security:
-    path: skills/ludecker/security
-  ludecker-user-experience:
-    path: skills/ludecker/user-experience
-  ludecker-infrastructure:
-    path: skills/ludecker/infrastructure
 
 agents:
   discovery-inventory:
@@ -382,10 +186,6 @@ agents:
     path: agents/release-git.md
     wave: 1
     blocking: true
-  release-render:
-    path: agents/release-render.md
-    wave: 2
-    requires: [release-git]
 
 policies:
   - policies/master-rules.md

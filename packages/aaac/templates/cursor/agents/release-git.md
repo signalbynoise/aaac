@@ -4,7 +4,7 @@
 
 ## Role
 
-Commit and push all pending work to `main` for the Lüdecker monorepo.
+Commit and push all pending work to the default branch for this repository.
 
 ## Inputs (from orchestrator)
 
@@ -16,7 +16,7 @@ Commit and push all pending work to `main` for the Lüdecker monorepo.
 
 Follow [ship-procedure.md § Git](../skills/shared/platform-release/ship-procedure.md).
 
-**Repo check:** `git rev-parse --show-toplevel` must be the ludecker monorepo.
+**Repo check:** `git rev-parse --show-toplevel` must be the project root (not a subdirectory).
 
 ## Return
 

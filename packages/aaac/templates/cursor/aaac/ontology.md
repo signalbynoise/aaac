@@ -3,8 +3,7 @@
 SSOT: [ontology.json](ontology.json). Regenerate graph and commands:
 
 ```bash
-node .cursor/aaac/generate-graph.mjs
-node .cursor/aaac/generate-commands.mjs
+npx @ludecker/aaac@latest generate
 ```
 
 ## Hierarchy (how developers already think)
@@ -22,17 +21,9 @@ Four layers in the graph:
 | **product** | feature, workflow, integration | `/create-feature`, `/check-workflow` |
 | **system** | app, domain, architecture | `/release-app`, `/update-domain`, `/review-architecture` |
 
-## Verbs (unchanged)
+## Verbs
 
 create · update · fix · review · check · test · release · remove
-
-## Ludecker domains
-
-| Slug | Bounded context |
-|------|-----------------|
-| `cms` | `apps/website` — public site + CMS admin |
-| `ui` | `packages/ui` — design system |
-| `database` | `supabase/migrations` — schema, RLS, type mirrors |
 
 ## Granular aliases
 
@@ -43,48 +34,42 @@ Finer nouns (api, endpoint, hook, spec, skill, graph, …) map to a canonical co
 | `/update-api` | `update-integration` |
 | `/fix-hook` | `fix-function` |
 | `/update-doc` | `update-architecture` |
-| `/update-design` | `update-component` (cms/ui resolver) |
 | `/check-inventory` | `check-module` |
 | `/create-skill` | `create-module` |
-| `/ship-ludecker` | `release-app` |
 
 ## Exceptions
 
 | Command | Note |
 |---------|------|
-| `fix-bug` | Defect repair; domain resolver (`cms`, `ui`, `database`); unknown slug → `verb-fix` |
+| `fix-bug` | Defect repair; routes to `verb-fix` + object `feature` by default |
+| `fix-module` | Same fix swarm; routes to `verb-fix` + object `module` by default |
 | `review-incident` | Production/deploy incident (`swarm-check` alias) |
 | `test-function` | Journey verification (dedicated orchestrator) |
-| `release-app` | Full platform ship (`ship-ludecker` alias) |
-| `write-article` | Content research swarm → CMS persist |
+| `release-app` | Platform release swarm |
+
+Add domain resolvers in `graph.project.yaml` to route `/update-module <slug>` to domain orchestrators.
 
 ## Invalid `release-*`
 
-Use `release-app`, `release-feature`, or `release-integration` — not `release-function`, `release-module`, `release-schema`, etc. (see `invalid_pairs` in graph).
+Use `release-app`, `release-feature`, or `release-integration` — not `release-function`, `release-module`, etc. (see `invalid_pairs` in graph).
 
 ## Verb lifecycle and gates
 
-**Work:** [lifecycle/lifecycle.json](lifecycle/lifecycle.json) → graph `verb_work_phases`  
-**Gates:** [governance/gates.json](governance/gates.json) → graph `governance_gate_stacks`  
-**Runtime (composed):** graph `verb_runtime` on Run at dispatch  
-**Run:** [run/schema.json](run/schema.json) — primary execution object  
-
-Phase → skill: [lifecycle/phases.json](lifecycle/phases.json)
+**Work:** [lifecycle/lifecycle.json](lifecycle/lifecycle.json)  
+**Gates:** [governance/gates.json](governance/gates.json)  
+**Run:** [run/schema.json](run/schema.json)
 
 ## Object capabilities
 
-Ontology declares `object_capabilities` per object. Graph resolves to provider skills via [capabilities/registry.json](capabilities/registry.json). Generated `object_skills` in graph.yaml is derived — do not edit by hand.
+Ontology declares `object_capabilities` per object. Graph resolves providers via [capabilities/registry.json](capabilities/registry.json). Generic install uses shared skills; replace with project skills in your overlay.
 
-Example: `component` → `[component-model, layer-boundaries, ui-design]` → `[component, architecture, ludecker-design-system]`
+Example: `component` → `[component-model, layer-boundaries, ui-design]` → `[component, architecture, component]`
 
 ## Domain argument
 
-- **Required:** `update-module`, `update-domain`, …
-- **Optional:** `*-function`, `review-incident`, `write-article`
+- **Recommended:** `update-module`, `fix-module`, … once you add domains
+- **Optional:** `*-function`, `review-incident`
 
-## Manual commands (not in graph)
+## Manual commands
 
-| Command | Purpose |
-|---------|---------|
-| `/launch-ludecker` | Local dev: kill stale processes, clean `.next`, start `pnpm dev` |
-| `/kill-ludecker` | Kill local dev port listeners |
+Add filenames to [project.config.json](project.config.json) `manual_commands` — not generated from ontology.

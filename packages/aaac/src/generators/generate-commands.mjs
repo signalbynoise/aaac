@@ -50,10 +50,13 @@ function isFixCommand(cmd, entry) {
 function writeFixCmd(cmd, entry = null) {
   const canonical = entry?.alias ?? cmd;
   const isBug = canonical === "fix-bug" || cmd === "bug-fix";
-  const resolver = isBug ? "fix-bug-by-slug" : "fix-domain-by-slug";
-  const domainRequired = isBug
-    ? "Domain slug **recommended** (`cms`, `ui`, `database`, `aaac`)."
-    : "**Domain slug required** (`cms`, `ui`, `database`, `aaac`).";
+  const hasResolver = Boolean(entry?.resolver);
+  const domainLine = hasResolver
+    ? "Domain slug **recommended** when your project overlay defines domain resolvers (see `graph.project.yaml`)."
+    : "Domain slug optional.";
+  const dispatchLine = hasResolver
+    ? `3. resolver **\`${entry.resolver}\`** (project overlay in \`graph.project.yaml\`)`
+    : `3. [verb-fix orchestrator](../skills/shared/verbs/fix/orchestrator/SKILL.md) — object \`${isBug ? "feature" : "module"}\``;
   const aliasLine =
     cmd !== canonical
       ? `\n\n> Alias → \`/${canonical}\`. See [${canonical}.md](${canonical}.md).\n`
@@ -71,10 +74,10 @@ AAAC: \`/${cmd} <domain> "<intent>"\`
 
 1. [.cursor/aaac/dispatch.md](../aaac/dispatch.md)
 2. [.cursor/aaac/graph.yaml](../aaac/graph.yaml) — **\`${canonical}\`**
-3. resolver **\`${resolver}\`** → \`cms-fix-bug\` | \`ui-fix-bug\` | \`database-fix-bug\` | \`aaac-fix-bug\`
-4. [investigation/SKILL.md](../skills/shared/investigation/SKILL.md) Mode A + domain \`fix_mode\`
+${dispatchLine}
+4. [investigation/SKILL.md](../skills/shared/investigation/SKILL.md) Mode A${hasResolver ? " + domain `fix_mode` when resolver routes to a domain orchestrator" : ""}
 
-${domainRequired}
+${domainLine}
 
 ## Swarm (mandatory)
 
@@ -90,8 +93,8 @@ Contract: [${canonical}.yaml](../aaac/contracts/commands/${canonical}.yaml)
 ## Example
 
 \`\`\`text
-/${cmd} cms "Getting Started nav missing published guides"
-/${cmd} ui "DocsNav section state lost on route change"
+/${cmd} payments "Webhook handler drops events on retry"
+/${cmd} api "Auth middleware returns 500 on expired token"
 \`\`\`
 `;
   fs.writeFileSync(path.join(commandsDir, `${cmd}.md`), body);
@@ -247,6 +250,11 @@ const written = new Set();
 
 for (const [cmd, entry] of Object.entries(command_overrides)) {
   if (KEEP_EXTRA.has(`${cmd}.md`)) continue;
+  if (isFixCommand(cmd, entry)) {
+    writeFixCmd(cmd, entry);
+    written.add(cmd);
+    continue;
+  }
   writeCmd(cmd, entry);
   written.add(cmd);
 }

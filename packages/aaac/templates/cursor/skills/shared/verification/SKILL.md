@@ -14,8 +14,8 @@ After `testing`. Before `report`.
 
 ## Checks
 
-- **Website build gate** (create / update / fix): `artifacts/verify.yaml` from [verify-website-build.mjs](../../../aaac/scripts/run-engine/verify-website-build.mjs) — static assets in `index.html` must exist; `pnpm --filter @ludecker/website build` must pass
-- **Playwright verb checks** (create / update / fix): launch [playwright-check-run](../../../agents/playwright-check-run.md) — `pnpm --filter @ludecker/aaac test:e2e` must pass; set `PLAYWRIGHT_BASE_URL` for public-route smoke
+- **App build gate** (create / update / fix, when `project.config.json` `verify.enabled`): `artifacts/verify.yaml` from [verify-website-build.mjs](../../../aaac/scripts/run-engine/verify-website-build.mjs)
+- **E2E smoke** (optional): launch [playwright-check-run](../../../agents/playwright-check-run.md) when project defines Playwright targets; set `PLAYWRIGHT_BASE_URL` for public-route smoke
 - Run artifact `artifacts.testing.repro_status` is **fixed** or **partial** with documented follow-up (fix paths)
 - Orchestrator `contract.yaml` `success_criteria`
 - Graph `object_skills` / `object_skill_verbs` skills were loaded for command object + verb

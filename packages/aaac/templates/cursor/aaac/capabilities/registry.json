@@ -2,44 +2,43 @@
   "version": 2,
   "capabilities": {
     "ui-design": {
-      "description": "Design tokens, component CSS, Figma alignment",
+      "description": "Presentational components, token-based styling",
       "providers": [
-        { "id": "ludecker-design-system", "type": "skill", "path": "skills/ludecker/design-system" }
+        { "id": "component", "type": "skill", "path": "skills/shared/component" }
       ]
     },
     "ux-design": {
-      "description": "Editorial readability, publish flow, navigation clarity",
+      "description": "Editorial readability, navigation clarity",
       "providers": [
-        { "id": "ludecker-user-experience", "type": "skill", "path": "skills/ludecker/user-experience" }
+        { "id": "documentation", "type": "skill", "path": "skills/shared/documentation" }
       ]
     },
     "api-design": {
       "description": "Contracts and validation at boundaries",
       "providers": [
-        { "id": "ludecker-api-first", "type": "skill", "path": "skills/ludecker/api-first" }
+        { "id": "integration", "type": "skill", "path": "skills/shared/integration" }
       ]
     },
     "database-design": {
-      "description": "Schema, migrations, RLS, type mirrors",
+      "description": "Schema, migrations, persistence boundaries",
       "providers": [
-        { "id": "ludecker-database-schema", "type": "skill", "path": "skills/ludecker/database-schema" },
-        { "id": "supabase-mcp", "type": "mcp", "optional": true, "note": "Apply migrations and RLS via Supabase MCP" }
+        { "id": "schema", "type": "skill", "path": "skills/shared/schema" }
       ]
     },
     "security": {
-      "description": "Auth, RLS, secrets, CMS gates",
+      "description": "Auth, secrets, access control at boundaries",
       "providers": [
-        { "id": "ludecker-security", "type": "skill", "path": "skills/ludecker/security" }
+        { "id": "architecture", "type": "skill", "path": "skills/shared/architecture" }
       ]
     },
     "infrastructure": {
-      "description": "Deploy, Render, env, hosting",
+      "description": "Deploy, hosting, environment configuration",
       "providers": [
-        { "id": "ludecker-infrastructure", "type": "skill", "path": "skills/ludecker/infrastructure" }
+        { "id": "integration", "type": "skill", "path": "skills/shared/integration" }
       ]
     },
     "layer-boundaries": {
-      "description": "SSOT, import direction, monorepo layers",
+      "description": "SSOT, import direction, module layers",
       "providers": [
         { "id": "architecture", "type": "skill", "path": "skills/shared/architecture" }
       ]
@@ -65,8 +64,7 @@
     "migration-model": {
       "description": "Migration scripts and apply procedure",
       "providers": [
-        { "id": "migration", "type": "skill", "path": "skills/shared/migration" },
-        { "id": "supabase-mcp", "type": "mcp", "optional": true }
+        { "id": "migration", "type": "skill", "path": "skills/shared/migration" }
       ]
     },
     "workflow-model": {
@@ -76,7 +74,7 @@
       ]
     },
     "integration-model": {
-      "description": "API routes, webhooks, MCP adapters",
+      "description": "API routes, webhooks, external adapters",
       "providers": [
         { "id": "integration", "type": "skill", "path": "skills/shared/integration" }
       ]

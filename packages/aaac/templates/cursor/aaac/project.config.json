@@ -1,3 +1,6 @@
 {
-  "manual_commands": []
+  "manual_commands": [],
+  "verify": {
+    "enabled": false
+  }
 }

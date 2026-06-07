@@ -28,7 +28,13 @@ process.stdin.on("end", () => {
   if (!active?.run_id) process.exit(0);
 
   const manifest = loadRunManifest(active.run_id);
-  if (!manifest || manifest.status === "completed") process.exit(0);
+  if (
+    !manifest ||
+    manifest.status === "completed" ||
+    manifest.status === "cancelled"
+  ) {
+    process.exit(0);
+  }
 
   const remaining = [manifest.phase, ...(manifest.pending ?? [])].filter(Boolean);
 

@@ -102,7 +102,7 @@ if (
     manifest.updated_at = isoNow();
     writeJson(manifestPath, manifest);
     console.error(
-      "Website verify failed (static assets + vite build). Fix errors, then re-run:\n" +
+      "App verify failed (see project.config.json verify). Fix errors, then re-run:\n" +
         `  node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id ${runId}\n` +
         detail,
     );
@@ -112,7 +112,7 @@ if (
     event: "verify_website_pass",
     phase: completedPhase,
     phase_kind: manifest.phase_kind,
-    detail: "static assets + vite build",
+    detail: "app verify gate",
     level: "info",
   });
 }

@@ -139,3 +139,36 @@ export function phaseKind(phase, registry) {
 export function promptFromHook(hook) {
   return hook?.prompt ?? hook?.text ?? hook?.content ?? "";
 }
+
+/** User explicitly asked to halt the current Run (short prompts only). */
+export function isUserStopIntent(text) {
+  if (!text || typeof text !== "string") return false;
+  const trimmed = text.trim();
+  if (trimmed.length > 60) return false;
+  return (
+    /^(stop|cancel|abort)([.!?]*)$/i.test(trimmed) ||
+    /^(please\s+)?(stop|cancel|abort)([.!?]*)$/i.test(trimmed) ||
+    /^(stop|cancel|abort)\s+(the\s+)?run([.!?]*)$/i.test(trimmed)
+  );
+}
+
+export function cancelRunManifest(manifest, evidence = "user_stop") {
+  manifest.status = "cancelled";
+  manifest.awaiting_approval = false;
+  manifest.blocked_reason = null;
+  manifest.updated_at = isoNow();
+  if (manifest.enforcement) {
+    manifest.enforcement.edit_allowed = true;
+  }
+  return manifest;
+}
+
+export function clearActiveRun(conversationId) {
+  if (!conversationId) return;
+  const filePath = activeRunPath(conversationId);
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // already cleared
+  }
+}

@@ -188,7 +188,7 @@ describe('advance-phase', () => {
     try {
       const result = await advancePhase(runId, 'verify');
       expect(result.code).toBe(2);
-      expect(result.stderr).toMatch(/Website verify failed/);
+      expect(result.stderr).toMatch(/App verify failed/);
     } finally {
       fs.unlinkSync(indexPath);
       fs.renameSync(backup, indexPath);

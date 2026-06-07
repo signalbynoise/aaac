@@ -53,10 +53,22 @@ process.stdin.on("end", () => {
   if (!conversationId) allow();
 
   const active = loadActiveRun(conversationId);
-  if (!active?.run_id || active.status === "completed") allow();
+  if (
+    !active?.run_id ||
+    active.status === "completed" ||
+    active.status === "cancelled"
+  ) {
+    allow();
+  }
 
   const manifest = loadRunManifest(active.run_id);
-  if (!manifest || manifest.status === "completed") allow();
+  if (
+    !manifest ||
+    manifest.status === "completed" ||
+    manifest.status === "cancelled"
+  ) {
+    allow();
+  }
   if (manifest.conversation_id && manifest.conversation_id !== conversationId) allow();
 
   const enforcement = loadEnforcement();

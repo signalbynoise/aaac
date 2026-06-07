@@ -23,9 +23,11 @@ failure_conditions:
   - skip domain inventory when slug resolves to inventory file
 dependencies:
   skills: [discovery, planning, execution, testing, verification, reporting]
-  policies: [master-rules, implementation, mcp-and-deploy]
+  policies: [master-rules, project-context, ui-design, implementation, mcp-and-deploy]
   docs:
     - docs/master_rules.md
+    - docs/ui_design.md
+    - docs/project_context.md
     - docs/architecture.md
     - docs/design_system.md
 verification:

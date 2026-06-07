@@ -25,7 +25,7 @@ function loadVerifyConfig() {
   if (!verify.enabled) {
     return { enabled: false };
   }
-  const appRootRel = verify.app_root ?? "apps/website";
+  const appRootRel = verify.app_root ?? "apps/web";
   const indexRel =
     verify.index_html ?? path.join(appRootRel, "index.html").replace(/\\/g, "/");
   const appRoot = path.join(PROJECT_ROOT, appRootRel);

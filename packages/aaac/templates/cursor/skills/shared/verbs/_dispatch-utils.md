@@ -16,9 +16,11 @@ Orchestrators execute phases from the Run `pending` queue. Do not skip gates unl
 Read before any phase:
 
 1. [.cursor/policies/master-rules.md](../../../policies/master-rules.md)
-2. [.cursor/policies/implementation.md](../../../policies/implementation.md)
-3. [.cursor/policies/mcp-and-deploy.md](../../../policies/mcp-and-deploy.md)
-4. [.cursor/policies/minimal-complexity.md](../../../policies/minimal-complexity.md) — **required for create / update / fix**
+2. [.cursor/policies/project-context.md](../../../policies/project-context.md)
+3. [.cursor/policies/ui-design.md](../../../policies/ui-design.md)
+4. [.cursor/policies/implementation.md](../../../policies/implementation.md)
+5. [.cursor/policies/mcp-and-deploy.md](../../../policies/mcp-and-deploy.md)
+6. [.cursor/policies/minimal-complexity.md](../../../policies/minimal-complexity.md) — **required for create / update / fix**
 
 ## Minimal complexity (create / update / fix)
 

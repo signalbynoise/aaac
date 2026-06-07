@@ -15,14 +15,13 @@ Orchestrator phase `execute` after approved plan.
 ## Mandatory
 
 1. Read [governance/implementation/SKILL.md](../governance/implementation/SKILL.md)
-2. Read domain [inventory](../../../domains/) constraints
+2. Read domain inventory when present (`domains/<slug>/update/inventory/`)
 3. Read [policies/](../../../policies/)
 
 ## Actions
 
 - Edit files per plan and implementation skill
-- `apply_migration` for new/changed `supabase/migrations/` (project `anseivwusnyiwopihnqu` — see [supabase-mcp.mdc](../../../rules/supabase-mcp.mdc))
-- `track()` for user-facing mutations
+- Apply database migrations via configured MCP when your project uses one (see [mcp-and-deploy.md](../../../policies/mcp-and-deploy.md) and `{{DOCS_ROOT}}/project_context.md`)
 - Structured logging on server async paths
 
 ## Must not

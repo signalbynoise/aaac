@@ -67,9 +67,9 @@ complexity_breakdown:
   new_api_endpoint: 1
   modify: 1
 reuse:
-  - "ExportButton pattern from packages/ui"
+  - "ExportButton pattern from <design-system-package>"
 modify:
-  - "apps/website/app/api/export/route.ts (extend existing export handler)"
+  - "<app>/api/export/route.ts (extend existing export handler)"
 create:
   - artifact: "GET /api/export/csv"
     kind: new_api_endpoint

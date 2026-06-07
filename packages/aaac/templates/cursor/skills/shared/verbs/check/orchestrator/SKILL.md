@@ -17,7 +17,7 @@ Read [_dispatch-utils.md](../_dispatch-utils.md) first.
 3. **load_inventory** — when domain slug maps to inventory
 4. **object_skills** — from graph `object_skills.<object>`
 5. [check](../../check/SKILL.md) — swarm per check skill
-6. **contract_checks** — run project test commands from domain inventory when present; for `@ludecker/aaac` package maintenance use `pnpm --filter @ludecker/aaac test` and `test:e2e`
+6. **contract_checks** — run test commands from domain inventory or `project.config.json` when present
 7. [reporting](../../reporting/SKILL.md) — **Answer** (yes/no/partial) then **How**
 
 No code changes. For test runs use `test-*`; for fixes use `fix-*`.

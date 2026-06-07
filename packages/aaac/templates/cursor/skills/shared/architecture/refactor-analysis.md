@@ -61,7 +61,7 @@ Also read the target with codebase tools (Grep, Read) — do not rely on shell a
 #### S - Single Responsibility
 
 Look for:
-- Files over budget (see Master Rules §19: routes 200, components 250, lib 300, openrouter 350)
+- Files over budget (see Master Rules §19: routes 200, components 250, lib 300)
 - Functions over 80 lines (or nested callbacks over 40)
 - Classes with > 10 methods
 - Mixed concerns (data + UI + business logic)
@@ -166,7 +166,7 @@ For each issue found, assess:
 - **Effort**: Lines to change, tests needed?
 - **Master rule**: Which rule(s) does fixing this satisfy?
 
-Prioritize: clarity and predictability over clever abstractions (Rule 22).
+Prioritize: clarity and predictability over clever abstractions (Rule 42).
 
 ## Output Format
 
@@ -196,7 +196,7 @@ Use this template exactly:
 | Area | Status | Top violations |
 |------|--------|----------------|
 | SSOT & layers | 🟡/🟢/🔴 | [e.g. UI fetching in component] |
-| UI discipline | 🟡/🟢/🔴 | [e.g. inline components] |
+| UI discipline | 🟡/🟢/🔴 | [e.g. inline components, deep CSS selectors — see ui_design.md] |
 | Boundaries & errors | 🟡/🟢/🔴 | [e.g. unvalidated API body] |
 | Async & state | 🟡/🟢/🔴 | [e.g. ad-hoc flags vs state machine] |
 | Testing & logging | 🟡/🟢/🔴 | [e.g. no tests for changed module] |
@@ -244,7 +244,7 @@ Use this template exactly:
 
 ### ⚠️ Technical Debt Notes
 
-- [Items to defer — document why per Rule 21 if suggesting exceptions]
+- [Items to defer — document why per Rule 34 if suggesting exceptions]
 
 ---
 
@@ -252,14 +252,14 @@ Use this template exactly:
 
 Before applying suggestions:
 
-- [ ] Tests exist for affected code (Rule 20)
+- [ ] Tests exist for affected code (Rule 21)
 - [ ] Create feature branch
 - [ ] Commit current state (only when user asks)
 - [ ] Apply **one** refactoring at a time
 - [ ] Run tests after each change
 - [ ] Review diff before committing
 - [ ] No scope creep — minimal diff (user preference)
-- [ ] Document any intentional rule exception (Rule 21)
+- [ ] Document any intentional rule exception (Rule 34)
 
 ## Applying Refactorings
 
@@ -270,7 +270,7 @@ When the user asks to implement (not just analyze):
 3. Centralize schemas and validation at boundaries
 4. Extract to new files (no inline components)
 5. Add/update behavioral tests, not implementation-detail tests
-6. Use structured logging on new async paths (Rule 19)
+6. Use structured logging on new async paths (Rule 20)
 
 ## Usage
 

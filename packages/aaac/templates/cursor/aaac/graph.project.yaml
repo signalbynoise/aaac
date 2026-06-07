@@ -189,5 +189,7 @@ agents:
 
 policies:
   - policies/master-rules.md
+  - policies/project-context.md
+  - policies/ui-design.md
   - policies/implementation.md
   - policies/mcp-and-deploy.md

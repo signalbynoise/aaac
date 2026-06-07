@@ -9,8 +9,8 @@ disable-model-invocation: true
 
 ## Scope
 
-- `apps/website/app/api/`, Supabase MCP, Render deploy policies
-- Project rules: [deploy.mdc](../../../../rules/deploy.mdc), [supabase-mcp.mdc](../../../../rules/supabase-mcp.mdc)
+- Your app's API routes, webhooks, and OAuth adapters
+- Optional: [mcp-and-deploy.md](../../../policies/mcp-and-deploy.md) and `.cursor/rules/` when MCP or deploy is configured
 
 ## Execution focus
 

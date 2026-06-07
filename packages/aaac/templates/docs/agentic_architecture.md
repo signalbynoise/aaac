@@ -57,7 +57,7 @@ AAAC generates ~130 commands from **8 verbs × 12 objects**:
 Install copies everything you need. Open the project in Cursor and run commands.
 
 - ~130 slash commands and the full shared pipeline (discover → plan → execute → verify → report)
-- Generic `master_rules.md` and `architecture.md` in your docs folder — **already filled in**, not empty stubs
+- Generic `master_rules.md`, `ui_design.md`, `project_context.md`, and `architecture.md` in your docs folder — **already filled in**, not empty stubs
 - Hook scripts and Run lifecycle under `.cursor/`
 - Generic capability registry (shared skills only)
 - **No** project domains required; **no** app build gate until you opt in (`verify.enabled: false` in `project.config.json`)
@@ -66,7 +66,7 @@ You do **not** need to enable hooks manually, write rules, add domains, or confi
 
 ### Optional — when you want more (any stack)
 
-1. Replace or extend `docs/master_rules.md` and `docs/architecture.md` with team-specific detail
+1. Fill in `docs/project_context.md` with your repo layout and SSOT anchors; extend `docs/master_rules.md` and `docs/architecture.md` when needed
 2. Add `domains/<slug>/update/` (orchestrator + inventory) — see Part 2
 3. Extend `graph.project.yaml` with resolvers and project skills
 4. Enable verify in `project.config.json` when you have a web app to gate:

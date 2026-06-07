@@ -1,31 +1,30 @@
 # Release ship procedure (reference)
 
-Canonical steps migrated from legacy `/ship-ludecker`. Subagents in `agents/release-*.md` own each slice.
+Generic git-first release. Deploy steps are **optional** — enable via project overlay (`docs/project_context.md`, `.cursor/rules/deploy.mdc`). Subagents in `agents/release-*.md` own each slice.
 
 ## Git (Wave 1 — blocking)
 
-1. Confirm repo: `signalbynoise/ludecker` (or local ludecker monorepo)
+1. Confirm repo root (`git rev-parse --show-toplevel`)
 2. `git status` + `git diff` + `git diff --staged` + `git log -5 --oneline`
-3. Never stage `.env`, `.env.local`, credentials, or API keys
+3. Never stage `.env`, credentials, or API keys
 4. Draft 1–2 sentence commit message from diff and user intent
 5. `git add` intentional paths → `git commit` (HEREDOC message)
-6. Ensure on `main`: `git checkout main` if needed; `git pull --rebase origin main`
-7. `git push origin main` — on reject, rebase once more; never force-push main
+6. Ensure on default branch: checkout if needed; `git pull --rebase origin <branch>`
+7. `git push origin <branch>` — on reject, rebase once more; never force-push protected branches
 8. Output: `commit_sha`, `commit_message_first_line`, `commit_message_body`
 
-**Rules:** No force-push main. On pre-commit hook failure: fix and new commit — never amend unless user asked.
+**Rules:** No force-push to protected branches. On pre-commit hook failure: fix and new commit — never amend unless user asked.
 
-## Render (Wave 2 — after push)
+## Deploy (Wave 2 — optional, project overlay)
 
-MCP: `user-render` only (not `plugin-render-render`).
+Skip when no deploy agent or `project.config.json` deploy section is configured.
 
-**Service SSOT:** `ludecker-website` (see `render.yaml`, `docs/deployment.md`).
-
-1. `list_services` — find `name === "ludecker-website"`, note `id`
-2. After push: `list_deploys` (`limit: 5`) — match deploy `commit.id` to `commit_sha`
-3. Poll up to **15 minutes**, every **30s**, until `status === "live"` or terminal failure
-4. Smoke check: `curl -fsS -o /dev/null -w "%{http_code}" https://ludecker-website.onrender.com/` — expect **200**
+1. Read service name and smoke URL from `docs/project_context.md` or `.cursor/rules/deploy.mdc`
+2. Use your team's configured deploy MCP (see [mcp-and-deploy.md](../../../policies/mcp-and-deploy.md))
+3. After push: list deploys — match `commit.id` to `commit_sha`
+4. Poll until `live` or terminal failure
+5. Smoke check production URL — expect success status
 
 ## Preflight (optional, Wave 0)
 
-If intent includes "with tests": run `pnpm typecheck` from repo root before git work.
+If intent includes "with tests": run project typecheck/test command from repo root before git work.

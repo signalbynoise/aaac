@@ -31,7 +31,7 @@ Works **out of the box** after `init` — open in Cursor and run commands. No po
 - `.cursor/skills/shared/` — full pipeline (discovery → execute → verify → report)
 - `.cursor/agents/` — 13 generic subagent specs
 - `.cursor/commands/` — ~130 generated slash commands
-- `docs/` — ready-to-use `master_rules.md`, `architecture.md`, and `agentic_architecture.md`
+- `docs/` — ready-to-use `master_rules.md`, `ui_design.md`, `project_context.md`, `architecture.md`, and `agentic_architecture.md`
 
 Optional later: add **domains** under `.cursor/domains/<slug>/` (see maintainer appendix in `agentic_architecture.md`).
 

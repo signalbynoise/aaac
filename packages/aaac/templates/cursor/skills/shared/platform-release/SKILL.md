@@ -17,7 +17,7 @@ Wave 1: release-git  ← BLOCKING
   ↓
 Wave 1.5: conditional package publish ← OPTIONAL (project overlay; blocking when triggered)
   ↓
-Wave 2: release-render ← BLOCKING (poll until live or fail)
+Wave 2: deploy agent ← OPTIONAL (project overlay; poll until live or fail)
   ↓
 Wave 3: verification + reporting
 ```
@@ -36,13 +36,11 @@ Execute [agents/release-git.md](../../../agents/release-git.md) or spawn shell s
 
 ## Wave 1.5 — conditional publish (project overlay)
 
-When the project ships an npm package with the app (e.g. `@ludecker/aaac`), the project overlay supplies a conditional publish agent and detection scripts. Skip when no changes detected.
+When the project ships an npm package with the app, the project overlay supplies a conditional publish agent and detection scripts. Skip when no changes detected.
 
-## Wave 2 — Render (mandatory)
+## Wave 2 — Deploy (optional)
 
-Execute [agents/release-render.md](../../../agents/release-render.md).
-
-**Never** end ship without polled deploy status.
+When configured, run the project overlay deploy agent. **Never** end ship without polled deploy status when deploy is enabled.
 
 ## Reference
 

@@ -18,7 +18,7 @@ disable-model-invocation: true
 1. [../SKILL.md](../SKILL.md) — swarm DAG
 2. [ship-procedure.md](../ship-procedure.md) — step reference
 3. [graph.yaml](../../../../aaac/graph.yaml) — `release-app`
-4. [ludecker-infrastructure](../../../ludecker/infrastructure/SKILL.md)
+4. Project overlay infrastructure skill when present (`skills/<project>/infrastructure/`)
 
 ## Phases
 
@@ -32,11 +32,11 @@ Spawn subagent per [agents/release-git.md](../../../../agents/release-git.md).
 
 **Do not** start Wave 2 until `commit_sha` is returned.
 
-### 2. Wave 2 — Render
+### 2. Wave 2 — Deploy (optional)
 
-Spawn [release-render](../../../../agents/release-render.md) with `commit_sha`, `commit_message_first_line`, `commit_message_body`.
+When project overlay supplies a deploy agent, spawn it with `commit_sha`, `commit_message_first_line`, `commit_message_body`. Skip when not configured.
 
-If Render `build_failed`, overall status is failed.
+If deploy `build_failed`, overall status is failed.
 
 ### 3. Verify + report
 

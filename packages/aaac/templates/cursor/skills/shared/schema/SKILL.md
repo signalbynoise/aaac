@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 ## Execution focus
 
-- New migration file per change; apply via Supabase MCP (`hjadkzfemzuvhpwbixbt`)
+- New migration file per change; apply via configured database MCP (see [mcp-and-deploy.md](../../../policies/mcp-and-deploy.md))
 - Backward-compatible defaults; document breaking changes in report
 - RLS and security advisors after apply
 

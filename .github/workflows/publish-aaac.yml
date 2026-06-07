@@ -1,0 +1,34 @@
+name: Publish @ludecker/aaac
+
+on:
+  push:
+    tags:
+      - "aaac-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: AAAC package tests
+        run: pnpm --filter @ludecker/aaac test
+
+      - name: Init smoke test
+        run: node packages/aaac/src/cli.mjs init --yes --dir /tmp/aaac-smoke-ci
+
+      - name: Publish with pnpm (no npm CLI)
+        run: pnpm --filter @ludecker/aaac publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

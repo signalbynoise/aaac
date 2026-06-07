@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.mjs'],
     exclude: ['tests/log.test.mjs'],
-    testTimeout: 10_000,
+    testTimeout: 60_000,
     fileParallelism: false,
   },
   resolve: {

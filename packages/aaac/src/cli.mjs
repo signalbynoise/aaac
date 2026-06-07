@@ -86,20 +86,21 @@ async function cmdInit(args) {
   });
 
   console.log(`
-AAAC installed.
+Agentic OS is ready.
 
   .cursor/     → ${cursorDest}
   docs/        → ${docsDest}
 
-Next steps:
-  1. Enable Cursor Hooks (Settings → Hooks) and restart Cursor
-  2. Open the project in Cursor
-  3. Create ${options.docsRoot}/master_rules.md and ${options.docsRoot}/architecture.md if missing
-  4. Try /review-architecture or /check-architecture
-  5. Read ${options.docsRoot}/agentic_architecture.md — Part 2 for adding domains
+Open this project in Cursor and use any command, for example:
 
-Regenerate after ontology changes:
-  pnpm dlx @ludecker/aaac@latest generate
+  /create-module api "Add health check endpoint"
+  /fix-module auth "Session expires too soon"
+  /review-architecture system "Check structure"
+
+No setup required after install. Rules and architecture docs are already in place.
+To go deeper later, read ${options.docsRoot}/agentic_architecture.md (Part 2 — optional).
+
+Regenerate commands after ontology edits:
   npx @ludecker/aaac@latest generate
 `);
 }

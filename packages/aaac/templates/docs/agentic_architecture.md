@@ -52,16 +52,21 @@ AAAC generates ~130 commands from **8 verbs × 12 objects**:
 | `release-app` | Phased release swarm (git → deploy) |
 | `fix-module` / `fix-bug` | Full fix swarm — domain optional until you add resolvers |
 
-### Fresh install — what works day one
+### Out of the box — no setup after install
 
-- Verb×object commands and shared pipeline (discover → plan → execute → verify → report)
-- Cursor hook enforcement and Run lifecycle
+Install copies everything you need. Open the project in Cursor and run commands.
+
+- ~130 slash commands and the full shared pipeline (discover → plan → execute → verify → report)
+- Generic `master_rules.md` and `architecture.md` in your docs folder — **already filled in**, not empty stubs
+- Hook scripts and Run lifecycle under `.cursor/`
 - Generic capability registry (shared skills only)
-- **No** project domains, **no** hardcoded app build gate (`verify.enabled: false` in `project.config.json`)
+- **No** project domains required; **no** app build gate until you opt in (`verify.enabled: false` in `project.config.json`)
 
-### After you customize (any stack)
+You do **not** need to enable hooks manually, write rules, add domains, or configure a stack before your first command.
 
-1. Write `docs/master_rules.md` and `docs/architecture.md`
+### Optional — when you want more (any stack)
+
+1. Replace or extend `docs/master_rules.md` and `docs/architecture.md` with team-specific detail
 2. Add `domains/<slug>/update/` (orchestrator + inventory) — see Part 2
 3. Extend `graph.project.yaml` with resolvers and project skills
 4. Enable verify in `project.config.json` when you have a web app to gate:

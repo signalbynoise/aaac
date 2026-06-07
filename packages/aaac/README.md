@@ -24,14 +24,16 @@ npx @ludecker/aaac@latest init --yes --dir /path/to/your/repo
 
 ## What you get
 
-- `.cursor/hooks.json` — runtime enforcement (enable in Cursor Settings → Hooks)
+Works **out of the box** after `init` — open in Cursor and run commands. No post-install setup.
+
+- `.cursor/hooks.json` — Run lifecycle and edit enforcement (installed with the project)
 - `.cursor/aaac/` — ontology, graph, lifecycle, run model, enforcement
 - `.cursor/skills/shared/` — full pipeline (discovery → execute → verify → report)
 - `.cursor/agents/` — 13 generic subagent specs
 - `.cursor/commands/` — ~130 generated slash commands
-- `docs/agentic_architecture.md` — user + maintainer guide
+- `docs/` — ready-to-use `master_rules.md`, `architecture.md`, and `agentic_architecture.md`
 
-Add project-specific **domains** under `.cursor/domains/<slug>/` (see maintainer appendix).
+Optional later: add **domains** under `.cursor/domains/<slug>/` (see maintainer appendix in `agentic_architecture.md`).
 
 ## Regenerate
 

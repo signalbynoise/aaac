@@ -11,8 +11,8 @@ Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …
 
 ## Prerequisites
 
-1. **Cursor Hooks enabled** — Settings → Hooks; restart Cursor after `.cursor/hooks.json` changes
-2. **Registry current** — `node .cursor/aaac/generate-graph.mjs`
+1. **Project opened in Cursor** — `.cursor/hooks.json` is installed by `init`; hooks run when the project is open
+2. **Registry current** — after ontology edits: `npx @ludecker/aaac@latest generate`
 
 ## Hook behavior (automatic)
 

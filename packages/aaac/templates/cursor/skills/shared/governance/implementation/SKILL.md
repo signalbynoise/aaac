@@ -48,6 +48,6 @@ Direction: **Input → State → Logic → Output**. No circular imports across 
 
 ---
 
-## Project overlay
+## Project overlay (optional)
 
-After `npx @ludecker/aaac init`, replace this generic skill with project-specific rules, or add a `skills/<project>/implementation/` skill and point `execution` depends in `graph.project.yaml`.
+Generic rules ship in `{{DOCS_ROOT}}/master_rules.md` and work without edits. When you outgrow defaults, extend those docs or add a `skills/<project>/implementation/` skill and wire it in `graph.project.yaml`.

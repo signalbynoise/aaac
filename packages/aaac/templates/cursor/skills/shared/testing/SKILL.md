@@ -12,6 +12,8 @@ disable-model-invocation: true
 
 Phase `verify` (and `test_only` orchestrators). On **fix** paths, run fix verify swarm **before** declaring tests complete.
 
+**Agent separation:** Test **authorship** happens in `test_execute` ([test-authoring](../test-authoring/SKILL.md)). This phase **runs** tests only — parent and subagents must not author new test files here.
+
 ## Standard steps
 
 1. Run tests from domain inventory relevant to change
@@ -27,6 +29,10 @@ Phase `verify` (and `test_only` orchestrators). On **fix** paths, run fix verify
 ## Fix verify swarm (mandatory on fix verb / fix_mode)
 
 After unit tests, launch **3 parallel** `Task` subagents in **one message**. Each prompt **must** include [_task-prompt-policy.md](../_task-prompt-policy.md) and investigation artifact paths.
+
+## Verify swarm (mandatory on all mutating verbs)
+
+After `test_execute`, launch **3 parallel** `Task` subagents in **one message** (same roster as fix verify when on fix paths; on create/update use run + static checks):
 
 | # | Agent spec | `subagent_type` | Role |
 |---|------------|-----------------|------|

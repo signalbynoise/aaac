@@ -7,6 +7,7 @@ import {
   loadEnforcement,
   isEditPhase,
   isArtifactPath,
+  isPathAllowedForPhase,
   conversationIdFromHook,
   runDir,
   writeJson,
@@ -86,6 +87,18 @@ process.stdin.on("end", () => {
   }
 
   if (isEditPhase(manifest.phase, enforcement)) {
+    if (filePath && !isPathAllowedForPhase(filePath, manifest.phase, enforcement)) {
+      persistEditEvent(
+        manifest,
+        active.run_id,
+        "edit_denied",
+        `${toolName} path not allowed in phase ${manifest.phase}: ${filePath}`,
+      );
+      deny(
+        `AAAC: ${manifest.phase} phase cannot edit this path. Run: ${active.run_id}`,
+        `Phase "${manifest.phase}" scope violation${filePath ? `: ${filePath}` : ""}. Use test_execute for tests; execute for prod code only.`,
+      );
+    }
     persistEditEvent(manifest, active.run_id, "edit_allowed", `${toolName} in phase ${manifest.phase}`);
     allow();
   }

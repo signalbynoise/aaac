@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import {
   loadEnforcement,
   loadRegistry,
+  isTestPath,
+  isPathAllowedForPhase,
 } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
 import { ENFORCEMENT_PATH } from './fixtures/paths.mjs';
 
@@ -13,6 +15,7 @@ describe('enforcement.json', () => {
   it('loads edit_phases for code change phases', () => {
     expect(enforcement.edit_phases).toEqual([
       'execute',
+      'test_execute',
       'sync_inventory',
       'persist',
       'write',
@@ -30,6 +33,27 @@ describe('enforcement.json', () => {
     expect(enforcement.swarm_min_agents.verify_fix).toBe(3);
   });
 
+  it('requires verify swarm for all mutating verbs', () => {
+    expect(enforcement.swarm_min_agents.verify).toBe(3);
+    expect(enforcement.swarm_min_agents.test_execute).toBe(1);
+    expect(enforcement.swarm_min_agents.review_swarm).toBe(3);
+  });
+
+  it('scopes edits by phase (writer vs tester)', () => {
+    expect(enforcement.phase_edit_scopes.execute.deny_test_paths).toBe(true);
+    expect(enforcement.phase_edit_scopes.test_execute.test_paths_only).toBe(true);
+    expect(isTestPath('/repo/packages/aaac/tests/foo.test.mjs')).toBe(true);
+    expect(isPathAllowedForPhase('/repo/foo.ts', 'execute', enforcement)).toBe(true);
+    expect(isPathAllowedForPhase('/repo/foo.test.ts', 'execute', enforcement)).toBe(false);
+    expect(isPathAllowedForPhase('/repo/foo.test.ts', 'test_execute', enforcement)).toBe(true);
+    expect(isPathAllowedForPhase('/repo/foo.ts', 'test_execute', enforcement)).toBe(false);
+  });
+
+  it('does not allow app edits during verify via artifact_write_phases', () => {
+    expect(enforcement.artifact_write_phases).toEqual(['plan', 'report']);
+    expect(enforcement.artifact_write_phases).not.toContain('verify');
+  });
+
   it('requires investigation and root_cause artifacts for fix swarm phases', () => {
     expect(enforcement.phase_artifacts.investigate_swarm).toEqual([
       'artifacts/investigation.md',
@@ -41,6 +65,8 @@ describe('enforcement.json', () => {
 
   it('requires plan and report artifacts for all verb flows', () => {
     expect(enforcement.phase_artifacts.plan).toEqual(['artifacts/plan.yaml']);
+    expect(enforcement.phase_artifacts.test_execute).toEqual(['artifacts/test_plan.yaml']);
+    expect(enforcement.phase_artifacts.review_swarm).toEqual(['artifacts/review.yaml']);
     expect(enforcement.phase_artifacts.verify).toEqual(['artifacts/verify.yaml']);
     expect(enforcement.phase_artifacts.report).toEqual(['artifacts/report.md']);
   });

@@ -15,10 +15,15 @@ Usage:
   aaac generate [options]
 
 Commands:
-  init      Copy AAAC kernel into .cursor/ and docs/ (default)
+  init        Copy AAAC kernel into .cursor/ and docs/ (default)
   generate    Regenerate graph.yaml and commands from ontology
   log-dump    Print Run manifest log + decisions
   debug-run   One-shot Run status summary
+
+Quick start:
+  1. npx @ludecker/aaac@latest init   (or: pnpm dlx @ludecker/aaac@latest init --yes)
+  2. Open project in Cursor → Settings → Hooks → enable → restart Cursor
+  3. Use any slash command (graph + commands generated during init)
 
 Options:
   --dir <path>   Target project directory (default: cwd)
@@ -78,7 +83,7 @@ async function cmdInit(args) {
   const options = await promptInitOptions(args);
   console.log(`\nInstalling AAAC into ${options.targetDir}...\n`);
 
-  const { cursorDest, docsDest } = installAaac({
+  const { cursorDest, docsDest, sweepReportPath } = installAaac({
     targetDir: options.targetDir,
     projectName: options.projectName,
     docsRoot: options.docsRoot,
@@ -90,17 +95,24 @@ Agentic OS is ready.
 
   .cursor/     → ${cursorDest}
   docs/        → ${docsDest}
+  sweep report → ${sweepReportPath}
 
-Open this project in Cursor and use any command, for example:
+Next steps:
+
+  1. Open this project in Cursor
+  2. Settings → Hooks → enable Hooks, then restart Cursor
+  3. Read the install sweep report (docs/rules/framework inventory + recommendations)
+
+Then use any command, for example:
 
   /create-module api "Add health check endpoint"
-  /fix-module auth "Session expires too soon"
+  /fix-bug auth "Session expires too soon"
   /review-architecture system "Check structure"
 
-No setup required after install. Rules and architecture docs are already in place.
-To go deeper later, read ${options.docsRoot}/agentic_architecture.md (Part 2 — optional).
+Graph and commands were generated during init — no manual setup required.
+Optional: add domain resolvers later (see ${options.docsRoot}/agentic_architecture.md Part 2).
 
-Regenerate commands after ontology edits:
+Regenerate only after ontology or graph.project.yaml edits:
   npx @ludecker/aaac@latest generate
 `);
 }

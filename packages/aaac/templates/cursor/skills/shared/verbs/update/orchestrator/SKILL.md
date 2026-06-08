@@ -25,9 +25,11 @@ Lifecycle: graph `verb_runtime.update` (work + gates on Run)
 9. **fitness_functions** — [fitness-functions](../../fitness-functions/SKILL.md)
 10. **rollback** — [rollback](../../rollback/SKILL.md) when maturity protected or blast_radius high
 11. **execute** — [execution](../../execution/SKILL.md); `design_mode` when component + design resolver
-12. **verify** — [testing](../../testing/SKILL.md) + [verification](../../verification/SKILL.md)
-13. **sync_inventory**
-14. **report** — [reporting](../../reporting/SKILL.md)
+12. **test_execute** — [test-authoring](../../test-authoring/SKILL.md) — **1** test-author Task agent
+13. **verify** — [testing](../../testing/SKILL.md) + [verification](../../verification/SKILL.md) — **3** verify subagents
+14. **review_swarm** — [implementation-review](../../implementation-review/SKILL.md) — **3** readonly reviewers
+15. **sync_inventory**
+16. **report** — [reporting](../../reporting/SKILL.md)
 
 Intent `Sync inventory only` → inventory sync only, no execution.
 

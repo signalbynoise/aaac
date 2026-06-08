@@ -28,7 +28,17 @@ async function satisfyArtifacts(runId, phase) {
   const enforcement = loadEnforcement();
   const required = enforcement.phase_artifacts?.[phase] ?? [];
   for (const rel of required) {
-    writeArtifact(runId, rel, `# ${rel}\n`);
+    if (rel === 'artifacts/plan.yaml') {
+      writeArtifact(runId, rel, 'tests_to_add: []\nsteps: []\n');
+    } else if (rel === 'artifacts/test_plan.yaml') {
+      writeArtifact(
+        runId,
+        rel,
+        'tests_to_add: []\nskipped_reason: integration flow stub\nfiles_written: []\n',
+      );
+    } else {
+      writeArtifact(runId, rel, `# ${rel}\n`);
+    }
   }
 }
 

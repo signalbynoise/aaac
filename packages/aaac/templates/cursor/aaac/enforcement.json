@@ -1,15 +1,23 @@
 {
-  "version": 2,
+  "version": 3,
   "description": "AAAC runtime enforcement — SSOT for hooks and run engine",
-  "edit_phases": ["execute", "sync_inventory", "persist", "write"],
-  "artifact_write_phases": ["plan", "report", "verify"],
+  "edit_phases": ["execute", "test_execute", "sync_inventory", "persist", "write"],
+  "artifact_write_phases": ["plan", "report"],
+  "mutating_verbs": ["create", "update", "fix"],
+  "phase_edit_scopes": {
+    "execute": { "deny_test_paths": true },
+    "test_execute": { "test_paths_only": true }
+  },
   "verify_verbs": ["create", "update", "fix"],
   "swarm_min_agents": {
     "discover": 4,
     "check_swarm": 3,
     "investigate_swarm": 7,
     "research_swarm": 6,
-    "verify_fix": 3
+    "test_execute": 1,
+    "verify": 3,
+    "verify_fix": 3,
+    "review_swarm": 3
   },
   "phase_artifacts": {
     "investigate_swarm": ["artifacts/investigation.md"],
@@ -20,7 +28,9 @@
     "dependency_graph": ["artifacts/dependency_graph.yaml"],
     "fitness_functions": ["artifacts/fitness.yaml"],
     "rollback": ["artifacts/rollback.yaml"],
+    "test_execute": ["artifacts/test_plan.yaml"],
     "verify": ["artifacts/verify.yaml"],
+    "review_swarm": ["artifacts/review.yaml"],
     "report": ["artifacts/report.md"]
   },
   "allowed_path_prefixes": {

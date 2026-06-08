@@ -14,7 +14,9 @@
     "fitness_functions": { "skill": "fitness-functions", "gate": true },
     "rollback": { "skill": "rollback", "gate": true },
     "execute": { "skill": "execution" },
+    "test_execute": { "skill": "test-authoring" },
     "verify": { "skills": ["testing", "verification"] },
+    "review_swarm": { "skill": "implementation-review", "readonly": true },
     "report": { "skill": "reporting" }
   }
 }

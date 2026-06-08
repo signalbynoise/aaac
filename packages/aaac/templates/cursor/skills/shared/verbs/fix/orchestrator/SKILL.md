@@ -29,9 +29,11 @@ Lifecycle: graph `verb_runtime.fix` or `command_workflows.fix-module` on Run
 10. **fitness_functions** — [fitness-functions](../../fitness-functions/SKILL.md)
 11. **rollback** — [rollback](../../rollback/SKILL.md) when maturity protected/critical or blast_radius ≥ medium
 12. **execute** — [execution](../../execution/SKILL.md)
-13. **verify** — [testing](../../testing/SKILL.md) fix verify swarm + [verification](../../verification/SKILL.md)
-14. **sync_inventory** — when domain inventory exists
-15. **report** — [reporting](../../reporting/SKILL.md)
+13. **test_execute** — [test-authoring](../../test-authoring/SKILL.md) — **1** test-author Task agent
+14. **verify** — [testing](../../testing/SKILL.md) fix verify swarm + [verification](../../verification/SKILL.md) — **3** subagents
+15. **review_swarm** — [implementation-review](../../implementation-review/SKILL.md) — **3** readonly reviewers
+16. **sync_inventory** — when domain inventory exists
+17. **report** — [reporting](../../reporting/SKILL.md)
 
 ## Swarm anti-patterns (hard fail)
 

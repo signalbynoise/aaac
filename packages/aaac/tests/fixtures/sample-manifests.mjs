@@ -11,7 +11,9 @@ const CREATE_PENDING = [
   'fitness_functions',
   'rollback',
   'execute',
+  'test_execute',
   'verify',
+  'review_swarm',
   'report',
 ];
 

@@ -17,6 +17,7 @@ import {
   isEditPhase,
   isGatePhase,
   resolveSwarmMinimum,
+  validatePhaseArtifactContent,
   writeJson,
   saveActiveRun,
 } from "./lib.mjs";
@@ -128,6 +129,28 @@ for (const rel of requiredArtifacts) {
     manifest.updated_at = isoNow();
     writeJson(manifestPath, manifest);
     console.error(`Missing artifact: ${rel} (required before leaving ${completedPhase})`);
+    process.exit(2);
+  }
+}
+
+if (!force) {
+  const contentGate = validatePhaseArtifactContent(
+    runId,
+    completedPhase,
+    manifest,
+    enforcement,
+  );
+  if (!contentGate.ok) {
+    recordLog(manifest, {
+      event: "gate_fail",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: contentGate.reason,
+      level: "warn",
+    });
+    manifest.updated_at = isoNow();
+    writeJson(manifestPath, manifest);
+    console.error(contentGate.reason);
     process.exit(2);
   }
 }

@@ -81,6 +81,24 @@ describe('advance-phase', () => {
     expect(ok.json?.phase).toBe('validate');
   });
 
+  it('create verify requires verify swarm minimum (3)', async () => {
+    const conversationId = uniqueConversationId('advance-verify-swarm');
+    const runId = nextRunId('advance-verify-swarm');
+    seedRun(createModuleManifest('verify', runId, conversationId), conversationId);
+    runs.push({ runId, conversationId });
+
+    const tooFew = await advancePhase(runId, 'verify');
+    expect(tooFew.code).toBe(2);
+    expect(tooFew.stderr).toMatch(/Swarm incomplete/);
+
+    for (let i = 0; i < 3; i += 1) {
+      await recordTaskLaunch(conversationId);
+    }
+    writeArtifact(runId, 'artifacts/verify.yaml', 'status: pass\n');
+    const result = await advancePhase(runId, 'verify', true);
+    expect(result.code).toBe(0);
+  });
+
   it('requires investigate_swarm artifact and swarm for fix-module', async () => {
     const conversationId = uniqueConversationId('advance-investigate');
     const runId = nextRunId('advance-investigate');
@@ -133,7 +151,7 @@ describe('advance-phase', () => {
         runtime: { state: 'trusted', invocations: 50, success_rate: 0.95, avg_fitness: 90 },
       },
     };
-    writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
+    writeArtifact(runId, 'artifacts/plan.yaml', 'tests_to_add: []\nsteps: []\n');
     writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
@@ -195,10 +213,14 @@ describe('advance-phase', () => {
       'execute',
     ];
     manifest.pending = ['report'];
-    writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
+    writeArtifact(runId, 'artifacts/plan.yaml', 'tests_to_add: []\nsteps: []\n');
     writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
+
+    for (let i = 0; i < 3; i += 1) {
+      await recordTaskLaunch(conversationId);
+    }
 
     const indexPath = path.join(REPO_ROOT, 'apps/website/index.html');
     const backup = `${indexPath}.bak-advance-test`;
@@ -216,5 +238,53 @@ describe('advance-phase', () => {
       fs.unlinkSync(indexPath);
       fs.renameSync(backup, indexPath);
     }
+  });
+
+  it('rejects plan advance when tests_to_add is missing for create verb', async () => {
+    const conversationId = uniqueConversationId('advance-plan-tests');
+    const runId = nextRunId('advance-plan-tests');
+    seedRun(createModuleManifest('plan', runId, conversationId), conversationId);
+    runs.push({ runId, conversationId });
+
+    writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
+    const result = await advancePhase(runId, 'plan');
+    expect(result.code).toBe(2);
+    expect(result.stderr).toMatch(/tests_to_add/);
+  });
+
+  it('rejects test_execute advance when tests required but files_written empty', async () => {
+    const conversationId = uniqueConversationId('advance-test-exec-gate');
+    const runId = nextRunId('advance-test-exec-gate');
+    const manifest = createModuleManifest('test_execute', runId, conversationId);
+    manifest.completed = [
+      'discover',
+      'investigate_lite',
+      'plan',
+      'validate',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+      'rollback',
+      'execute',
+    ];
+    manifest.pending = ['verify', 'review_swarm', 'report'];
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    writeArtifact(
+      runId,
+      'artifacts/plan.yaml',
+      'tests_to_add:\n  - behavior: sum weekly downloads\n    kind: unit\n',
+    );
+    writeArtifact(
+      runId,
+      'artifacts/test_plan.yaml',
+      'unit_tests:\n  - path: foo.test.ts\n    status: deferred\n',
+    );
+    await recordTaskLaunch(conversationId);
+
+    const result = await advancePhase(runId, 'test_execute');
+    expect(result.code).toBe(2);
+    expect(result.stderr).toMatch(/files_written|defer/i);
   });
 });

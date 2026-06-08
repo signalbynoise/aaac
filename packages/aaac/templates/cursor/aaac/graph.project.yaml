@@ -1,5 +1,6 @@
-# Generic AAAC project overlay — verb orchestrators + exception commands only.
-# Add domain resolvers, orchestrators, and project skills in your repo after init.
+# Generic AAAC project overlay — copied into consumer repos by `aaac init`.
+# Add `resolvers:` and domain orchestrators when you create `.cursor/domains/<slug>/`.
+# Reference implementation (Lüdecker cms/ui/database): ludecker repo `.cursor/aaac/graph.project.yaml`
 
 orchestrators:
   update-doc:
@@ -41,7 +42,7 @@ orchestrators:
   verb-fix:
     path: skills/shared/verbs/fix/orchestrator
     requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
-    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, verify, sync_inventory, report]
+    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, sync_inventory, report]
 
   verb-review:
     path: skills/shared/verbs/review/orchestrator
@@ -72,11 +73,17 @@ skills:
   execution:
     path: skills/shared/execution
     depends: [governance/implementation]
+  test-authoring:
+    path: skills/shared/test-authoring
+    agents: [test-author]
   testing:
     path: skills/shared/testing
     agents: [unit-test-run, fallow-check-changed, fix-repro-verify]
   verification:
     path: skills/shared/verification
+  implementation-review:
+    path: skills/shared/implementation-review
+    agents: [boundary-review, doc-conformance, implementation-review]
   reporting:
     path: skills/shared/reporting
   architecture:
@@ -182,6 +189,12 @@ agents:
     path: agents/fix-repro-verify.md
   fix-hypothesis-validate:
     path: agents/fix-hypothesis-validate.md
+  test-author:
+    path: agents/test-author.md
+  doc-conformance:
+    path: agents/doc-conformance.md
+  implementation-review:
+    path: agents/implementation-review.md
   release-git:
     path: agents/release-git.md
     wave: 1
@@ -189,7 +202,5 @@ agents:
 
 policies:
   - policies/master-rules.md
-  - policies/project-context.md
-  - policies/ui-design.md
   - policies/implementation.md
   - policies/mcp-and-deploy.md

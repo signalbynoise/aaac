@@ -123,6 +123,28 @@ export function isEditPhase(phase, enforcement) {
   return enforcement.edit_phases.includes(phase);
 }
 
+/** Test/spec file paths — used for writer vs tester phase scoping. */
+export function isTestPath(filePath) {
+  if (!filePath) return false;
+  const normalized = filePath.replace(/\\/g, "/");
+  return (
+    /\.(test|spec)\.(mjs|cjs|js|ts|tsx)$/.test(normalized) ||
+    /(?:^|\/)__tests__(?:\/|$)/.test(normalized) ||
+    /(?:^|\/)tests\/(?:unit|integration|e2e|fixtures)\//.test(normalized)
+  );
+}
+
+/** Phase-scoped edit rules from enforcement.phase_edit_scopes (v3+). */
+export function isPathAllowedForPhase(filePath, phase, enforcement) {
+  if (!filePath) return true;
+  const scopes = enforcement.phase_edit_scopes?.[phase];
+  if (!scopes) return true;
+  const isTest = isTestPath(filePath);
+  if (scopes.deny_test_paths && isTest) return false;
+  if (scopes.test_paths_only && !isTest) return false;
+  return true;
+}
+
 export function isArtifactPath(filePath, enforcement) {
   const normalized = filePath.replace(/\\/g, "/");
   const prefixes = [
@@ -138,11 +160,22 @@ export function phaseKind(phase, registry) {
 
 /** Swarm minimum for completed phase — check verb uses check_swarm on discover. */
 export function resolveSwarmMinimum(completedPhase, manifest, enforcement) {
-  if (
-    completedPhase === "verify" &&
-    (enforcement.fix_commands?.includes(manifest.command) || manifest.verb === "fix")
-  ) {
-    return enforcement.swarm_min_agents?.verify_fix;
+  const mutating = enforcement.mutating_verbs ?? ["create", "update", "fix"];
+  const isMutating =
+    mutating.includes(manifest.verb) ||
+    enforcement.fix_commands?.includes(manifest.command);
+
+  if (completedPhase === "verify" && isMutating) {
+    return (
+      enforcement.swarm_min_agents?.verify ??
+      enforcement.swarm_min_agents?.verify_fix
+    );
+  }
+  if (completedPhase === "test_execute" && isMutating) {
+    return enforcement.swarm_min_agents?.test_execute;
+  }
+  if (completedPhase === "review_swarm" && isMutating) {
+    return enforcement.swarm_min_agents?.review_swarm;
   }
   if (completedPhase === "discover" && manifest.verb === "check") {
     return (
@@ -188,4 +221,119 @@ export function clearActiveRun(conversationId) {
   } catch {
     // already cleared
   }
+}
+
+export function isMutatingVerb(manifest, enforcement) {
+  const mutating = enforcement.mutating_verbs ?? ["create", "update", "fix"];
+  return (
+    mutating.includes(manifest.verb) ||
+    (enforcement.fix_commands ?? []).includes(manifest.command)
+  );
+}
+
+/** List items under a YAML field (lines starting with `-` before next top-level key). */
+export function readYamlListField(content, fieldName) {
+  if (!content) return [];
+  const lines = content.split("\n");
+  const start = lines.findIndex((line) => line.startsWith(`${fieldName}:`));
+  if (start < 0) return [];
+
+  const inline = lines[start].slice(`${fieldName}:`.length).trim();
+  if (inline === "[]") return [];
+  if (inline && !inline.startsWith("-")) return [inline];
+
+  const items = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\S/.test(line) && line.trim()) break;
+    const itemMatch = line.match(/^\s+-\s+(.*)$/);
+    if (itemMatch) items.push(itemMatch[1].trim());
+  }
+  return items;
+}
+
+export function readYamlScalarField(content, fieldName) {
+  if (!content) return null;
+  const match = content.match(new RegExp(`^${fieldName}:\\s*(.+)$`, "m"));
+  if (!match) return null;
+  return match[1].trim().replace(/^["']|["']$/g, "");
+}
+
+export function hasYamlField(content, fieldName) {
+  if (!content) return false;
+  return new RegExp(`^${fieldName}:`, "m").test(content);
+}
+
+export function planRequiresTests(planContent) {
+  if (!planContent) return false;
+  if (hasYamlField(planContent, "tests_to_add")) {
+    return readYamlListField(planContent, "tests_to_add").length > 0;
+  }
+  return /^\s*create:[\s\S]*?^\s+-\s+path:.*\/lib\//m.test(planContent);
+}
+
+export function validatePhaseArtifactContent(runId, completedPhase, manifest, enforcement) {
+  if (!isMutatingVerb(manifest, enforcement)) {
+    return { ok: true };
+  }
+
+  const planPath = path.join(runDir(runId), "artifacts/plan.yaml");
+  const planContent = fs.existsSync(planPath)
+    ? fs.readFileSync(planPath, "utf8")
+    : "";
+
+  if (completedPhase === "plan") {
+    if (!hasYamlField(planContent, "tests_to_add")) {
+      return {
+        ok: false,
+        reason:
+          "plan.yaml must include tests_to_add (behaviors to cover, or tests_to_add: [] when no tests are needed)",
+      };
+    }
+    return { ok: true };
+  }
+
+  if (completedPhase === "test_execute") {
+    const testPlanPath = path.join(runDir(runId), "artifacts/test_plan.yaml");
+    const testPlanContent = fs.existsSync(testPlanPath)
+      ? fs.readFileSync(testPlanPath, "utf8")
+      : "";
+
+    const filesWritten = readYamlListField(testPlanContent, "files_written");
+    const skippedReason = readYamlScalarField(testPlanContent, "skipped_reason");
+    const testsRequired = planRequiresTests(planContent);
+
+    if (/status:\s*deferred/i.test(testPlanContent) && filesWritten.length === 0) {
+      return {
+        ok: false,
+        reason:
+          "test_plan.yaml cannot defer tests — author test files in test_execute (files_written required)",
+      };
+    }
+
+    if (testsRequired && filesWritten.length === 0) {
+      return {
+        ok: false,
+        reason:
+          "plan.yaml tests_to_add requires non-empty test_plan.files_written — launch test-author Task in test_execute",
+      };
+    }
+
+    if (
+      hasYamlField(planContent, "tests_to_add") &&
+      /tests_to_add:\s*\[\]/m.test(planContent) &&
+      filesWritten.length === 0 &&
+      !skippedReason
+    ) {
+      return {
+        ok: false,
+        reason:
+          "tests_to_add is empty — test_plan.yaml must include skipped_reason explaining why no tests were authored",
+      };
+    }
+
+    return { ok: true };
+  }
+
+  return { ok: true };
 }

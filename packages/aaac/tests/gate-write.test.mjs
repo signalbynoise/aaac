@@ -32,7 +32,7 @@ describe('gate-write', () => {
     expect(result.json?.agent_message).toMatch(/discover/i);
   });
 
-  it('allows Write during execute phase', async () => {
+  it('allows Write during execute phase for prod paths', async () => {
     const conversationId = uniqueConversationId('gate-execute');
     const runId = nextRunId('gate-execute');
     const manifest = createModuleManifest('execute', runId, conversationId);
@@ -44,6 +44,51 @@ describe('gate-write', () => {
     const result = await gateWrite(preToolUseHook('Write', appPath, conversationId));
 
     expect(result.json?.permission).toBe('allow');
+  });
+
+  it('denies Write of test files during execute phase', async () => {
+    const conversationId = uniqueConversationId('gate-execute-test');
+    const runId = nextRunId('gate-execute-test');
+    const manifest = createModuleManifest('execute', runId, conversationId);
+    manifest.enforcement.edit_allowed = true;
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const testPath = `${REPO_ROOT}/packages/aaac/tests/foo.test.mjs`;
+    const result = await gateWrite(preToolUseHook('Write', testPath, conversationId));
+
+    expect(result.json?.permission).toBe('deny');
+    expect(result.json?.agent_message).toMatch(/test_execute|scope/i);
+  });
+
+  it('allows Write of test files during test_execute phase', async () => {
+    const conversationId = uniqueConversationId('gate-test-exec');
+    const runId = nextRunId('gate-test-exec');
+    const manifest = createModuleManifest('execute', runId, conversationId);
+    manifest.phase = 'test_execute';
+    manifest.enforcement.edit_allowed = true;
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const testPath = `${REPO_ROOT}/packages/aaac/tests/foo.test.mjs`;
+    const result = await gateWrite(preToolUseHook('Write', testPath, conversationId));
+
+    expect(result.json?.permission).toBe('allow');
+  });
+
+  it('denies Write of prod files during test_execute phase', async () => {
+    const conversationId = uniqueConversationId('gate-test-exec-prod');
+    const runId = nextRunId('gate-test-exec-prod');
+    const manifest = createModuleManifest('execute', runId, conversationId);
+    manifest.phase = 'test_execute';
+    manifest.enforcement.edit_allowed = true;
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const appPath = `${REPO_ROOT}/apps/website/lib/nav/foo.ts`;
+    const result = await gateWrite(preToolUseHook('Write', appPath, conversationId));
+
+    expect(result.json?.permission).toBe('deny');
   });
 
   it('allows writes to run artifact paths during discover', async () => {

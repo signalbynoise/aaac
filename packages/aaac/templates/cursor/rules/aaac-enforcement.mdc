@@ -19,7 +19,7 @@ Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …
 | Hook | Effect |
 |------|--------|
 | `beforeSubmitPrompt` | Detects `/command` → creates Run scoped to **`conversation_id`** (this chat only) |
-| `preToolUse` | **Denies** Write/StrReplace/Delete for **this chat only** until execute phase |
+| `preToolUse` | **Denies** edits outside allowed phases; **phase-scoped paths** — `execute` = prod only, `test_execute` = tests only |
 | `subagentStart` | Counts Task launches for swarm phase validation |
 | `stop` | Follow-up if Run not `completed` |
 
@@ -34,12 +34,19 @@ Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …
    - `discover`: 4 Task agents (check verbs: `check_swarm` 3)
    - `investigate_swarm`: 7 Task agents
    - `research_swarm`: 6 Task agents
-4. **Verify gate (create / update / fix):** before advancing past `verify`, run:
+   - `test_execute`: 1 test-author Task agent (mutating verbs)
+   - `verify`: 3 Task agents (all create/update/fix — not fix-only)
+   - `review_swarm`: 3 readonly reviewers (mutating verbs)
+4. **Agent separation (mutating verbs):**
+   - **Writer** — parent in `execute` only (no test files)
+   - **Tester** — test-author subagent in `test_execute` only
+   - **Reviewer** — readonly swarm in `review_swarm` (not the execute agent)
+5. **Verify gate (create / update / fix):** before advancing past `verify`, run:
    ```bash
    node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id <run_id>
    ```
    `advance-phase.mjs verify` runs this automatically and blocks on missing static assets or failed `vite build` (catches favicon/path regressions).
-5. **Code edits only in `execute`** (hook-enforced). Before execute: artifacts only under `.cursor/aaac/state/runs/`.
+5. **Edits:** prod code in `execute`; test files in `test_execute` only. Run artifacts under `.cursor/aaac/state/runs/` anytime.
 6. **Complete the Run** — advance through `report`, set status completed.
 
 ## If edit is denied

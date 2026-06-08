@@ -7,6 +7,10 @@ import {
   packageGeneratorsDir,
   packageTemplatesDir,
 } from "./paths.mjs";
+import {
+  runInstallSweep,
+  snapshotProjectDocs,
+} from "./sweep-project-docs.mjs";
 
 export function runGenerators(cursorRoot) {
   const generatorsDir = packageGeneratorsDir();
@@ -45,6 +49,8 @@ export function installAaac({
     );
   }
 
+  const beforeSweep = snapshotProjectDocs(resolvedTarget, { docsRoot });
+
   if (fs.existsSync(cursorDest) && force) {
     const backup = `${cursorDest}.aaac-backup-${Date.now()}`;
     fs.renameSync(cursorDest, backup);
@@ -73,5 +79,11 @@ export function installAaac({
 
   runGenerators(cursorDest);
 
-  return { cursorDest, docsDest };
+  const sweep = runInstallSweep(resolvedTarget, {
+    docsRoot,
+    projectName,
+    before: beforeSweep,
+  });
+
+  return { cursorDest, docsDest, sweepReportPath: sweep.reportPath };
 }

@@ -66,6 +66,10 @@ rejected_alternatives:
     complexity_score: <number>
     rejected_because: "<no requirement / reuse suffices>"
 paths_to_touch: ["<concrete file paths>"]
+tests_to_add:
+  - behavior: "<from requirement_map>"
+    kind: unit | integration | e2e
+    target_path: "<test file path>"
 rollback_notes: "<when protected/critical object>"
 ```
 
@@ -74,6 +78,7 @@ Also include:
 - SSOT owner for new state
 - Extract before add if any file ≥80% budget
 - Named machine states/events **only** if user requirement demands async coordination
+- **`tests_to_add[]`** — behaviors needing new tests (see [test-authoring](../test-authoring/SKILL.md)); empty array with reason when docs-only
 
 ## Complexity score
 

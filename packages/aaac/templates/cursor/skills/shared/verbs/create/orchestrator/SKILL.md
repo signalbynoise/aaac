@@ -30,9 +30,11 @@ Lifecycle: graph `verb_runtime.create` (work + gates on Run)
 9. **fitness_functions** — [fitness-functions](../../fitness-functions/SKILL.md)
 10. **rollback** — [rollback](../../rollback/SKILL.md) when object maturity protected or impact high
 11. **execute** — [execution](../../execution/SKILL.md) + object_skills + module-authoring when listed
-12. **verify** — [testing](../../testing/SKILL.md) + [verification](../../verification/SKILL.md)
-13. **sync_inventory** — when domain inventory exists and execute ran
-14. **report** — [reporting](../../reporting/SKILL.md)
+12. **test_execute** — [test-authoring](../../test-authoring/SKILL.md) — **1** test-author Task agent; parent must not write tests
+13. **verify** — [testing](../../testing/SKILL.md) + [verification](../../verification/SKILL.md) — **3** verify subagents (all mutating verbs)
+14. **review_swarm** — [implementation-review](../../implementation-review/SKILL.md) — **3** readonly reviewers; block on critical findings
+15. **sync_inventory** — when domain inventory exists and execute ran
+16. **report** — [reporting](../../reporting/SKILL.md)
 
 Domain slugs with graph resolver use domain orchestrator instead (e.g. `create-feature` → `create-feature-by-slug`).
 

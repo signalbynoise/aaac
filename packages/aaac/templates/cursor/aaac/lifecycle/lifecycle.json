@@ -8,7 +8,9 @@
         "investigate_lite",
         "plan",
         "execute",
+        "test_execute",
         "verify",
+        "review_swarm",
         "report"
       ],
       "gate_stack": "pre_execute"
@@ -19,7 +21,9 @@
         "investigate_lite",
         "plan",
         "execute",
+        "test_execute",
         "verify",
+        "review_swarm",
         "report"
       ],
       "gate_stack": "pre_execute"
@@ -31,7 +35,9 @@
         "root_cause",
         "plan",
         "execute",
+        "test_execute",
         "verify",
+        "review_swarm",
         "report"
       ],
       "gate_stack": "pre_execute"
@@ -58,7 +64,9 @@
         "investigate_lite",
         "plan",
         "execute",
+        "test_execute",
         "verify",
+        "review_swarm",
         "report"
       ],
       "gate_stack": "pre_execute"
@@ -96,7 +104,9 @@
         "root_cause",
         "plan",
         "execute",
+        "test_execute",
         "verify",
+        "review_swarm",
         "report"
       ],
       "gate_stack": "pre_execute"
@@ -109,7 +119,9 @@
         "root_cause",
         "plan",
         "execute",
+        "test_execute",
         "verify",
+        "review_swarm",
         "report"
       ],
       "gate_stack": "pre_execute"

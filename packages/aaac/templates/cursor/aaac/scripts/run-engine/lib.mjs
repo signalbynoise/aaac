@@ -136,6 +136,23 @@ export function phaseKind(phase, registry) {
   return isGatePhase(phase, registry) ? "gate" : "work";
 }
 
+/** Swarm minimum for completed phase — check verb uses check_swarm on discover. */
+export function resolveSwarmMinimum(completedPhase, manifest, enforcement) {
+  if (
+    completedPhase === "verify" &&
+    (enforcement.fix_commands?.includes(manifest.command) || manifest.verb === "fix")
+  ) {
+    return enforcement.swarm_min_agents?.verify_fix;
+  }
+  if (completedPhase === "discover" && manifest.verb === "check") {
+    return (
+      enforcement.swarm_min_agents?.check_swarm ??
+      enforcement.swarm_min_agents?.discover
+    );
+  }
+  return enforcement.swarm_min_agents?.[completedPhase];
+}
+
 export function promptFromHook(hook) {
   return hook?.prompt ?? hook?.text ?? hook?.content ?? "";
 }

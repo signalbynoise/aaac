@@ -21,6 +21,7 @@ describe('enforcement.json', () => {
 
   it('defines swarm minimums for discover and investigate_swarm', () => {
     expect(enforcement.swarm_min_agents.discover).toBe(4);
+    expect(enforcement.swarm_min_agents.check_swarm).toBe(3);
     expect(enforcement.swarm_min_agents.investigate_swarm).toBe(7);
     expect(enforcement.swarm_min_agents.research_swarm).toBe(6);
   });
@@ -42,6 +43,16 @@ describe('enforcement.json', () => {
     expect(enforcement.phase_artifacts.plan).toEqual(['artifacts/plan.yaml']);
     expect(enforcement.phase_artifacts.verify).toEqual(['artifacts/verify.yaml']);
     expect(enforcement.phase_artifacts.report).toEqual(['artifacts/report.md']);
+  });
+
+  it('requires gate phase artifacts before advance', () => {
+    expect(enforcement.phase_artifacts.validate).toEqual(['artifacts/validate.yaml']);
+    expect(enforcement.phase_artifacts.impact_analysis).toEqual(['artifacts/impact.yaml']);
+    expect(enforcement.phase_artifacts.dependency_graph).toEqual([
+      'artifacts/dependency_graph.yaml',
+    ]);
+    expect(enforcement.phase_artifacts.fitness_functions).toEqual(['artifacts/fitness.yaml']);
+    expect(enforcement.phase_artifacts.rollback).toEqual(['artifacts/rollback.yaml']);
   });
 
   it('requires website verify gate for create update fix verbs', () => {

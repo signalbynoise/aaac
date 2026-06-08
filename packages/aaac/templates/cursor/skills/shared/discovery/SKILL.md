@@ -24,6 +24,10 @@ Launch **4–6** parallel `Task` subagents (`explore`, `readonly: true`) in **on
 
 Add domain-specific angles from inventory skill. Max **8** agents total; second wave ≤2 for critical gaps.
 
+## Task prompt (mandatory)
+
+Every Task prompt **must** include the policy excerpt from [_task-prompt-policy.md](../_task-prompt-policy.md) plus: intent, domain, inventory constraints, and the linked agent spec path.
+
 ## Output
 
 Merged brief for `planning`: findings, evidence, gaps, confidence. Parent spot-checks `path:line` claims.

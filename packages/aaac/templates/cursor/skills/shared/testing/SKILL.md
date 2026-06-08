@@ -18,15 +18,15 @@ Phase `verify` (and `test_only` orchestrators). On **fix** paths, run fix verify
 2. Invoke [unit-test-run.md](../../../agents/unit-test-run.md) pattern for targeted vitest
 3. Fallow MCP → `check_changed` on touched files when configured
 4. `ReadLints` on edited paths
-5. **App build gate (when enabled):** before advancing `verify`, run:
+5. **Website build gate (mandatory on create / update / fix):** before advancing `verify`, run:
    ```bash
    node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id <run_id>
    ```
-   Reads `verify` from `.cursor/aaac/project.config.json`. Skips when `verify.enabled: false` (default on fresh install). When enabled, checks `index_html` static assets and runs the configured build command. `advance-phase.mjs verify` **blocks** until this passes and writes `artifacts/verify.yaml`.
+   This checks `index.html` static asset paths resolve under `apps/website/public/` (or project root for Vite dev) and runs `pnpm --filter @ludecker/website build`. `advance-phase.mjs verify` **blocks** until this passes and writes `artifacts/verify.yaml`.
 
 ## Fix verify swarm (mandatory on fix verb / fix_mode)
 
-After unit tests, launch **3 parallel** `Task` subagents in **one message**:
+After unit tests, launch **3 parallel** `Task` subagents in **one message**. Each prompt **must** include [_task-prompt-policy.md](../_task-prompt-policy.md) and investigation artifact paths.
 
 | # | Agent spec | `subagent_type` | Role |
 |---|------------|-----------------|------|

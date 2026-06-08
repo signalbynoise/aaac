@@ -6,6 +6,7 @@
   "verify_verbs": ["create", "update", "fix"],
   "swarm_min_agents": {
     "discover": 4,
+    "check_swarm": 3,
     "investigate_swarm": 7,
     "research_swarm": 6,
     "verify_fix": 3
@@ -14,6 +15,11 @@
     "investigate_swarm": ["artifacts/investigation.md"],
     "root_cause": ["artifacts/root_cause.yaml"],
     "plan": ["artifacts/plan.yaml"],
+    "validate": ["artifacts/validate.yaml"],
+    "impact_analysis": ["artifacts/impact.yaml"],
+    "dependency_graph": ["artifacts/dependency_graph.yaml"],
+    "fitness_functions": ["artifacts/fitness.yaml"],
+    "rollback": ["artifacts/rollback.yaml"],
     "verify": ["artifacts/verify.yaml"],
     "report": ["artifacts/report.md"]
   },

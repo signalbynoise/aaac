@@ -11,8 +11,8 @@ Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …
 
 ## Prerequisites
 
-1. **Project opened in Cursor** — `.cursor/hooks.json` is installed by `init`; hooks run when the project is open
-2. **Registry current** — after ontology edits: `npx @ludecker/aaac@latest generate`
+1. **Cursor Hooks enabled** — Settings → Hooks; restart Cursor after `.cursor/hooks.json` changes
+2. **Registry current** — `node .cursor/aaac/generate-graph.mjs`
 
 ## Hook behavior (automatic)
 
@@ -31,11 +31,16 @@ Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …
    node .cursor/aaac/scripts/run-engine/advance-phase.mjs <run_id> <phase>
    ```
 3. **Swarm minimums** (enforced by advance-phase):
-   - `discover`: 4 Task agents
+   - `discover`: 4 Task agents (check verbs: `check_swarm` 3)
    - `investigate_swarm`: 7 Task agents
    - `research_swarm`: 6 Task agents
-4. **Code edits only in `execute`** (hook-enforced). Before execute: artifacts only under `.cursor/aaac/state/runs/`.
-5. **Complete the Run** — advance through `report`, set status completed.
+4. **Verify gate (create / update / fix):** before advancing past `verify`, run:
+   ```bash
+   node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id <run_id>
+   ```
+   `advance-phase.mjs verify` runs this automatically and blocks on missing static assets or failed `vite build` (catches favicon/path regressions).
+5. **Code edits only in `execute`** (hook-enforced). Before execute: artifacts only under `.cursor/aaac/state/runs/`.
+6. **Complete the Run** — advance through `report`, set status completed.
 
 ## If edit is denied
 

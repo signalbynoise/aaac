@@ -16,6 +16,7 @@ import {
   phaseKind,
   isEditPhase,
   isGatePhase,
+  resolveSwarmMinimum,
   writeJson,
   saveActiveRun,
 } from "./lib.mjs";
@@ -55,11 +56,7 @@ if (manifest.phase !== completedPhase) {
   process.exit(1);
 }
 
-const minAgents =
-  completedPhase === "verify" &&
-  (enforcement.fix_commands?.includes(manifest.command) || manifest.verb === "fix")
-    ? enforcement.swarm_min_agents?.verify_fix
-    : enforcement.swarm_min_agents?.[completedPhase];
+const minAgents = resolveSwarmMinimum(completedPhase, manifest, enforcement);
 const launches = manifest.swarm?.task_launches_this_phase ?? 0;
 if (minAgents && launches < minAgents && !force) {
   recordLog(manifest, {

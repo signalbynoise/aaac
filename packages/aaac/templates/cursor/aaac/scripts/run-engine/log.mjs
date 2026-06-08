@@ -334,7 +334,7 @@ export function debugRunSummary(manifest) {
     awaiting_approval: manifest.awaiting_approval,
     completed: manifest.completed ?? [],
     pending: manifest.pending ?? [],
-    swarm: { phase: swarmPhase, task_launches_this_phase: swarmCount },
+    swarm: { phase: swarmPhase, task_launches_this_phase: swarmCount, agents: manifest.swarm?.agents ?? [] },
     edit_allowed: manifest.enforcement?.edit_allowed ?? false,
     last_log_entries: log.slice(-10),
     decisions_count: (manifest.decisions ?? []).length,

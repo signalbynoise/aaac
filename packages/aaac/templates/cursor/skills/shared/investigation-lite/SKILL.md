@@ -36,3 +36,5 @@ Pass output to [validation](../validation/SKILL.md). If any confidence below thr
 ## Agents
 
 Reuse readonly specs: [discovery-inventory.md](../../../agents/discovery-inventory.md), [discovery-ssot.md](../../../agents/discovery-ssot.md), [dependency-analysis.md](../../../agents/dependency-analysis.md) — 2–3 parallel max for lite path.
+
+Every Task prompt **must** include the policy excerpt from [_task-prompt-policy.md](../_task-prompt-policy.md).

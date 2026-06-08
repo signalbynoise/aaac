@@ -31,6 +31,12 @@ if (summary.blocked_reason) console.log(`Blocked: ${summary.blocked_reason}`);
 console.log(`Completed: ${summary.completed.join(" → ") || "(none)"}`);
 console.log(`Pending: ${summary.pending.join(" → ") || "(none)"}`);
 console.log(`Swarm: phase=${summary.swarm.phase} count=${summary.swarm.task_launches_this_phase}`);
+if (summary.swarm.agents?.length) {
+  console.log(`Agents: ${summary.swarm.agents.length} recorded this phase`);
+  for (const a of summary.swarm.agents.slice(-5)) {
+    console.log(`  #${a.index} ${a.subagent_type ?? "?"} ${a.description ?? ""} @ ${a.at}`);
+  }
+}
 console.log(`Log: ${summary.log_count} entries  Decisions: ${summary.decisions_count}`);
 console.log("--- last 10 log entries ---");
 for (const e of summary.last_log_entries) {

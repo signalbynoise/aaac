@@ -1,5 +1,8 @@
 import fs from 'node:fs';
-import { loadEnforcement } from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import {
+  loadEnforcement,
+  resolveSwarmMinimum,
+} from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
 import {
   advancePhase,
   initRun,
@@ -14,10 +17,8 @@ import {
 
 async function satisfySwarm(conversationId, phase, command, verb) {
   const enforcement = loadEnforcement();
-  let min = enforcement.swarm_min_agents?.[phase] ?? 0;
-  if (phase === 'verify' && (enforcement.fix_commands?.includes(command) || verb === 'fix')) {
-    min = enforcement.swarm_min_agents?.verify_fix ?? 0;
-  }
+  const min =
+    resolveSwarmMinimum(phase, { command, verb }, enforcement) ?? 0;
   for (let i = 0; i < min; i += 1) {
     await recordTaskLaunch(conversationId);
   }

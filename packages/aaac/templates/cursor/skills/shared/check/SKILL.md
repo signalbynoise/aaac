@@ -34,6 +34,10 @@ Launch **3** parallel `Task` subagents (`explore`, `readonly: true`) in **one me
 
 Optional **4th** agent (second wave, only if intent names external system): `discovery-boundaries.md` for integration edges.
 
+## Task prompt (mandatory)
+
+Every Task prompt **must** include the policy excerpt from [_task-prompt-policy.md](../_task-prompt-policy.md) plus: question, scope, agent spec path, and inventory path when available.
+
 ## Merge
 
 Parent synthesizes one brief:

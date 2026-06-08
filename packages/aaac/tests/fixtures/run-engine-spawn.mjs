@@ -44,8 +44,10 @@ export function spawnRunEngine(script, args = [], stdinObj = null) {
   });
 }
 
-export async function recordTaskLaunch(conversationId) {
-  return spawnRunEngine('record-task.mjs', [], { conversation_id: conversationId });
+export async function recordTaskLaunch(conversationId, hookOverrides = null) {
+  const payload = hookOverrides ?? { conversation_id: conversationId };
+  if (!payload.conversation_id) payload.conversation_id = conversationId;
+  return spawnRunEngine('record-task.mjs', [], payload);
 }
 
 export async function initRun(hookPayload) {

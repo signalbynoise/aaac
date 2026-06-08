@@ -53,7 +53,7 @@ Launch **7 parallel** `Task` subagents in **one message**. `readonly: true` unle
 | 6 | [fix-runtime-evidence.md](../../../agents/fix-runtime-evidence.md) | `generalPurpose` | CI/logs/MCP evidence |
 | 7 | [fix-inventory-confirm.md](../../../agents/fix-inventory-confirm.md) | `explore` | Inventory scope + constraints |
 
-**Parent prompt must include:** intent, domain, inventory path, discovery brief summary, frame fields.
+**Parent prompt must include:** intent, domain, inventory path, discovery brief summary, frame fields, and the policy excerpt from [_task-prompt-policy.md](../_task-prompt-policy.md).
 
 **Anti-patterns (hard fail):**
 

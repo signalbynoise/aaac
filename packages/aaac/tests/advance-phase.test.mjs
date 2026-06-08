@@ -12,6 +12,7 @@ import { uniqueConversationId } from './fixtures/hook-payloads.mjs';
 import {
   createModuleManifest,
   fixModuleManifest,
+  checkModuleManifest,
 } from './fixtures/sample-manifests.mjs';
 import {
   advancePhase,
@@ -59,6 +60,25 @@ describe('advance-phase', () => {
     const manifest = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
     expect(manifest.completed).toContain('discover');
     expect(manifest.enforcement.edit_allowed).toBe(false);
+  });
+
+  it('check verb discover requires check_swarm minimum (3), not discover (4)', async () => {
+    const conversationId = uniqueConversationId('advance-check-discover');
+    const runId = nextRunId('advance-check-discover');
+    seedRun(checkModuleManifest('discover', runId, conversationId), conversationId);
+    runs.push({ runId, conversationId });
+
+    for (let i = 0; i < 2; i += 1) {
+      await recordTaskLaunch(conversationId);
+    }
+    const tooFew = await advancePhase(runId, 'discover');
+    expect(tooFew.code).toBe(2);
+    expect(tooFew.stderr).toMatch(/Swarm incomplete/);
+
+    await recordTaskLaunch(conversationId);
+    const ok = await advancePhase(runId, 'discover');
+    expect(ok.code).toBe(0);
+    expect(ok.json?.phase).toBe('validate');
   });
 
   it('requires investigate_swarm artifact and swarm for fix-module', async () => {
@@ -114,6 +134,7 @@ describe('advance-phase', () => {
       },
     };
     writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
+    writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
 
@@ -144,6 +165,7 @@ describe('advance-phase', () => {
         runtime: { state: 'experimental', invocations: 0, success_rate: null, avg_fitness: null },
       },
     };
+    writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
 
@@ -174,6 +196,7 @@ describe('advance-phase', () => {
     ];
     manifest.pending = ['report'];
     writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
+    writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
 

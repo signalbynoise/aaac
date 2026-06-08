@@ -13,6 +13,14 @@ import {
 
 const INJECT_MARKER = "{{INJECT_OBJECT_BLOCKS}}";
 
+/** Drop `#` comment lines from graph.project.yaml — comments are not valid in merged graph.yaml tail. */
+function stripProjectOverlayComments(text) {
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+}
+
 const args = parseArgs(process.argv);
 const cursorRoot = resolveCursorRoot(args.root);
 const aaac = aaacDir(cursorRoot);
@@ -242,7 +250,7 @@ contracts: aaac/contracts/
 
 `;
 
-let tail = projectTail.trim();
+let tail = stripProjectOverlayComments(projectTail.trim());
 if (tail.includes(INJECT_MARKER)) {
   tail = tail.replace(INJECT_MARKER, injectBlock.trim());
 } else {

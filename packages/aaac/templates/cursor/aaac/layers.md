@@ -20,7 +20,8 @@ Lifecycle Layer (work)
 Governance Layer (gates + rules)
 ├─ Gate stacks                 .cursor/aaac/governance/gates.json
 ├─ Complexity SSOT             .cursor/aaac/complexity.yaml
-├─ Policies                    .cursor/policies/ (incl. minimal-complexity.md)
+├─ Context budget SSOT         .cursor/aaac/context-budget.yaml
+├─ Policies                    .cursor/policies/ (incl. minimal-complexity.md, context-budget.md)
 ├─ Rules                       .cursor/rules/
 ├─ Dependencies                .cursor/aaac/dependencies.yaml
 ├─ Fitness functions           .cursor/aaac/fitness-functions.yaml

@@ -1,0 +1,10 @@
+{
+  "run_id": "run_20260626_check-architecture-context-aos_1d88",
+  "session_id": "aos_1d88af3a-741c-49c5-8236-a68220f1c7ca",
+  "command": "check-architecture",
+  "phase": "discover",
+  "status": "failed",
+  "origin": "agentic-os",
+  "started_at": "2026-06-26T17:24:20.105Z",
+  "updated_at": "2026-06-26T17:24:23.051Z"
+}

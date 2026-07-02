@@ -39,10 +39,15 @@ describe('graph.project.yaml template vs Lüdecker overlay', () => {
     expect(ludecker).toContain('ludecker-design-system');
   });
 
+  it('npm template includes remediate-app orchestrator', () => {
+    expect(template).toContain('remediate-app:');
+    expect(template).toContain('skills/shared/remediation/orchestrator');
+  });
+
   it('template overlay is smaller than Lüdecker overlay', () => {
     const templateLines = template.split('\n').length;
     const ludeckerLines = ludecker.split('\n').length;
     expect(templateLines).toBeLessThan(ludeckerLines);
-    expect(templateLines).toBeLessThan(250);
+    expect(templateLines).toBeLessThan(280);
   });
 });

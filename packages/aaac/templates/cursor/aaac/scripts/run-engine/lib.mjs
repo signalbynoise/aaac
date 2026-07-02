@@ -4,13 +4,28 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const CURSOR_ROOT = path.resolve(__dirname, "../../..");
-export const REPO_ROOT = path.resolve(CURSOR_ROOT, "..");
+
+function resolveRoots() {
+  const workspaceOverride = process.env.AAAC_WORKSPACE_ROOT;
+  if (workspaceOverride) {
+    const repoRoot = path.resolve(workspaceOverride);
+    const cursorRoot = path.join(repoRoot, ".cursor");
+    return { repoRoot, cursorRoot };
+  }
+  const cursorRoot = path.resolve(__dirname, "../../..");
+  return { repoRoot: path.resolve(cursorRoot, ".."), cursorRoot };
+}
+
+const { repoRoot: REPO_ROOT_VALUE, cursorRoot: CURSOR_ROOT_VALUE } = resolveRoots();
+
+export const CURSOR_ROOT = CURSOR_ROOT_VALUE;
+export const REPO_ROOT = REPO_ROOT_VALUE;
 export const AAAC_ROOT = path.join(CURSOR_ROOT, "aaac");
 export const STATE_ROOT = path.join(AAAC_ROOT, "state");
 export const RUNS_ROOT = path.join(STATE_ROOT, "runs");
 export const ACTIVE_RUN_PATH = path.join(STATE_ROOT, "active-run.json");
 export const ACTIVE_RUNS_DIR = path.join(STATE_ROOT, "active-runs");
+export const SESSIONS_DIR = path.join(STATE_ROOT, "sessions");
 export const REGISTRY_PATH = path.join(AAAC_ROOT, "runtime-registry.json");
 export const ENFORCEMENT_PATH = path.join(AAAC_ROOT, "enforcement.json");
 export const ONTOLOGY_PATH = path.join(AAAC_ROOT, "ontology.json");
@@ -29,6 +44,19 @@ export function readJson(filePath, fallback = null) {
 export function writeJson(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
+  maybeScheduleRunPersist(filePath, data);
+}
+
+function maybeScheduleRunPersist(filePath, data) {
+  const normalized = filePath.replace(/\\/g, "/");
+  if (!normalized.endsWith("/run.json")) return;
+  const runId = data?.run_id ?? path.basename(path.dirname(filePath));
+  if (!runId) return;
+  import("./persist-run.mjs")
+    .then(({ scheduleRunPersist }) => scheduleRunPersist(runId, data))
+    .catch(() => {
+      // persist-run optional when not deployed
+    });
 }
 
 export function loadRegistry() {
@@ -154,6 +182,103 @@ export function isArtifactPath(filePath, enforcement) {
   return prefixes.some((p) => normalized.includes(p.replace(/^\.\//, "")));
 }
 
+/** Decision artifacts for a phase (global + verb-specific). */
+export function phaseDecisionArtifacts(phase, manifest, enforcement) {
+  const byVerb = enforcement.phase_artifacts_by_verb?.[manifest?.verb]?.[phase];
+  const global = enforcement.phase_artifacts?.[phase] ?? [];
+  return [...global, ...(byVerb ?? [])];
+}
+
+/** True when filePath is a phase decision artifact (requires swarm before parent may write). */
+export function artifactMatchesPhaseDecision(filePath, phase, manifest, enforcement) {
+  if (!filePath || !phase) return false;
+  const normalized = filePath.replace(/\\/g, "/");
+  if (!isArtifactPath(filePath, enforcement)) return false;
+  const aliases = enforcement.phase_artifact_aliases ?? {};
+  const decisions = phaseDecisionArtifacts(phase, manifest, enforcement);
+  for (const artifact of decisions) {
+    const candidates = [artifact, ...(aliases[artifact] ?? [])];
+    if (candidates.some((c) => normalized.includes(c.replace(/^\.\//, "")))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * When agent_separation.parent_may_assess is false, block parent writes to decision
+ * artifacts until Task swarm minimum is met for the current phase.
+ * @returns {{ min: number, launches: number, phase: string } | null}
+ */
+export function parentAssessmentBlocked(manifest, enforcement, filePath) {
+  if (enforcement.agent_separation?.parent_may_assess !== false) return null;
+  if (!filePath || !manifest?.phase) return null;
+  if (!artifactMatchesPhaseDecision(filePath, manifest.phase, manifest, enforcement)) {
+    return null;
+  }
+  const min = resolveSwarmMinimum(manifest.phase, manifest, enforcement);
+  if (!min) return null;
+  const launches = manifest.swarm?.task_launches_this_phase ?? 0;
+  if (launches >= min) return null;
+  return { min, launches, phase: manifest.phase };
+}
+
+const EDITOR_DELEGATE_PHASES_DEFAULT = ["execute", "debt_sweep"];
+
+/** True when subagent_id is registered as an active code editor with required agent_spec_id. */
+export function isRegisteredCodeEditor(hook, manifest, enforcement) {
+  const subagentId = hook?.subagent_id ?? hook?.subagentId ?? null;
+  if (!subagentId) return false;
+  const required = enforcement?.agent_separation?.required_execute_agent_spec;
+  if (!required) return false;
+  const editors = manifest?.swarm?.active_code_editors ?? [];
+  return editors.some(
+    (e) => e.subagent_id === subagentId && e.agent_spec_id === required,
+  );
+}
+
+/** True when the hook originates from a Task subagent (not the parent orchestrator). */
+export function isSubagentToolHook(hook, manifest, enforcement = null) {
+  const subagentId = hook?.subagent_id ?? hook?.subagentId ?? null;
+  if (subagentId) {
+    const delegatePhases =
+      enforcement?.agent_separation?.editor_delegate_phases ?? EDITOR_DELEGATE_PHASES_DEFAULT;
+    const phase = manifest?.phase;
+    if (phase && delegatePhases.includes(phase)) {
+      if (!enforcement) return false;
+      return isRegisteredCodeEditor(hook, manifest, enforcement);
+    }
+    const editors = manifest?.swarm?.active_code_editors ?? [];
+    if (!editors.length) return true;
+    return editors.some((e) => e.subagent_id === subagentId);
+  }
+  if (hook?.parent_conversation_id ?? hook?.parentConversationId) return true;
+  return false;
+}
+
+/** Production/source path (not test, not run artifact). */
+export function isProdEditPath(filePath, enforcement) {
+  if (!filePath) return false;
+  if (isTestPath(filePath)) return false;
+  if (isArtifactPath(filePath, enforcement)) return false;
+  return true;
+}
+
+/**
+ * Block parent orchestrator from writing prod code in delegate phases (execute).
+ * @returns {{ phase: string } | null}
+ */
+export function parentProdEditBlocked(manifest, enforcement, filePath, hook) {
+  if (enforcement.agent_separation?.parent_may_edit_prod !== false) return null;
+  const phase = manifest?.phase;
+  const delegatePhases =
+    enforcement.agent_separation?.editor_delegate_phases ?? EDITOR_DELEGATE_PHASES_DEFAULT;
+  if (!phase || !delegatePhases.includes(phase)) return null;
+  if (!isProdEditPath(filePath, enforcement)) return null;
+  if (isSubagentToolHook(hook, manifest, enforcement)) return null;
+  return { phase };
+}
+
 export function phaseKind(phase, registry) {
   return isGatePhase(phase, registry) ? "gate" : "work";
 }
@@ -174,6 +299,9 @@ export function resolveSwarmMinimum(completedPhase, manifest, enforcement) {
   if (completedPhase === "test_execute" && isMutating) {
     return enforcement.swarm_min_agents?.test_execute;
   }
+  if (completedPhase === "execute" && isMutating) {
+    return enforcement.swarm_min_agents?.execute;
+  }
   if (completedPhase === "review_swarm" && isMutating) {
     return enforcement.swarm_min_agents?.review_swarm;
   }
@@ -182,6 +310,9 @@ export function resolveSwarmMinimum(completedPhase, manifest, enforcement) {
       enforcement.swarm_min_agents?.check_swarm ??
       enforcement.swarm_min_agents?.discover
     );
+  }
+  if (completedPhase === "discover") {
+    return enforcement.swarm_min_agents?.discover;
   }
   return enforcement.swarm_min_agents?.[completedPhase];
 }
@@ -222,6 +353,13 @@ export function clearActiveRun(conversationId) {
     // already cleared
   }
 }
+
+export function saveSessionRun(sessionId, data) {
+  if (!sessionId) return;
+  const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  writeJson(path.join(SESSIONS_DIR, `${safe}.json`), data);
+}
+
 
 export function isMutatingVerb(manifest, enforcement) {
   const mutating = enforcement.mutating_verbs ?? ["create", "update", "fix"];
@@ -270,6 +408,25 @@ export function planRequiresTests(planContent) {
     return readYamlListField(planContent, "tests_to_add").length > 0;
   }
   return /^\s*create:[\s\S]*?^\s+-\s+path:.*\/lib\//m.test(planContent);
+}
+
+export function validateExecuteAgentSpec(manifest, enforcement, completedPhase = "execute") {
+  if (completedPhase !== "execute") return { ok: true };
+  if (!isMutatingVerb(manifest, enforcement)) return { ok: true };
+  const required = enforcement.agent_separation?.required_execute_agent_spec;
+  if (!required) return { ok: true };
+  const agents = (manifest.swarm?.agents ?? []).filter((a) => a.phase === completedPhase);
+  if (agents.some((a) => a.agent_spec_id === required)) return { ok: true };
+  const observed = agents.length
+    ? agents.map((a) => a.agent_spec_id ?? "(missing)").join(", ")
+    : "(none)";
+  return {
+    ok: false,
+    reason:
+      `execute phase requires ≥1 Task agent with agent_spec_id "${required}" ` +
+      `(found: ${observed}). Launch Task with description starting "${required}" ` +
+      `or reference agents/${required}.md.`,
+  };
 }
 
 export function validatePhaseArtifactContent(runId, completedPhase, manifest, enforcement) {
@@ -335,5 +492,66 @@ export function validatePhaseArtifactContent(runId, completedPhase, manifest, en
     return { ok: true };
   }
 
+  if (completedPhase === "execute") {
+    return validateExecuteAgentSpec(manifest, enforcement, completedPhase);
+  }
+
   return { ok: true };
+}
+
+/** Parse workspace .env.local files (website first, then repo root). */
+export function loadWorkspaceDotenv(repoRoot = REPO_ROOT) {
+  const candidates = [
+    path.join(repoRoot, "apps/website/.env.local"),
+    path.join(repoRoot, ".env.local"),
+  ];
+  const merged = {};
+  for (const envPath of candidates) {
+    if (!fs.existsSync(envPath)) continue;
+    for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let value = trimmed.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Resolve a required phase artifact path. When agents write a known alias
+ * (e.g. impact_analysis.yaml), rename it to the canonical enforcement name.
+ */
+export function normalizePhaseArtifactPath(runId, canonicalRel, enforcement) {
+  const canonicalPath = path.join(runDir(runId), canonicalRel);
+  if (fs.existsSync(canonicalPath)) {
+    return { ok: true, path: canonicalRel };
+  }
+
+  const aliases = enforcement.phase_artifact_aliases?.[canonicalRel] ?? [];
+  for (const aliasRel of aliases) {
+    const aliasPath = path.join(runDir(runId), aliasRel);
+    if (fs.existsSync(aliasPath)) {
+      fs.renameSync(aliasPath, canonicalPath);
+      return { ok: true, path: canonicalRel, normalized_from: aliasRel };
+    }
+  }
+
+  return { ok: false, path: canonicalRel };
+}
+
+/** Workspace env overrides process env (fixes stale shell SUPABASE_URL). */
+export function applyWorkspaceEnv(repoRoot = REPO_ROOT) {
+  for (const [key, value] of Object.entries(loadWorkspaceDotenv(repoRoot))) {
+    process.env[key] = value;
+  }
 }

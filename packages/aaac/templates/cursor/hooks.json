@@ -20,6 +20,12 @@
         "failClosed": false
       }
     ],
+    "subagentStop": [
+      {
+        "command": ".cursor/hooks/aaac-subagent-stop.sh",
+        "failClosed": false
+      }
+    ],
     "stop": [
       {
         "command": ".cursor/hooks/aaac-stop.sh",

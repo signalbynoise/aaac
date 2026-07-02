@@ -125,6 +125,20 @@
         "report"
       ],
       "gate_stack": "pre_execute"
+    },
+    "remediate-app": {
+      "description": "Long-running remediation campaign — Fallow scan, check swarm, fix waves, debt sweep, satisfaction loop",
+      "work_phases": [
+        "campaign_init",
+        "scan",
+        "check_swarm",
+        "plan_waves",
+        "execute",
+        "debt_sweep",
+        "satisfaction_gate",
+        "report"
+      ],
+      "gate_stack": null
     }
   }
 }

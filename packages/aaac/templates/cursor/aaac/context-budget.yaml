@@ -1,0 +1,55 @@
+# Effective context budget — SSOT for LLM prompt/context governance in AAAC runs
+# Policy: .cursor/policies/context-budget.md
+# Implementation (scripts, enforcement gates): deferred to /update-module aaac
+
+version: 1
+
+# Research: models can degrade sharply beyond ~40–50% of advertised context (task-dependent).
+# Use ratios vs advertised window until per-model calibration is available.
+
+effective_ratio:
+  default: 0.40
+  conservative: 0.35 # fix / investigate_swarm / large remediation swarms
+
+allocation:
+  per_agent_max: 0.08 # max fraction of advertised window per parallel subagent prompt
+  parent_retention_max: 0.25 # orchestrator active context before compaction required
+
+compaction:
+  # List caps for scripted preflight (prepare-check-context pattern)
+  top_review_for_trace: 25
+  top_actionable: 40
+  dupes_top_groups: 15
+  discover_brief_max_evidence_lines: 10
+  discover_brief_max_steps: 7
+  merge_findings_max: 25
+  merge_gaps_max: 10
+  artifact_char_warn: 16000 # align with classify-verify-failure evidence cap
+
+handoff:
+  rule: artifact_first
+  description: >-
+    After every swarm, parent writes a compact checkpoint to Run artifacts.
+    Later phases read artifact paths — do not re-paste raw agent returns into parent prompts.
+  required_artifacts:
+    check_discover: artifacts/discover_brief.yaml
+    fix_investigate: artifacts/investigation.md
+    remediation_check_swarm: iterations/{n}/check-swarm-raw.json
+
+swarm:
+  description: >-
+    Parallel swarms are the primary mitigation. Minimums stay in enforcement.json;
+    when estimated prompt exceeds per_agent_max, reduce parallel count or split waves.
+  prefer_waves_over_monolith: true
+
+telemetry:
+  # Fields for Run schema / Agentic OS (implementation in /update-module aaac)
+  track:
+    - artifact_bytes
+    - compaction_applied
+    - estimated_utilization
+
+calibration:
+  note: >-
+    Ratios are default guardrails. Maximum Effective Context Window (MECW) varies by
+    model and task type. Override per model in future context-budget.models section.

@@ -19,6 +19,9 @@ Commands:
   generate    Regenerate graph.yaml and commands from ontology
   log-dump    Print Run manifest log + decisions
   debug-run   One-shot Run status summary
+  dispatch    Dispatch a Run from Agentic OS (no chat required)
+  list-runs   List runs under state/runs/
+  approve-run Approve or reject a blocked Run gate
 
 Quick start:
   1. npx @ludecker/aaac@latest init   (or: pnpm dlx @ludecker/aaac@latest init --yes)
@@ -147,6 +150,39 @@ function cmdDebugRun(args, argv) {
   runEngineScript("debug-run.mjs", passthrough.slice(runIdx), targetDir);
 }
 
+function cmdDispatch(args, argv) {
+  const targetDir = args.dir ? path.resolve(args.dir) : process.cwd();
+  const passthrough = argv.filter((a) => a !== "dispatch" && a !== "--dir");
+  const prompt = passthrough.filter((a) => !a.startsWith("-")).join(" ");
+  if (!prompt) {
+    console.error('Usage: aaac dispatch "/command domain \\"intent\\"" [--session-id id] [--dir <path>]');
+    process.exit(1);
+  }
+  const extra = passthrough.includes("--json") ? ["--json"] : ["--json"];
+  const sessionIdx = passthrough.indexOf("--session-id");
+  if (sessionIdx >= 0) extra.push("--session-id", passthrough[sessionIdx + 1]);
+  runEngineScript("dispatch-run.mjs", [prompt, ...extra], targetDir);
+}
+
+function cmdListRuns(args, argv) {
+  const targetDir = args.dir ? path.resolve(args.dir) : process.cwd();
+  const extra = argv.includes("--json") ? ["--json"] : ["--json"];
+  const statusIdx = argv.indexOf("--status");
+  if (statusIdx >= 0) extra.push("--status", argv[statusIdx + 1]);
+  runEngineScript("list-runs.mjs", extra, targetDir);
+}
+
+function cmdApproveRun(args, argv) {
+  const targetDir = args.dir ? path.resolve(args.dir) : process.cwd();
+  const passthrough = argv.filter((a) => a !== "approve-run" && a !== "--dir");
+  const runIdx = passthrough.findIndex((a) => !a.startsWith("-"));
+  if (runIdx === -1) {
+    console.error("Usage: aaac approve-run <run_id> --approve|--reject [--reason text] [--dir <path>]");
+    process.exit(1);
+  }
+  runEngineScript("approve-run.mjs", passthrough.slice(runIdx), targetDir);
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h")) {
@@ -171,6 +207,18 @@ async function main() {
   }
   if (sub === "debug-run") {
     cmdDebugRun(args, argv);
+    return;
+  }
+  if (sub === "dispatch") {
+    cmdDispatch(args, argv);
+    return;
+  }
+  if (sub === "list-runs") {
+    cmdListRuns(args, argv);
+    return;
+  }
+  if (sub === "approve-run") {
+    cmdApproveRun(args, argv);
     return;
   }
 

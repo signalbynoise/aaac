@@ -52,6 +52,12 @@ describe('advance-phase', () => {
     for (let i = 0; i < min; i += 1) {
       await recordTaskLaunch(conversationId);
     }
+    writeArtifact(
+      runId,
+      'artifacts/discover_brief.yaml',
+      'answer: partial\nsummary: test\n',
+    );
+    writeArtifact(runId, 'artifacts/discovery-brief.md', '# Discover\n');
 
     const result = await advancePhase(runId, 'discover');
     expect(result.code).toBe(0);
@@ -76,6 +82,12 @@ describe('advance-phase', () => {
     expect(tooFew.stderr).toMatch(/Swarm incomplete/);
 
     await recordTaskLaunch(conversationId);
+    writeArtifact(
+      runId,
+      'artifacts/discover_brief.yaml',
+      'answer: partial\nsummary: test\n',
+    );
+    writeArtifact(runId, 'artifacts/discovery-brief.md', '# Discover\n');
     const ok = await advancePhase(runId, 'discover');
     expect(ok.code).toBe(0);
     expect(ok.json?.phase).toBe('validate');
@@ -130,6 +142,58 @@ describe('advance-phase', () => {
     expect(result.stderr).toMatch(/Phase mismatch/);
   });
 
+  it('returns ok when completed phase already advanced (idempotent)', async () => {
+    const conversationId = uniqueConversationId('advance-idempotent');
+    const runId = nextRunId('advance-idempotent');
+    const manifest = createModuleManifest('validate', runId, conversationId);
+    manifest.completed = ['discover', 'validate'];
+    manifest.pending = [
+      'plan',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+      'rollback',
+      'execute',
+      'verify',
+      'report',
+    ];
+    manifest.phase = 'impact_analysis';
+    manifest.phase_kind = 'gate';
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const result = await advancePhase(runId, 'validate');
+    expect(result.code).toBe(0);
+    expect(result.json?.already_completed).toBe(true);
+    expect(result.json?.phase).toBe('impact_analysis');
+  });
+
+  it('returns ok when completed phase already advanced (idempotent)', async () => {
+    const conversationId = uniqueConversationId('advance-idempotent');
+    const runId = nextRunId('advance-idempotent');
+    const manifest = createModuleManifest('validate', runId, conversationId);
+    manifest.completed = ['discover', 'validate'];
+    manifest.pending = [
+      'plan',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+      'rollback',
+      'execute',
+      'verify',
+      'report',
+    ];
+    manifest.phase = 'impact_analysis';
+    manifest.phase_kind = 'gate';
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const result = await advancePhase(runId, 'validate');
+    expect(result.code).toBe(0);
+    expect(result.json?.already_completed).toBe(true);
+    expect(result.json?.phase).toBe('impact_analysis');
+  });
+
   it('sets edit_allowed true when entering execute', async () => {
     const conversationId = uniqueConversationId('advance-execute');
     const runId = nextRunId('advance-execute');
@@ -155,6 +219,10 @@ describe('advance-phase', () => {
     writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
+
+    for (let i = 0; i < 2; i += 1) {
+      await recordTaskLaunch(conversationId);
+    }
 
     const result = await advancePhase(runId, 'rollback');
     expect(result.code).toBe(0);
@@ -186,6 +254,10 @@ describe('advance-phase', () => {
     writeArtifact(runId, 'artifacts/rollback.yaml', 'verified: true\n');
     seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
+
+    for (let i = 0; i < 2; i += 1) {
+      await recordTaskLaunch(conversationId);
+    }
 
     const result = await advancePhase(runId, 'rollback');
     expect(result.code).toBe(2);
@@ -246,6 +318,9 @@ describe('advance-phase', () => {
     seedRun(createModuleManifest('plan', runId, conversationId), conversationId);
     runs.push({ runId, conversationId });
 
+    for (let i = 0; i < 2; i += 1) {
+      await recordTaskLaunch(conversationId);
+    }
     writeArtifact(runId, 'artifacts/plan.yaml', 'steps: []\n');
     const result = await advancePhase(runId, 'plan');
     expect(result.code).toBe(2);
@@ -286,5 +361,36 @@ describe('advance-phase', () => {
     const result = await advancePhase(runId, 'test_execute');
     expect(result.code).toBe(2);
     expect(result.stderr).toMatch(/files_written|defer/i);
+  });
+
+  it('rejects execute advance without code-author agent_spec_id', async () => {
+    const conversationId = uniqueConversationId('advance-execute-spec');
+    const runId = nextRunId('advance-execute-spec');
+    const manifest = createModuleManifest('execute', runId, conversationId);
+    manifest.completed = [
+      'discover',
+      'investigate_lite',
+      'plan',
+      'validate',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+      'rollback',
+    ];
+    manifest.pending = ['test_execute', 'verify', 'review_swarm', 'report'];
+    manifest.enforcement.edit_allowed = true;
+    manifest.swarm = {
+      task_launches_this_phase: 1,
+      phase: 'execute',
+      agents: [{ phase: 'execute', agent_spec_id: 'explorer', index: 1 }],
+    };
+    writeArtifact(runId, 'artifacts/plan.yaml', 'tests_to_add: []\nsteps: []\n');
+    writeArtifact(runId, 'artifacts/execute_summary.yaml', 'status: complete\n');
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const result = await advancePhase(runId, 'execute');
+    expect(result.code).toBe(2);
+    expect(result.stderr).toMatch(/code-author/);
   });
 });

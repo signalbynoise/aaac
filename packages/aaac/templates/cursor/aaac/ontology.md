@@ -73,3 +73,7 @@ Example: `component` → `[component-model, layer-boundaries, ui-design]` → `[
 ## Manual commands
 
 Add filenames to [project.config.json](project.config.json) `manual_commands` — not generated from ontology.
+
+| Command | Purpose |
+|---------|---------|
+| `/setup-app-web` | Scaffold React/Vite/TS/Tailwind/TanStack/Zod/Zustand/Vitest/Playwright/ESLint/Prettier/Shadcn app; optional Supabase + Render via MCP; generates `/launch-<app-slug>` |

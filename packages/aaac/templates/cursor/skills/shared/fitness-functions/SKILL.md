@@ -37,6 +37,8 @@ Policy: [minimal-complexity.md](../../../policies/minimal-complexity.md)
 
 ## Output
 
+Write Run artifact **`artifacts/fitness.yaml`** (canonical name — not `fitness_functions.yaml`).
+
 ```yaml
 score:
   api_first: pass | warning | fail

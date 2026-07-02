@@ -63,3 +63,9 @@ export async function advancePhase(runId, completedPhase, force = false) {
 export async function gateWrite(hookPayload) {
   return spawnRunEngine('gate-write.mjs', [], hookPayload);
 }
+
+export async function recordSubagentProgress(conversationId, hookOverrides = null) {
+  const payload = hookOverrides ?? { conversation_id: conversationId };
+  if (!payload.conversation_id) payload.conversation_id = conversationId;
+  return spawnRunEngine('record-subagent-progress.mjs', [], payload);
+}

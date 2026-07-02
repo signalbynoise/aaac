@@ -20,6 +20,7 @@ import {
   promptFromHook,
 } from "./lib.mjs";
 import { recordLog, recordDecision } from "./log.mjs";
+import { supersedeIncompleteRuns } from "./reconcile-run-status.mjs";
 import {
   resolveCapabilitiesWithRuntime,
   evaluateCapabilityRuntimePolicy,
@@ -108,6 +109,11 @@ const convShort = conversationId.slice(0, 8);
 const runId = `run_${date}_${slugify(parsed.command + (parsed.domain ? `-${parsed.domain}` : ""))}-${convShort}`;
 
 const entry = registry.commands[parsed.command];
+supersedeIncompleteRuns({
+  conversationId,
+  newRunId: runId,
+});
+
 fs.mkdirSync(runDir(runId), { recursive: true });
 
 const runObject = entry.object ?? null;

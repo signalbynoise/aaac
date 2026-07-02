@@ -17,6 +17,12 @@
     "test_execute": { "skill": "test-authoring" },
     "verify": { "skills": ["testing", "verification"] },
     "review_swarm": { "skill": "implementation-review", "readonly": true },
-    "report": { "skill": "reporting" }
+    "report": { "skill": "reporting" },
+    "campaign_init": { "skill": "remediation", "readonly": true },
+    "scan": { "skill": "remediation", "readonly": true },
+    "check_swarm": { "skill": "check", "readonly": true },
+    "plan_waves": { "skill": "planning", "readonly": true },
+    "debt_sweep": { "skill": "remediation" },
+    "satisfaction_gate": { "skill": "remediation", "readonly": true }
   }
 }

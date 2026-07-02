@@ -3,6 +3,7 @@ import {
   loadEnforcement,
   resolveSwarmMinimum,
 } from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import { resolvePhaseArtifacts } from '../../../../.cursor/aaac/scripts/run-engine/context-budget.mjs';
 import {
   advancePhase,
   initRun,
@@ -24,9 +25,9 @@ async function satisfySwarm(conversationId, phase, command, verb) {
   }
 }
 
-async function satisfyArtifacts(runId, phase) {
+async function satisfyArtifacts(runId, phase, manifest) {
   const enforcement = loadEnforcement();
-  const required = enforcement.phase_artifacts?.[phase] ?? [];
+  const required = resolvePhaseArtifacts(phase, manifest, enforcement);
   for (const rel of required) {
     if (rel === 'artifacts/plan.yaml') {
       writeArtifact(runId, rel, 'tests_to_add: []\nsteps: []\n');
@@ -36,6 +37,10 @@ async function satisfyArtifacts(runId, phase) {
         rel,
         'tests_to_add: []\nskipped_reason: integration flow stub\nfiles_written: []\n',
       );
+    } else if (rel === 'artifacts/discover_brief.yaml') {
+      writeArtifact(runId, rel, 'answer: partial\nsummary: integration stub\n');
+    } else if (rel === 'artifacts/discovery-brief.md') {
+      writeArtifact(runId, rel, '# Discovery brief\n');
     } else {
       writeArtifact(runId, rel, `# ${rel}\n`);
     }
@@ -58,7 +63,7 @@ export async function simulateVerbFlow(prompt, conversationId) {
   while (manifest.status === 'running' && manifest.phase !== 'report') {
     const phase = manifest.phase;
     await satisfySwarm(conversationId, phase, manifest.command, manifest.verb);
-    await satisfyArtifacts(runId, phase);
+    await satisfyArtifacts(runId, phase, manifest);
 
     const forceExecute =
       phase === 'rollback' &&
@@ -74,7 +79,8 @@ export async function simulateVerbFlow(prompt, conversationId) {
   }
 
   if (manifest.phase === 'report') {
-    await satisfyArtifacts(runId, 'report');
+    await satisfySwarm(conversationId, 'report', manifest.command, manifest.verb);
+    await satisfyArtifacts(runId, 'report', manifest);
     const final = await advancePhase(runId, 'report');
     if (final.code !== 0) {
       throw new Error(`advance report failed: ${final.stderr}`);

@@ -24,6 +24,8 @@ What can break?
 
 ## Output (mandatory)
 
+Write Run artifact **`artifacts/impact.yaml`** (canonical name — not `impact_analysis.yaml`).
+
 ```yaml
 affected:
   - cms | ui | database | integration | ...

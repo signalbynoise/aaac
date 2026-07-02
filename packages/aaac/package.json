@@ -1,13 +1,13 @@
 {
   "name": "@ludecker/aaac",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "description": "Agentic Architecture as Code (AAAC) — installable Cursor agent framework",
   "type": "module",
   "license": "MIT",
   "author": "Hans-Erik Lydecker",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eriklydecker/ludecker.git",
+    "url": "git+https://github.com/eriklydecker/ludecker.git",
     "directory": "packages/aaac"
   },
   "homepage": "https://ludecker.com/guide/install-aaac",
@@ -23,7 +23,11 @@
     "commands"
   ],
   "bin": {
-    "aaac": "./src/cli.mjs"
+    "aaac": "src/cli.mjs"
+  },
+  "exports": {
+    ".": "./src/cli.mjs",
+    "./install": "./src/lib/install.mjs"
   },
   "files": [
     "src/",

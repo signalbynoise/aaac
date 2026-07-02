@@ -37,6 +37,7 @@ describe('record-task', () => {
     expect(manifest.swarm.agents).toHaveLength(1);
     expect(manifest.swarm.agents[0].subagent_type).toBe('explore');
     expect(manifest.swarm.agents[0].description).toBe('discovery-inventory');
+    expect(manifest.swarm.agents[0].agent_spec_id).toBe('discovery-inventory');
     expect(manifest.swarm.agents[0].readonly).toBe(true);
   });
 });

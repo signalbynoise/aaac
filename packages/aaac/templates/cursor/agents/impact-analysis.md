@@ -14,6 +14,8 @@ Given an approved plan, list affected domains/systems and risk categories.
 
 ## Return
 
+Write parent Run artifact at **`artifacts/impact.yaml`** (canonical — do not use `impact_analysis.yaml`).
+
 ```yaml
 affected: [cms, ui, database, integration, ...]
 risk: [migrations, breaking_contracts, auth, deployment]

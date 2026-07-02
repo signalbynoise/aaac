@@ -180,6 +180,7 @@
     "review-incident": { "orchestrator": "review-incident" },
     "test-function": { "orchestrator": "test-function" },
     "release-app": { "orchestrator": "release-app" },
+    "remediate-app": { "orchestrator": "remediate-app", "object": "app" },
     "module-update": { "alias": "update-module" },
     "update-doc": { "alias": "update-architecture" },
     "architecture": { "alias": "update-architecture" },

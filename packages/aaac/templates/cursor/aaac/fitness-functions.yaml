@@ -28,6 +28,14 @@ functions:
     skill: architecture
     applies_to: [module, component, feature, app]
 
+  context_budget:
+    description: Effective LLM context limits, artifact-first swarm handoffs, compaction caps
+    policy: context-budget
+    config: aaac/context-budget.yaml
+    applies_to: [function, component, module, schema, model, migration, feature, workflow, integration, app, domain, architecture]
+    applies_to_verbs: [create, update, fix, check, review, test, remove]
+    blocking: false
+
   minimal_complexity:
     description: Reuse-first plan, complexity score within verb threshold, YAGNI — no speculative architecture
     policy: minimal-complexity

@@ -7,6 +7,8 @@ import {
   loadEnforcement,
   isEditPhase,
   isArtifactPath,
+  parentAssessmentBlocked,
+  parentProdEditBlocked,
   isPathAllowedForPhase,
   conversationIdFromHook,
   runDir,
@@ -77,6 +79,19 @@ process.stdin.on("end", () => {
     hook.tool_input?.path ?? hook.toolInput?.path ?? hook.tool_input?.file_path ?? hook.arguments?.path ?? "";
 
   if (filePath && isArtifactPath(filePath, enforcement)) {
+    const blocked = parentAssessmentBlocked(manifest, enforcement, filePath);
+    if (blocked) {
+      persistEditEvent(
+        manifest,
+        active.run_id,
+        "edit_denied",
+        `agent separation: phase ${blocked.phase} requires ${blocked.min} Task agents before decision artifact write (got ${blocked.launches})`,
+      );
+      deny(
+        `AAAC: phase "${blocked.phase}" requires ${blocked.min} independent Task agents before writing decision artifacts. Run: ${active.run_id}`,
+        `Agent separation: launch ${blocked.min} parallel Task subagents for "${blocked.phase}" first. Parent may merge outputs only — no self-assessment. Got ${blocked.launches}/${blocked.min}.`,
+      );
+    }
     persistEditEvent(manifest, active.run_id, "edit_allowed", `artifact path: ${filePath}`);
     allow();
   }
@@ -96,7 +111,20 @@ process.stdin.on("end", () => {
       );
       deny(
         `AAAC: ${manifest.phase} phase cannot edit this path. Run: ${active.run_id}`,
-        `Phase "${manifest.phase}" scope violation${filePath ? `: ${filePath}` : ""}. Use test_execute for tests; execute for prod code only.`,
+        `Phase "${manifest.phase}" scope violation${filePath ? `: ${filePath}` : ""}. Use test_execute for tests; launch code-author Task in execute for prod code.`,
+      );
+    }
+    const prodBlocked = parentProdEditBlocked(manifest, enforcement, filePath, hook);
+    if (prodBlocked) {
+      persistEditEvent(
+        manifest,
+        active.run_id,
+        "edit_denied",
+        `agent separation: parent cannot edit prod in phase ${prodBlocked.phase}`,
+      );
+      deny(
+        `AAAC: orchestrator cannot edit production code in "${prodBlocked.phase}". Run: ${active.run_id}`,
+        `Agent separation: launch 1 code-author Task subagent with artifacts/plan.yaml. Parent merges execute_summary.yaml only — never edit source files directly.`,
       );
     }
     persistEditEvent(manifest, active.run_id, "edit_allowed", `${toolName} in phase ${manifest.phase}`);

@@ -15,6 +15,7 @@ describe('enforcement.json', () => {
   it('loads edit_phases for code change phases', () => {
     expect(enforcement.edit_phases).toEqual([
       'execute',
+      'debt_sweep',
       'test_execute',
       'sync_inventory',
       'persist',
@@ -50,7 +51,13 @@ describe('enforcement.json', () => {
   });
 
   it('does not allow app edits during verify via artifact_write_phases', () => {
-    expect(enforcement.artifact_write_phases).toEqual(['plan', 'report']);
+    expect(enforcement.artifact_write_phases).toEqual([
+      'campaign_init',
+      'scan',
+      'check_swarm',
+      'plan_waves',
+      'satisfaction_gate',
+    ]);
     expect(enforcement.artifact_write_phases).not.toContain('verify');
   });
 
@@ -81,6 +88,15 @@ describe('enforcement.json', () => {
     expect(enforcement.phase_artifacts.rollback).toEqual(['artifacts/rollback.yaml']);
   });
 
+  it('defines phase artifact aliases for common agent naming mistakes', () => {
+    expect(enforcement.phase_artifact_aliases['artifacts/impact.yaml']).toEqual(
+      expect.arrayContaining(['artifacts/impact_analysis.yaml']),
+    );
+    expect(enforcement.phase_artifact_aliases['artifacts/fitness.yaml']).toEqual(
+      expect.arrayContaining(['artifacts/fitness_functions.yaml']),
+    );
+  });
+
   it('requires website verify gate for create update fix verbs', () => {
     expect(enforcement.verify_verbs).toEqual(['create', 'update', 'fix']);
   });
@@ -94,6 +110,17 @@ describe('enforcement.json', () => {
   it('allows artifact writes under run state paths', () => {
     expect(enforcement.allowed_path_prefixes.run_artifacts).toEqual(
       expect.arrayContaining(['.cursor/aaac/state/runs/']),
+    );
+    expect(enforcement.allowed_path_prefixes.campaign_artifacts).toEqual(
+      expect.arrayContaining(['.cursor/aaac/state/campaigns/']),
+    );
+  });
+
+  it('defines remediate-app swarm and gate SSOT', () => {
+    expect(enforcement.swarm_min_agents_by_command['remediate-app'].check_swarm).toBe(7);
+    expect(enforcement.remediation_gate.exit_codes.remediate).toBe(3);
+    expect(enforcement.phase_artifacts_remediate.debt_sweep).toEqual(
+      expect.arrayContaining(['artifacts/debt_sweep.json']),
     );
   });
 

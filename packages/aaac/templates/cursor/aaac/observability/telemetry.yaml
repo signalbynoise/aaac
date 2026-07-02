@@ -27,6 +27,8 @@ log_on:
   - skill_loaded
   - doc_loaded
   - agent_spawned
+  - agent_complete
+  - agent_progress
   - execute_start
   - execute_complete
   - run_completed

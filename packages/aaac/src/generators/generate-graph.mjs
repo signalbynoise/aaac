@@ -240,6 +240,7 @@ lifecycle: aaac/lifecycle/lifecycle.json
 lifecycle_phases: aaac/lifecycle/phases.json
 governance_gates: aaac/governance/gates.json
 complexity: aaac/complexity.yaml
+context_budget: aaac/context-budget.yaml
 run: aaac/run/schema.json
 capabilities: aaac/capabilities/registry.json
 dependencies: aaac/dependencies.yaml

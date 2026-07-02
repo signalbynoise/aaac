@@ -31,6 +31,12 @@ orchestrators:
     path: skills/shared/platform-release/orchestrator
     requires: [testing, verification, execution, reporting]
 
+  remediate-app:
+    path: skills/shared/remediation/orchestrator
+    requires: [remediation, discovery, check, execution, testing, verification, reporting]
+    check_swarm_skill: skills/shared/remediation/check-swarm
+    phases: [campaign_init, scan, check_swarm, plan_waves, execute, debt_sweep, satisfaction_gate, report]
+
   verb-create:
     path: skills/shared/verbs/create/orchestrator
     requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, module-authoring]
@@ -143,6 +149,10 @@ skills:
     path: skills/shared/module-authoring
   platform-release:
     path: skills/shared/platform-release
+  remediation:
+    path: skills/shared/remediation
+  remediation-check-swarm:
+    path: skills/shared/remediation/check-swarm
   governance/implementation:
     path: skills/shared/governance/implementation
 
@@ -199,6 +209,24 @@ agents:
     path: agents/release-git.md
     wave: 1
     blocking: true
+  remediation-check-app-inventory:
+    path: agents/remediation-check-app-inventory.md
+  remediation-check-app-ssot:
+    path: agents/remediation-check-app-ssot.md
+  remediation-check-app-trace:
+    path: agents/remediation-check-app-trace.md
+  remediation-check-architecture-boundaries:
+    path: agents/remediation-check-architecture-boundaries.md
+  remediation-check-architecture-deps:
+    path: agents/remediation-check-architecture-deps.md
+  remediation-check-architecture-decomposition:
+    path: agents/remediation-check-architecture-decomposition.md
+  remediation-check-risk:
+    path: agents/remediation-check-risk.md
+  remediation-remediator:
+    path: agents/remediation-remediator.md
+  remediation-e2e-gate:
+    path: agents/remediation-e2e-gate.md
 
 policies:
   - policies/master-rules.md

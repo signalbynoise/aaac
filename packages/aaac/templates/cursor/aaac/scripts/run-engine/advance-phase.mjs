@@ -18,10 +18,23 @@ import {
   isGatePhase,
   resolveSwarmMinimum,
   validatePhaseArtifactContent,
+  normalizePhaseArtifactPath,
   writeJson,
   saveActiveRun,
 } from "./lib.mjs";
+import {
+  resolvePhaseArtifacts,
+  validateContextBudgetArtifacts,
+  recordPhaseContextTelemetry,
+  formatPhaseMetricsDetail,
+} from "./context-budget.mjs";
+import {
+  archivePhaseSwarm,
+  aggregateRunMetrics,
+  computePhaseDurationMs,
+} from "./swarm-telemetry.mjs";
 import { recordLog } from "./log.mjs";
+import { syncRunSidecars } from "./reconcile-run-status.mjs";
 import {
   processRunEvidence,
   evaluateCapabilityRuntimePolicy,
@@ -51,6 +64,29 @@ if (!manifest) {
 }
 
 if (manifest.phase !== completedPhase) {
+  if (manifest.completed?.includes(completedPhase)) {
+    recordLog(manifest, {
+      event: "phase_already_completed",
+      phase: manifest.phase,
+      phase_kind: manifest.phase_kind,
+      detail: `skipped advance: ${completedPhase} already completed (current=${manifest.phase})`,
+      level: "info",
+    });
+    manifest.updated_at = isoNow();
+    writeJson(manifestPath, manifest);
+    console.log(
+      JSON.stringify({
+        ok: true,
+        run_id: runId,
+        completed: completedPhase,
+        phase: manifest.phase,
+        status: manifest.status,
+        edit_allowed: manifest.enforcement?.edit_allowed ?? false,
+        already_completed: true,
+      }),
+    );
+    process.exit(0);
+  }
   console.error(
     `Phase mismatch: current=${manifest.phase} completed=${completedPhase}`,
   );
@@ -115,10 +151,10 @@ if (
   });
 }
 
-const requiredArtifacts = enforcement.phase_artifacts?.[completedPhase] ?? [];
+const requiredArtifacts = resolvePhaseArtifacts(completedPhase, manifest, enforcement);
 for (const rel of requiredArtifacts) {
-  const artifactPath = path.join(runDir(runId), rel);
-  if (!fs.existsSync(artifactPath)) {
+  const resolved = normalizePhaseArtifactPath(runId, rel, enforcement);
+  if (!resolved.ok) {
     recordLog(manifest, {
       event: "gate_fail",
       phase: completedPhase,
@@ -130,6 +166,15 @@ for (const rel of requiredArtifacts) {
     writeJson(manifestPath, manifest);
     console.error(`Missing artifact: ${rel} (required before leaving ${completedPhase})`);
     process.exit(2);
+  }
+  if (resolved.normalized_from) {
+    recordLog(manifest, {
+      event: "artifact_normalized",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: `${resolved.normalized_from} → ${rel}`,
+      level: "info",
+    });
   }
 }
 
@@ -151,6 +196,26 @@ if (!force) {
     manifest.updated_at = isoNow();
     writeJson(manifestPath, manifest);
     console.error(contentGate.reason);
+    process.exit(2);
+  }
+
+  const budgetGate = validateContextBudgetArtifacts(
+    runId,
+    completedPhase,
+    manifest,
+    enforcement,
+  );
+  if (!budgetGate.ok) {
+    recordLog(manifest, {
+      event: "gate_fail",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: budgetGate.reason,
+      level: "warn",
+    });
+    manifest.updated_at = isoNow();
+    writeJson(manifestPath, manifest);
+    console.error(budgetGate.reason);
     process.exit(2);
   }
 }
@@ -181,11 +246,36 @@ if (completedPhase === "execute") {
 }
 
 manifest.completed.push(completedPhase);
+const phaseCompletedAt = isoNow();
+manifest.phase_metrics = manifest.phase_metrics ?? {};
+const phaseDurationMs = computePhaseDurationMs(manifest, completedPhase, phaseCompletedAt);
+if (phaseDurationMs != null) {
+  manifest.phase_metrics[completedPhase] = {
+    ...(manifest.phase_metrics[completedPhase] ?? {}),
+    duration_ms: phaseDurationMs,
+  };
+}
+recordPhaseContextTelemetry(manifest, completedPhase, runId, enforcement);
+const phaseMetrics = manifest.phase_metrics?.[completedPhase] ?? {};
+const contextEntry = manifest.context?.phases?.[completedPhase] ?? {};
+const phaseCompleteDetail = formatPhaseMetricsDetail({
+  ...(minAgents ? { swarm_count: launches } : {}),
+  ...(phaseMetrics.tokens != null ? { tokens: phaseMetrics.tokens } : {}),
+  ...(phaseMetrics.context != null
+    ? { score: phaseMetrics.context }
+    : contextEntry.estimated_utilization != null
+      ? { score: contextEntry.estimated_utilization }
+      : {}),
+  ...(contextEntry.artifact_bytes != null ? { artifact_bytes: contextEntry.artifact_bytes } : {}),
+  ...(phaseMetrics.files_read != null ? { files_read: phaseMetrics.files_read } : {}),
+  ...(phaseMetrics.edits != null ? { edits: phaseMetrics.edits } : {}),
+  ...(phaseMetrics.duration_ms != null ? { duration_ms: phaseMetrics.duration_ms } : {}),
+});
 recordLog(manifest, {
   event: "phase_complete",
   phase: completedPhase,
   phase_kind: manifest.phase_kind,
-  detail: minAgents ? `swarm_count=${launches}` : "ok",
+  detail: phaseCompleteDetail,
   level: "info",
 });
 
@@ -254,6 +344,8 @@ if (nextPhase === "execute" && !force) {
 if (!nextPhase) {
   manifest.status = "completed";
   manifest.phase = "report";
+  manifest.completed_at = isoNow();
+  manifest.metrics = aggregateRunMetrics(manifest);
   manifest.enforcement.edit_allowed = false;
   recordLog(manifest, {
     event: "run_completed",
@@ -303,9 +395,16 @@ if (!nextPhase) {
     });
   }
 } else {
+  archivePhaseSwarm(manifest, completedPhase);
+  const priorAgents = manifest.swarm?.agents ?? [];
   manifest.phase = nextPhase;
   manifest.phase_kind = phaseKind(nextPhase, registry);
-  manifest.swarm = { task_launches_this_phase: 0, phase: nextPhase };
+  manifest.swarm = {
+    ...(manifest.swarm ?? {}),
+    task_launches_this_phase: 0,
+    phase: nextPhase,
+    agents: priorAgents,
+  };
   manifest.enforcement.edit_allowed = isEditPhase(nextPhase, enforcement);
 
   recordLog(manifest, {
@@ -340,16 +439,7 @@ if (!nextPhase) {
 manifest.updated_at = now;
 writeJson(manifestPath, manifest);
 
-saveActiveRun(manifest.conversation_id ?? null, {
-  run_id: runId,
-  conversation_id: manifest.conversation_id ?? null,
-  command: manifest.command,
-  phase: manifest.phase,
-  status: manifest.status,
-  task_launches_this_phase: 0,
-  edit_allowed: manifest.enforcement.edit_allowed,
-  started_at: manifest.created_at,
-});
+syncRunSidecars(manifest);
 
 console.log(
   JSON.stringify({

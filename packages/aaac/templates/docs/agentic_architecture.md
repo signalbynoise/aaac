@@ -49,6 +49,7 @@ Without a domain overlay, commands route to **generic verb orchestrators** (`ver
 | `test-module` / `test-function` | Verify behavior |
 | `update-doc` | Update architecture documentation (no code) |
 | `release-app` | Phased release swarm (git push + deploy steps) |
+| `remediate-app` | Long-running tech-debt campaign (Fallow + fix waves + satisfaction loop) |
 
 See [`.cursor/aaac/ontology.md`](../.cursor/aaac/ontology.md) for the full verb × object matrix (~130 commands).
 
@@ -158,6 +159,18 @@ Intent → Command → Execution Graph → Result
 
 Inventory documents constraints and file maps. **Dependency reasoning** uses [`.cursor/aaac/dependencies.yaml`](../.cursor/aaac/dependencies.yaml) via the `dependency_graph` phase — not inventory alone.
 
+### Orchestrator vs code-author
+
+| Role | Responsibilities | Must NOT |
+|------|------------------|----------|
+| **Parent orchestrator** | Dispatch Task subagents, merge artifacts, advance phases, user comms | Assess, score, validate, investigate, plan, verify, or review in its own context; **never edit production/source** |
+| **code-author subagent** | Production/source edits in `execute` only (1 Task per execute phase) | Edit test files; self-review |
+| **test-author subagent** | Test files in `test_execute` only | Edit production/source |
+
+**Hooks:** `gate-write.mjs` blocks parent prod writes in `execute`/`debt_sweep`; [`enforcement.json`](../.cursor/aaac/enforcement.json) `agent_separation` defines swarm minimums and parent write denial.
+
+Policy: [.cursor/policies/agent-separation.md](../.cursor/policies/agent-separation.md). Agent spec: [.cursor/agents/code-author.md](../.cursor/agents/code-author.md).
+
 ### Execution determinism (create / update / fix)
 
 Commands define *what* to load; **work lifecycle** defines phases of work; **gate stacks** define approval checkpoints; the **Run** holds state and observability.
@@ -171,7 +184,7 @@ Policies → Ontology → Graph → Create Run
 → Work: Execute → Test execute → Verify → Review swarm → Report
 ```
 
-**Agent separation (create / update / fix):** production code in `execute`; tests in `test_execute` (separate test-author agent); readonly review swarm before report. Hooks enforce path scopes via `enforcement.json` `phase_edit_scopes`.
+**Agent separation (create / update / fix):** see [Orchestrator vs code-author](#orchestrator-vs-code-author) above — parent delegates prod edits to code-author in `execute`; tests in `test_execute`; readonly review swarm before report. Hooks enforce path scopes via `enforcement.json` `phase_edit_scopes` and `agent_separation`.
 
 **Work lifecycles** (SSOT: [`.cursor/aaac/lifecycle/lifecycle.json`](../.cursor/aaac/lifecycle/lifecycle.json)):
 

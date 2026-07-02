@@ -4,6 +4,13 @@
   "description": "Every command executes within a Run. No standalone execution or logging.",
   "run": {
     "run_id": "run_{timestamp}_{slug}",
+    "origin": "agentic-os | cursor-chat",
+    "session_id": "aos_{uuid} | null",
+    "conversation_id": "string | null",
+    "execution": {
+      "adapter": "cursor-local | cursor-cloud | null",
+      "cursor_run_id": "string | null"
+    },
     "command": "string",
     "verb": "string",
     "object": "string | null",
@@ -38,7 +45,22 @@
     "swarm": {
       "task_launches_this_phase": 0,
       "phase": "string | null",
-      "agents": []
+      "agents": [],
+      "artifact_bytes": "number | null",
+      "compaction_applied": "boolean | null",
+      "estimated_utilization": "number | null"
+    },
+    "swarm_history": {},
+    "phase_metrics": {},
+    "metrics": {
+      "duration_ms": "number | null",
+      "total_tokens": "number | null",
+      "phase_count": "number | null",
+      "completed_at": "iso8601 | null"
+    },
+    "completed_at": "iso8601 | null",
+    "context": {
+      "phases": {}
     },
     "created_at": "iso8601",
     "updated_at": "iso8601"
@@ -61,7 +83,7 @@
     "phase": "string",
     "phase_kind": "work | gate",
     "skill": "string | null",
-    "event": "phase_start | phase_complete | gate_pass | gate_fail | blocked | resumed",
+    "event": "phase_start | phase_complete | gate_pass | gate_fail | blocked | resumed | agent_spawned | agent_complete | agent_progress",
     "detail": "string"
   },
   "checkpoint_entry": {

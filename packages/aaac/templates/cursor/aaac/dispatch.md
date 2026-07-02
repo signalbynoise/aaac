@@ -55,6 +55,7 @@ Read [graph.yaml](graph.yaml) and [ontology.json](ontology.json).
 - **Dependencies:** [dependencies.yaml](dependencies.yaml)
 - **Fitness:** [fitness-functions.yaml](fitness-functions.yaml) — includes `minimal_complexity` for create/update/fix
 - **Complexity:** [complexity.yaml](complexity.yaml) + [minimal-complexity.md](../policies/minimal-complexity.md) for create/update/fix
+- **Context budget:** [context-budget.yaml](context-budget.yaml) + [context-budget.md](../policies/context-budget.md) for swarm handoffs and compaction
 - **Contracts:** validate against [contracts/commands/](contracts/commands/) and [contracts/skills/](contracts/skills/)
 
 ## 2.5 Create or resume Run
@@ -138,6 +139,14 @@ Do **not** proceed until user approves in chat. On approval: log decision, set `
 | create | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) |
 | update | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) |
 | fix | [investigation](../skills/shared/investigation/SKILL.md) Mode A (7-agent swarm) → [root-cause](../skills/shared/root-cause/SKILL.md) |
+
+### Agent separation (mandatory — all commands)
+
+Policy: [agent-separation.md](../policies/agent-separation.md)
+
+- **Parent orchestrator must not assess** — no self-scoring, gate passes, investigation conclusions, or report without independent Task subagents.
+- **Hooks** deny decision-artifact writes until `swarm_min_agents` Task launches are recorded for the current phase.
+- **Writer / tester / reviewer** remain separated in execute → test_execute → verify → review_swarm; parent delegates prod edits to code-author Task in `execute`.
 
 ### Fix swarm (mandatory on fix verb / fix_mode)
 

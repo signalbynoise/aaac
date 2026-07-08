@@ -14,9 +14,13 @@ function aaacRoot() {
   if (workspaceOverride) {
     return path.join(path.resolve(workspaceOverride), ".cursor", "aaac");
   }
-  const fromPackage = path.resolve(__dirname, "../../../..", ".cursor", "aaac");
-  if (fs.existsSync(path.join(fromPackage, "swarm-sizing.yaml"))) {
-    return fromPackage;
+  const dogfood = path.resolve(__dirname, "../../../..", ".cursor", "aaac");
+  if (fs.existsSync(path.join(dogfood, "swarm-sizing.yaml"))) {
+    return dogfood;
+  }
+  const packaged = path.resolve(__dirname, "../../templates/cursor/aaac");
+  if (fs.existsSync(path.join(packaged, "swarm-sizing.yaml"))) {
+    return packaged;
   }
   return path.resolve(__dirname, "../../..", "aaac");
 }

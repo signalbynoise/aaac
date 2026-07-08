@@ -3,7 +3,7 @@ import {
   loadEnforcement,
   resolveSwarmMinimum,
 } from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
-import { resolveSwarmTarget } from '../../../../.cursor/aaac/scripts/run-engine/resolve-swarm-target.mjs';
+import { resolveSwarmTarget } from '../../src/run-engine/resolve-swarm-target.mjs';
 import { resolvePhaseArtifacts } from '../../../../.cursor/aaac/scripts/run-engine/context-budget.mjs';
 import {
   advancePhase,

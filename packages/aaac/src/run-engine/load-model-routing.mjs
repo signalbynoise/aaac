@@ -37,9 +37,13 @@ function aaacRoot() {
   if (workspaceOverride) {
     return path.join(path.resolve(workspaceOverride), ".cursor", "aaac");
   }
-  const fromPackage = path.resolve(__dirname, "../../../..", ".cursor", "aaac");
-  if (fs.existsSync(path.join(fromPackage, "model-routing.yaml"))) {
-    return fromPackage;
+  const dogfood = path.resolve(__dirname, "../../../..", ".cursor", "aaac");
+  if (fs.existsSync(path.join(dogfood, "model-routing.yaml"))) {
+    return dogfood;
+  }
+  const packaged = path.resolve(__dirname, "../../templates/cursor/aaac");
+  if (fs.existsSync(path.join(packaged, "model-routing.yaml"))) {
+    return packaged;
   }
   return path.resolve(__dirname, "../../..", "aaac");
 }

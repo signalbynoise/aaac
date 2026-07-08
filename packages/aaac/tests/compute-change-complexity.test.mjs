@@ -15,7 +15,7 @@ import { REPO_ROOT } from "./fixtures/paths.mjs";
 
 const COMPUTE_CHANGE = path.join(
   REPO_ROOT,
-  ".cursor/aaac/scripts/run-engine/compute-change-complexity.mjs",
+  "packages/aaac/src/run-engine/compute-change-complexity.mjs",
 );
 
 describe("compute-change-complexity", () => {

@@ -15,7 +15,7 @@ import { REPO_ROOT } from "./fixtures/paths.mjs";
 
 const COMPUTE_SCOPE = path.join(
   REPO_ROOT,
-  ".cursor/aaac/scripts/run-engine/compute-scope-complexity.mjs",
+  "packages/aaac/src/run-engine/compute-scope-complexity.mjs",
 );
 
 function runComputeScope(runId, source) {

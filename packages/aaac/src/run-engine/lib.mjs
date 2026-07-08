@@ -12,6 +12,14 @@ function resolveRoots() {
     const cursorRoot = path.join(repoRoot, ".cursor");
     return { repoRoot, cursorRoot };
   }
+  const monorepoRoot = path.resolve(__dirname, "../../../..");
+  const dogfoodAaac = path.join(monorepoRoot, ".cursor", "aaac");
+  if (fs.existsSync(path.join(dogfoodAaac, "enforcement.json"))) {
+    return {
+      repoRoot: monorepoRoot,
+      cursorRoot: path.join(monorepoRoot, ".cursor"),
+    };
+  }
   const cursorRoot = path.resolve(__dirname, "../../..");
   return { repoRoot: path.resolve(cursorRoot, ".."), cursorRoot };
 }

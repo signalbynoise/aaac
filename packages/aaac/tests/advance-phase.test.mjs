@@ -18,7 +18,7 @@ import {
   advancePhase,
   recordTaskLaunch,
 } from './fixtures/run-engine-spawn.mjs';
-import { resolveSwarmTarget } from '../../../.cursor/aaac/scripts/run-engine/resolve-swarm-target.mjs';
+import { resolveSwarmTarget } from '../src/run-engine/resolve-swarm-target.mjs';
 import { loadEnforcement } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
 import { REPO_ROOT } from './fixtures/paths.mjs';
 

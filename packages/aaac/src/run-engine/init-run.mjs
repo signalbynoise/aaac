@@ -26,6 +26,7 @@ import {
   evaluateCapabilityRuntimePolicy,
   loadObjectMaturity,
 } from "./capability-evidence.mjs";
+import { bootstrapSwarmSizing } from "./swarm-sizing-hooks.mjs";
 
 async function readStdin() {
   return new Promise((resolve) => {
@@ -148,8 +149,14 @@ const manifest = {
   capability_runtime: capabilityRuntimePolicy,
   capability_runtime_approved: false,
   confidence: { architecture: null, requirements: null, scope: null },
+  complexity: {},
   gates: { stack: entry.gate_stack ?? null, results: {} },
-  swarm: { task_launches_this_phase: 0, phase: pending[0] },
+  swarm: {
+    task_launches_this_phase: 0,
+    phase: pending[0],
+    target_agents: {},
+    wave_plan: {},
+  },
   enforcement: { edit_allowed: false, hook_version: 2 },
   created_at: now,
   updated_at: now,
@@ -238,6 +245,8 @@ recordLog(manifest, {
 
 manifest.updated_at = now;
 writeJson(`${runDir(runId)}/run.json`, manifest);
+const bootstrapped = bootstrapSwarmSizing(runId, manifest);
+writeJson(`${runDir(runId)}/run.json`, bootstrapped);
 saveActiveRun(conversationId, {
   run_id: runId,
   conversation_id: conversationId,

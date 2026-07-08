@@ -235,6 +235,10 @@ export function archivePhaseSwarm(manifest, phase) {
   manifest.swarm_history[phase] = {
     agents,
     phase_metrics: manifest.phase_metrics?.[phase] ?? null,
+    target_agents: manifest.swarm?.target_agents?.[phase] ?? null,
+    scope_score: manifest.complexity?.scope_score ?? null,
+    change_score: manifest.complexity?.change_score ?? null,
+    wave_count: manifest.swarm?.wave_plan?.[phase]?.waves?.length ?? null,
     ...(expectedSpecs?.length ? { expected_agent_specs: expectedSpecs } : {}),
   };
 }

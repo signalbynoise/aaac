@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
 import { copyDirRecursive, substituteInTree } from "./copy.mjs";
+import { spawnNodeScript } from "./node-exec.mjs";
 import {
   ensureDir,
   packageGeneratorsDir,
@@ -12,20 +13,39 @@ import {
   snapshotProjectDocs,
 } from "./sweep-project-docs.mjs";
 
+const packageRoot = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
+
+function writeInstallManifest(aaacDest) {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"),
+  );
+  const manifest = {
+    package: pkg.name,
+    version: pkg.version,
+    installed_at: new Date().toISOString(),
+  };
+  fs.writeFileSync(
+    path.join(aaacDest, "install-manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+}
+
 export function runGenerators(cursorRoot) {
   const generatorsDir = packageGeneratorsDir();
-  const graph = spawnSync(
-    process.execPath,
-    [path.join(generatorsDir, "generate-graph.mjs"), "--root", cursorRoot],
-    { stdio: "inherit" },
+  const graph = spawnNodeScript(
+    path.join(generatorsDir, "generate-graph.mjs"),
+    ["--root", cursorRoot],
   );
   if (graph.status !== 0) {
     throw new Error("generate-graph.mjs failed");
   }
-  const commands = spawnSync(
-    process.execPath,
-    [path.join(generatorsDir, "generate-commands.mjs"), "--root", cursorRoot],
-    { stdio: "inherit" },
+  const commands = spawnNodeScript(
+    path.join(generatorsDir, "generate-commands.mjs"),
+    ["--root", cursorRoot],
   );
   if (commands.status !== 0) {
     throw new Error("generate-commands.mjs failed");
@@ -78,6 +98,7 @@ export function installAaac({
   substituteInTree(docsDest, replacements);
 
   runGenerators(cursorDest);
+  writeInstallManifest(aaacDest);
 
   const sweep = runInstallSweep(resolvedTarget, {
     docsRoot,

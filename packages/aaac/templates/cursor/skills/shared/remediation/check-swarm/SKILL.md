@@ -26,7 +26,11 @@ node .cursor/aaac/scripts/remediation/prepare-check-context.mjs \
 
 Read `iterations/{n}/check-context.json` — SSOT input for every agent.
 
-## Swarm (mandatory — **7 parallel Task agents**, one message)
+## Swarm (mandatory — parallel Task agents, one message)
+
+Read **`manifest.swarm.target_agents.check_swarm`** on the Run (set after Fallow scan via `compute-scope-complexity.mjs --source remediation_scan`). Default floor for `remediate-app` is **7**; scope score may raise the target up to the ceiling.
+
+Launch **that many** parallel Task agents in **one message** (use `manifest.swarm.wave_plan.check_swarm` when present):
 
 Each agent: `subagent_type: explore`, `readonly: true`. Prompt **must** include policy from [_task-prompt-policy.md](../../_task-prompt-policy.md), `check-context.json` path, and agent spec path.
 

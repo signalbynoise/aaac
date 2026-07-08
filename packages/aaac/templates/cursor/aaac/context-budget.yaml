@@ -1,6 +1,6 @@
 # Effective context budget — SSOT for LLM prompt/context governance in AAAC runs
 # Policy: .cursor/policies/context-budget.md
-# Implementation (scripts, enforcement gates): deferred to /update-module aaac
+# Script enforcement: context-budget.mjs, prepare-phase-context.mjs, advance-phase gates
 
 version: 1
 
@@ -38,8 +38,11 @@ handoff:
 
 swarm:
   description: >-
-    Parallel swarms are the primary mitigation. Minimums stay in enforcement.json;
-    when estimated prompt exceeds per_agent_max, reduce parallel count or split waves.
+    Parallel swarms are the primary mitigation. Per-phase targets come from
+    swarm-sizing.yaml (scope/change scores → tiers); floors are hard minimums.
+    When estimated prompt exceeds per_agent_max, reduce parallel count or split waves
+    (see manifest.swarm.wave_plan).
+  ssot: aaac/swarm-sizing.yaml
   prefer_waves_over_monolith: true
 
 telemetry:

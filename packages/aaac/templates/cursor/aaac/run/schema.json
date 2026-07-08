@@ -45,7 +45,15 @@
     "swarm": {
       "task_launches_this_phase": 0,
       "phase": "string | null",
-      "agents": [],
+      "agents": [
+        {
+          "model": "string | null",
+          "expected_model": "string | null",
+          "expected_tier": "string | null",
+          "model_routing_source": "agent_specs | phases | subagent_types | default_tier | null",
+          "model_mismatch": "boolean"
+        }
+      ],
       "artifact_bytes": "number | null",
       "compaction_applied": "boolean | null",
       "estimated_utilization": "number | null"

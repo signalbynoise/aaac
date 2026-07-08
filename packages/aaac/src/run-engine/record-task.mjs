@@ -11,6 +11,7 @@ import {
   conversationIdFromHook,
 } from "./lib.mjs";
 import { recordLog } from "./log.mjs";
+import { resolveModelForPhase } from "./resolve-model-for-phase.mjs";
 
 function inferAgentSpecId(hook, description) {
   const explicit = hook.agent_spec_id ?? hook.agentSpecId ?? null;
@@ -82,6 +83,20 @@ process.stdin.on("end", () => {
   if (manifest.phase === "execute" && !agentSpecId && requiredExecuteSpec) {
     agentSpecId = requiredExecuteSpec;
   }
+
+  const subagentType = hook.subagent_type ?? hook.subagentType ?? null;
+  const modelRouting = resolveModelForPhase({
+    phase: manifest.phase,
+    agent_spec_id: agentSpecId,
+    subagent_type: subagentType,
+  });
+
+  const expectedTier = modelRouting.tier ?? null;
+  const expectedModel = modelRouting.model_slug ?? null;
+  const modelRoutingSource = modelRouting.source ?? null;
+  const observedModel = hook.model ?? null;
+  const modelMismatch = observedModel != null && observedModel !== expectedModel;
+
   const subagentId = hook.subagent_id ?? hook.subagentId ?? null;
 
   const agentEntry = {
@@ -89,15 +104,21 @@ process.stdin.on("end", () => {
     started_at: isoNow(),
     index: launchIndex,
     phase: manifest.phase,
-    subagent_type: hook.subagent_type ?? hook.subagentType ?? null,
+    subagent_type: subagentType,
     description,
     ...(agentSpecId ? { agent_spec_id: agentSpecId } : {}),
     ...(subagentId ? { subagent_id: subagentId } : {}),
-    model: hook.model ?? null,
+    model: observedModel,
+    expected_model: expectedModel,
+    expected_tier: expectedTier,
+    model_routing_source: modelRoutingSource,
+    model_mismatch: modelMismatch,
     readonly: hook.readonly ?? null,
   };
+
   manifest.swarm.agents = manifest.swarm.agents ?? [];
   manifest.swarm.agents.push(agentEntry);
+
   const isDelegatePhase = delegatePhases.includes(manifest.phase);
   const matchesRequiredSpec =
     !requiredExecuteSpec || agentSpecId === requiredExecuteSpec;
@@ -119,6 +140,10 @@ process.stdin.on("end", () => {
     ...(agentEntry.description ? { description: agentEntry.description } : {}),
     ...(agentEntry.agent_spec_id ? { agent_spec_id: agentEntry.agent_spec_id } : {}),
     ...(agentEntry.model ? { model: agentEntry.model } : {}),
+    expected_model: expectedModel,
+    expected_tier: expectedTier,
+    model_routing_source: modelRoutingSource,
+    model_mismatch: modelMismatch,
   };
 
   recordLog(manifest, {

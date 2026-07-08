@@ -10,6 +10,7 @@ import {
   resolveCursorRoot,
   packageGeneratorsDir,
 } from "../lib/paths.mjs";
+import { nodeScriptEnv } from "../lib/node-exec.mjs";
 
 const INJECT_MARKER = "{{INJECT_OBJECT_BLOCKS}}";
 
@@ -264,5 +265,8 @@ console.log("Wrote graph.yaml");
 
 const registryScript = path.join(aaac, "scripts", "generate-runtime-registry.mjs");
 if (fs.existsSync(registryScript)) {
-  execSync(`${process.execPath} "${registryScript}"`, { stdio: "inherit" });
+  execSync(`"${process.execPath}" "${registryScript}"`, {
+    stdio: "inherit",
+    env: nodeScriptEnv(),
+  });
 }

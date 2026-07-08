@@ -171,6 +171,16 @@ Inventory documents constraints and file maps. **Dependency reasoning** uses [`.
 
 Policy: [.cursor/policies/agent-separation.md](../.cursor/policies/agent-separation.md). Agent spec: [.cursor/agents/code-author.md](../.cursor/agents/code-author.md).
 
+### Heterogeneous model routing
+
+AAAC supports tiered model routing so each phase/subagent launch resolves from one SSOT before Task spawn.
+
+- **SSOT config:** [`.cursor/aaac/model-routing.yaml`](../.cursor/aaac/model-routing.yaml)
+- **Resolver:** `.cursor/aaac/scripts/run-engine/resolve-model-for-phase.mjs`
+- **Tier intent (v1):** `fast` for discovery/verification/review swarms, `reasoning` for planning + gate analysis, `codex` for execute/test_execute code-writing flows
+- **Scope:** v1 is guidance + telemetry only (no hard launch block on mismatch)
+- **Telemetry:** `agent_spawned` records observed model + expected tier/model + routing source + mismatch flag on the Run
+
 ### Execution determinism (create / update / fix)
 
 Commands define *what* to load; **work lifecycle** defines phases of work; **gate stacks** define approval checkpoints; the **Run** holds state and observability.

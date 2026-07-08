@@ -12,6 +12,7 @@ Append this block to **every** Task sub-agent prompt the orchestrator sends.
 - **Agent separation:** parent orchestrator must not assess or write prod; delegate to code-author in execute. See [agent-separation.md](../../policies/agent-separation.md).
 - **Errors:** never silent — state gaps explicitly in the return block.
 - **Context budget:** assume degraded recall beyond ~40% of advertised context. Prefer scoped reads over whole-repo scans. Return structured blocks only — no prose dumps. See [.cursor/policies/context-budget.md](../../policies/context-budget.md) and [context-budget.yaml](../../../aaac/context-budget.yaml).
+- **Model routing:** parent resolves tier from `.cursor/aaac/model-routing.yaml` and passes the matching `model` slug on Task launches.
 
 Full policy chain: [.cursor/policies/master-rules.md](../../policies/master-rules.md) → [docs/master_rules.md](../../../docs/master_rules.md)
 

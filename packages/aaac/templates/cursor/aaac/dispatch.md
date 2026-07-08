@@ -51,11 +51,12 @@ Read [graph.yaml](graph.yaml) and [ontology.json](ontology.json).
 - **Lifecycle (work):** [lifecycle/lifecycle.json](lifecycle/lifecycle.json) `verbs.*.work_phases`
 - **Gates (approval):** [governance/gates.json](governance/gates.json) — composed into runtime per `verb_runtime` in graph
 - **Maturity:** read `object_maturity.<object>` and apply `maturity_rules.<level>` (may require extra gate phases)
-- **Capabilities:** resolve `object_capabilities.<object>` via [capabilities/registry.json](capabilities/registry.json) — `init-run.mjs` records providers on `Run.capabilities_resolved`; on completion `capability-evidence.mjs` aggregates evidence into [state/capability-stats.json](state/capability-stats.json) and evaluates [capabilities/promotion-rules.json](capabilities/promotion-rules.json)
+- **Capabilities:** resolve `object_capabilities.<object>` via [capabilities/registry.json](capabilities/registry.json) — `init-run.mjs` records providers + **runtime state** on `Run.capabilities_resolved` (from [state/capability-stats.json](state/capability-stats.json)); [capabilities/promotion-rules.json](capabilities/promotion-rules.json) `runtime` rules **block or require approval** before `execute`; on completion evidence is aggregated back into stats
 - **Dependencies:** [dependencies.yaml](dependencies.yaml)
 - **Fitness:** [fitness-functions.yaml](fitness-functions.yaml) — includes `minimal_complexity` for create/update/fix
 - **Complexity:** [complexity.yaml](complexity.yaml) + [minimal-complexity.md](../policies/minimal-complexity.md) for create/update/fix
 - **Context budget:** [context-budget.yaml](context-budget.yaml) + [context-budget.md](../policies/context-budget.md) for swarm handoffs and compaction
+- **Model routing:** [model-routing.yaml](model-routing.yaml) + [model-routing.md](../policies/model-routing.md) as model tier SSOT + launch policy
 - **Contracts:** validate against [contracts/commands/](contracts/commands/) and [contracts/skills/](contracts/skills/)
 
 ## 2.5 Create or resume Run
@@ -136,22 +137,23 @@ Do **not** proceed until user approves in chat. On approval: log decision, set `
 
 | Verb | Investigation |
 |------|----------------|
-| create | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) |
-| update | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) |
-| fix | [investigation](../skills/shared/investigation/SKILL.md) Mode A (7-agent swarm) → [root-cause](../skills/shared/root-cause/SKILL.md) |
+| create | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) — **3-agent swarm** |
+| update | [investigation-lite](../skills/shared/investigation-lite/SKILL.md) — **3-agent swarm** |
+| fix | [investigation](../skills/shared/investigation/SKILL.md) Mode A (7-agent swarm) → [root-cause](../skills/shared/root-cause/SKILL.md) — **2-agent swarm** |
 
 ### Agent separation (mandatory — all commands)
 
-Policy: [agent-separation.md](../policies/agent-separation.md)
+Policy: [.cursor/policies/agent-separation.md](../policies/agent-separation.md)
 
 - **Parent orchestrator must not assess** — no self-scoring, gate passes, investigation conclusions, or report without independent Task subagents.
-- **Hooks** deny decision-artifact writes until `swarm_min_agents` Task launches are recorded for the current phase.
+- **Hooks** deny decision-artifact writes until the Run swarm **target** Task launches are recorded (`manifest.swarm.target_agents`; floors in `swarm-sizing.yaml`).
 - **Writer / tester / reviewer** remain separated in execute → test_execute → verify → review_swarm; parent delegates prod edits to code-author Task in `execute`.
+- **Model selection before Task launch:** resolve model via `resolve-model-for-phase.mjs` (reads `model-routing.yaml`) and pass the resolved `model` parameter to each Task tool call.
 
 ### Fix swarm (mandatory on fix verb / fix_mode)
 
-1. **discover** — 4–6 parallel Task agents per [discovery/SKILL.md](../skills/shared/discovery/SKILL.md)
-2. **investigate_swarm** — 7 parallel Task agents per investigation Mode A — **one message**
+1. **discover** — parallel Task agents per [discovery/SKILL.md](../skills/shared/discovery/SKILL.md) — count from `manifest.swarm.target_agents.discover`
+2. **investigate_swarm** — parallel Task agents per investigation Mode A — count from `manifest.swarm.target_agents.investigate_swarm` — **one message**
 3. **root_cause** — artifact required; confidence ≥ 0.7 before plan
 4. **verify** — fix verify swarm (3 parallel) per [testing/SKILL.md](../skills/shared/testing/SKILL.md); **website build gate** (`verify-website-build.mjs`) must pass for create/update/fix; fail if `repro_status: not_fixed`
 

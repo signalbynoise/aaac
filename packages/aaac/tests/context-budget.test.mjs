@@ -9,6 +9,7 @@ import {
   CONTEXT_BUDGET_PATH,
 } from "../../../.cursor/aaac/scripts/run-engine/context-budget.mjs";
 import { loadEnforcement } from "../../../.cursor/aaac/scripts/run-engine/lib.mjs";
+import { resolveSwarmTarget } from "../../../.cursor/aaac/scripts/run-engine/resolve-swarm-target.mjs";
 import {
   seedRun,
   cleanupRun,
@@ -61,12 +62,15 @@ describe("context-budget", () => {
   it("check verb discover advance requires discover_brief.yaml", async () => {
     const conversationId = uniqueConversationId("check-discover-brief");
     const runId = nextRunId("check-discover-brief");
-    seedRun(checkModuleManifest("discover", runId, conversationId), conversationId);
+    const manifest = checkModuleManifest("discover", runId, conversationId);
+    const enforcement = loadEnforcement();
+    const min =
+      resolveSwarmTarget("discover", manifest, enforcement) ??
+      enforcement.swarm_min_agents.check_swarm ??
+      3;
+    manifest.swarm = { task_launches_this_phase: min, phase: "discover" };
+    seedRun(manifest, conversationId);
     runs.push({ runId, conversationId });
-
-    for (let i = 0; i < 3; i += 1) {
-      await recordTaskLaunch(conversationId);
-    }
 
     const missing = await advancePhase(runId, "discover");
     expect(missing.code).toBe(2);

@@ -1,0 +1,46 @@
+version: 1
+
+tiers:
+  fast: composer-2.5-fast
+  codex: gpt-5.3-codex-high-fast
+  reasoning: claude-sonnet-5-thinking-high
+
+default_tier: fast
+
+phases:
+  discover: fast
+  investigate_lite: fast
+  investigate_swarm: fast
+  research_swarm: fast
+  check_swarm: fast
+  verify: fast
+  review_swarm: fast
+
+  plan: reasoning
+  validate: reasoning
+  impact_analysis: reasoning
+  dependency_graph: reasoning
+  fitness_functions: reasoning
+  rollback: reasoning
+  root_cause: reasoning
+  report: reasoning
+
+  execute: codex
+  test_execute: codex
+  debt_sweep: codex
+
+  scan: null # parent_only
+  parse: null # parent_only
+  campaign_init: null # parent_only
+  plan_waves: null # parent_only
+  satisfaction_gate: null # parent_only
+
+agent_specs:
+  code-author: codex
+  test-author: codex
+  discovery-*: fast
+  fix-*: fast
+
+subagent_types:
+  explore: fast
+  shell: fast

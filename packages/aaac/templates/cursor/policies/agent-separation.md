@@ -16,17 +16,17 @@ Parent may only:
 
 ## Hard enforcement
 
-1. **`advance-phase.mjs`** — blocks phase completion until `swarm_min_agents` Task launches are recorded for that phase.
-2. **`gate-write.mjs`** — denies writes to phase decision artifacts until the swarm minimum is met.
+1. **`advance-phase.mjs`** — blocks phase completion until the Run's **swarm target** Task launches are recorded for that phase (`manifest.swarm.target_agents`, floors in `swarm-sizing.yaml`).
+2. **`gate-write.mjs`** — denies writes to phase decision artifacts until the swarm target is met.
 3. **Hooks** — `subagentStart` counts Task launches per phase.
 
 ## Swarm phases (all commands)
 
-Every phase that produces a decision artifact requires independent Task subagents — see `swarm_min_agents` in enforcement.json.
+Every phase that produces a decision artifact requires independent Task subagents. **Targets are dynamic** — read `manifest.swarm.target_agents.<phase>` (computed by `compute-scope-complexity.mjs` / `compute-change-complexity.mjs` + `resolve-swarm-target.mjs`). **Floors** in `swarm-sizing.yaml` are hard minimums.
 
-| Phase | Min agents | Parent role |
-|-------|------------|-------------|
-| discover | 4 | Merge brief |
+| Phase | Typical floor | Parent role |
+|-------|---------------|-------------|
+| discover | 4 | Merge brief + scope_signals |
 | investigate_lite | 3 | Merge investigation |
 | plan | 2 | Merge plan.yaml |
 | validate … rollback | 2–3 each | Merge gate artifacts |

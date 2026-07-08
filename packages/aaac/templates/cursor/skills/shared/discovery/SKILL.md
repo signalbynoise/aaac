@@ -14,7 +14,9 @@ Orchestrator phase `discovery_swarm`. **Readonly** — no file edits.
 
 ## Swarm (mandatory)
 
-Launch **4–6** parallel `Task` subagents (`explore`, `readonly: true`) in **one message**:
+Read **`manifest.swarm.target_agents.discover`** (or current phase key) from the Run — do not hardcode agent counts. Floors and tiers live in `.cursor/aaac/swarm-sizing.yaml`; bootstrap scope score sets the initial target at Run start.
+
+Launch **that many** parallel `Task` subagents (`explore`, `readonly: true`) in **one message** (split into waves when `manifest.swarm.wave_plan.discover` exists):
 
 | Agent spec | Angle |
 |------------|-------|
@@ -22,7 +24,21 @@ Launch **4–6** parallel `Task` subagents (`explore`, `readonly: true`) in **on
 | [discovery-boundaries.md](../../../agents/discovery-boundaries.md) | In/out of scope |
 | [discovery-ssot.md](../../../agents/discovery-ssot.md) | State ownership |
 
-Add domain-specific angles from inventory skill. Max **8** agents total; second wave ≤2 for critical gaps.
+Add domain-specific angles from inventory skill. Respect ceiling in swarm-sizing.yaml; second wave only when wave_plan requires it.
+
+## discover_brief scope_signals (mandatory)
+
+Each discovery agent must contribute to merged **`artifacts/discover_brief.yaml`** including a `scope_signals` block consumed by `compute-scope-complexity.mjs`:
+
+```yaml
+scope_signals:
+  files_in_scope: <number>
+  cross_domain: <true|false>
+  migration_mentioned: <true|false>
+  protected_object: <true|false>
+  intent_ambiguity: low|medium|high
+  open_questions: <count>
+```
 
 ## Task prompt (mandatory)
 

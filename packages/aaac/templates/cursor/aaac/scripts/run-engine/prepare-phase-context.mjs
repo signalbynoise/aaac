@@ -8,6 +8,7 @@
 import path from "path";
 import { isoNow, loadRunManifest, runDir, writeJson } from "./lib.mjs";
 import { loadContextBudget } from "./context-budget.mjs";
+import { resolveModelForPhase } from "./resolve-model-for-phase.mjs";
 
 function parseArgs(argv) {
   const out = { runId: null };
@@ -32,6 +33,7 @@ if (!manifest) {
 const budget = loadContextBudget();
 const intent =
   typeof manifest.intent === "string" ? manifest.intent.slice(0, 2000) : "";
+const modelRouting = resolveModelForPhase({ phase: manifest.phase });
 
 const context = {
   prepared_at: isoNow(),
@@ -43,6 +45,18 @@ const context = {
   intent,
   phase: manifest.phase,
   completed: manifest.completed ?? [],
+  complexity: {
+    scope_score: manifest.complexity?.scope_score ?? null,
+    change_score: manifest.complexity?.change_score ?? null,
+  },
+  swarm_target: manifest.swarm?.target_agents?.[manifest.phase] ?? null,
+  wave_plan: manifest.swarm?.wave_plan?.[manifest.phase] ?? null,
+  model_routing: {
+    tier: modelRouting.tier ?? null,
+    model_slug: modelRouting.model_slug ?? null,
+    source: modelRouting.source ?? null,
+    parent_only: modelRouting.parent_only ?? false,
+  },
   compaction: budget.compaction,
   handoff: {
     rule: "artifact_first",
@@ -51,7 +65,10 @@ const context = {
   },
   policy_paths: {
     context_budget: ".cursor/aaac/context-budget.yaml",
+    swarm_sizing: ".cursor/aaac/swarm-sizing.yaml",
+    model_routing: ".cursor/aaac/model-routing.yaml",
     context_budget_policy: ".cursor/policies/context-budget.md",
+    model_routing_policy: ".cursor/policies/model-routing.md",
     task_prompt_policy: ".cursor/skills/shared/_task-prompt-policy.md",
   },
   instructions:

@@ -2,6 +2,13 @@
 
 version: 1
 
+swarm_sizing:
+  ssot: aaac/swarm-sizing.yaml
+  note: >-
+    Dynamic targets on manifest.swarm.target_agents override swarm_minimums below.
+    Scope score (bootstrap/discover/scan) drives discover/investigate/check swarms;
+    change score (plan/post_impact) drives gate/verify/review/report swarms.
+
 create:
   description: Create verbs — discover → investigate_lite → plan → gates → execute → verify → report.
   phases:

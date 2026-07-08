@@ -18,6 +18,7 @@ import {
   advancePhase,
   recordTaskLaunch,
 } from './fixtures/run-engine-spawn.mjs';
+import { resolveSwarmTarget } from '../../../.cursor/aaac/scripts/run-engine/resolve-swarm-target.mjs';
 import { loadEnforcement } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
 import { REPO_ROOT } from './fixtures/paths.mjs';
 
@@ -45,13 +46,14 @@ describe('advance-phase', () => {
   it('advances discover after enough Task launches', async () => {
     const conversationId = uniqueConversationId('advance-discover-ok');
     const runId = nextRunId('advance-discover-ok');
-    seedRun(createModuleManifest('discover', runId, conversationId), conversationId);
+    const enforcement = loadEnforcement();
+    const seeded = createModuleManifest('discover', runId, conversationId);
+    const min =
+      resolveSwarmTarget('discover', seeded, enforcement) ??
+      enforcement.swarm_min_agents.discover;
+    seeded.swarm = { task_launches_this_phase: min, phase: 'discover' };
+    seedRun(seeded, conversationId);
     runs.push({ runId, conversationId });
-
-    const min = loadEnforcement().swarm_min_agents.discover;
-    for (let i = 0; i < min; i += 1) {
-      await recordTaskLaunch(conversationId);
-    }
     writeArtifact(
       runId,
       'artifacts/discover_brief.yaml',

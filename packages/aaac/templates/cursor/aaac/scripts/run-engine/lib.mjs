@@ -283,8 +283,11 @@ export function phaseKind(phase, registry) {
   return isGatePhase(phase, registry) ? "gate" : "work";
 }
 
-/** Swarm minimum for completed phase — check verb uses check_swarm on discover. */
+/** Swarm minimum for completed phase — uses dynamic targets when available on manifest. */
 export function resolveSwarmMinimum(completedPhase, manifest, enforcement) {
+  const fromManifest = manifest?.swarm?.target_agents?.[completedPhase];
+  if (fromManifest != null && fromManifest > 0) return fromManifest;
+
   const mutating = enforcement.mutating_verbs ?? ["create", "update", "fix"];
   const isMutating =
     mutating.includes(manifest.verb) ||
@@ -316,6 +319,11 @@ export function resolveSwarmMinimum(completedPhase, manifest, enforcement) {
   }
   return enforcement.swarm_min_agents?.[completedPhase];
 }
+
+export function resolveSwarmTarget(completedPhase, manifest, enforcement) {
+  return resolveSwarmMinimum(completedPhase, manifest, enforcement);
+}
+
 
 export function promptFromHook(hook) {
   return hook?.prompt ?? hook?.text ?? hook?.content ?? "";

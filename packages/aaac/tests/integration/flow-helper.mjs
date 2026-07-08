@@ -3,6 +3,7 @@ import {
   loadEnforcement,
   resolveSwarmMinimum,
 } from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import { resolveSwarmTarget } from '../../../../.cursor/aaac/scripts/run-engine/resolve-swarm-target.mjs';
 import { resolvePhaseArtifacts } from '../../../../.cursor/aaac/scripts/run-engine/context-budget.mjs';
 import {
   advancePhase,
@@ -16,10 +17,14 @@ import {
   writeArtifact,
 } from '../fixtures/run-state.mjs';
 
-async function satisfySwarm(conversationId, phase, command, verb) {
+async function satisfySwarm(conversationId, phase, runId) {
+  const manifest = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
   const enforcement = loadEnforcement();
   const min =
-    resolveSwarmMinimum(phase, { command, verb }, enforcement) ?? 0;
+    manifest.swarm?.target_agents?.[phase] ??
+    resolveSwarmTarget(phase, manifest, enforcement) ??
+    resolveSwarmMinimum(phase, manifest, enforcement) ??
+    0;
   for (let i = 0; i < min; i += 1) {
     await recordTaskLaunch(conversationId);
   }
@@ -62,7 +67,7 @@ export async function simulateVerbFlow(prompt, conversationId) {
 
   while (manifest.status === 'running' && manifest.phase !== 'report') {
     const phase = manifest.phase;
-    await satisfySwarm(conversationId, phase, manifest.command, manifest.verb);
+    await satisfySwarm(conversationId, phase, runId);
     await satisfyArtifacts(runId, phase, manifest);
 
     const forceExecute =
@@ -79,7 +84,7 @@ export async function simulateVerbFlow(prompt, conversationId) {
   }
 
   if (manifest.phase === 'report') {
-    await satisfySwarm(conversationId, 'report', manifest.command, manifest.verb);
+    await satisfySwarm(conversationId, 'report', runId);
     await satisfyArtifacts(runId, 'report', manifest);
     const final = await advancePhase(runId, 'report');
     if (final.code !== 0) {

@@ -44,7 +44,7 @@ Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …
    - `review_swarm`: 3 readonly reviewers (mutating verbs)
    - `report`: 2 readonly reviewers
 4. **Orchestrator vs editor:** Parent must **never** edit production code — launch **1 code-author** Task in `execute`. Hooks deny parent prod writes.
-5. **Agent separation (mutating verbs):** Parent must **never** assess, score, validate, investigate, plan, verify, or review in its own context. Launch independent Task subagents per phase; parent merges only. See [agent-separation.md](../policies/agent-separation.md). Hard enforcement: `gate-write.mjs` + `advance-phase.mjs` + `swarm_min_agents` in [enforcement.json](../aaac/enforcement.json).
+5. **Agent separation (mutating verbs):** Parent must **never** assess, score, validate, investigate, plan, verify, or review in its own context. Launch independent Task subagents per phase; parent merges only. See [.cursor/policies/agent-separation.md](../policies/agent-separation.md). Hard enforcement: `gate-write.mjs` + `advance-phase.mjs` + dynamic targets in [swarm-sizing.yaml](../aaac/swarm-sizing.yaml) (`manifest.swarm.target_agents`).
 6. **Verify gate (create / update / fix):** before advancing past `verify`, run:
    ```bash
    node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id <run_id>

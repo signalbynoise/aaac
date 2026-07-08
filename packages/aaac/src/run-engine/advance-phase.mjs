@@ -36,6 +36,11 @@ import {
 import { recordLog } from "./log.mjs";
 import { syncRunSidecars } from "./reconcile-run-status.mjs";
 import {
+  runPhaseComplexityHooks,
+  applyNextPhaseSwarmTarget,
+} from "./swarm-sizing-hooks.mjs";
+import { resolveSwarmTargetDetail } from "./resolve-swarm-target.mjs";
+import {
   processRunEvidence,
   evaluateCapabilityRuntimePolicy,
   resolveCapabilitiesWithRuntime,
@@ -93,7 +98,10 @@ if (manifest.phase !== completedPhase) {
   process.exit(1);
 }
 
-const minAgents = resolveSwarmMinimum(completedPhase, manifest, enforcement);
+const minAgents =
+  manifest.swarm?.target_agents?.[completedPhase] ??
+  resolveSwarmMinimum(completedPhase, manifest, enforcement);
+const targetDetail = resolveSwarmTargetDetail(completedPhase, manifest, enforcement);
 const launches = manifest.swarm?.task_launches_this_phase ?? 0;
 if (minAgents && launches < minAgents && !force) {
   recordLog(manifest, {
@@ -109,6 +117,27 @@ if (minAgents && launches < minAgents && !force) {
     `Swarm incomplete: phase ${completedPhase} requires ${minAgents} Task agents, got ${launches}. Launch parallel Task subagents first.`,
   );
   process.exit(2);
+}
+
+if (!force) {
+  const complexityHook = runPhaseComplexityHooks(runId, completedPhase, manifest);
+  if (!complexityHook.ok) {
+    recordLog(manifest, {
+      event: "gate_fail",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: complexityHook.reason,
+      level: "warn",
+    });
+    manifest.updated_at = isoNow();
+    writeJson(manifestPath, manifest);
+    console.error(complexityHook.reason);
+    process.exit(2);
+  }
+  const refreshed = loadRunManifest(runId);
+  if (refreshed) {
+    Object.assign(manifest, refreshed);
+  }
 }
 
 const verifyVerbs = enforcement.verify_verbs ?? ["create", "update", "fix"];
@@ -259,7 +288,13 @@ recordPhaseContextTelemetry(manifest, completedPhase, runId, enforcement);
 const phaseMetrics = manifest.phase_metrics?.[completedPhase] ?? {};
 const contextEntry = manifest.context?.phases?.[completedPhase] ?? {};
 const phaseCompleteDetail = formatPhaseMetricsDetail({
-  ...(minAgents ? { swarm_count: launches } : {}),
+  ...(minAgents ? { swarm_count: launches, swarm_target: targetDetail.target } : {}),
+  ...(manifest.complexity?.scope_score != null
+    ? { scope_score: manifest.complexity.scope_score }
+    : {}),
+  ...(manifest.complexity?.change_score != null
+    ? { change_score: manifest.complexity.change_score }
+    : {}),
   ...(phaseMetrics.tokens != null ? { tokens: phaseMetrics.tokens } : {}),
   ...(phaseMetrics.context != null
     ? { score: phaseMetrics.context }
@@ -406,6 +441,7 @@ if (!nextPhase) {
     agents: priorAgents,
   };
   manifest.enforcement.edit_allowed = isEditPhase(nextPhase, enforcement);
+  applyNextPhaseSwarmTarget(runId, manifest, nextPhase);
 
   recordLog(manifest, {
     event: "phase_start",

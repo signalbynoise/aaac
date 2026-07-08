@@ -22,6 +22,7 @@ import {
   evaluateCapabilityRuntimePolicy,
   loadObjectMaturity,
 } from "./capability-evidence.mjs";
+import { bootstrapSwarmSizing } from "./swarm-sizing-hooks.mjs";
 
 export function createRunManifest({
   parsed,
@@ -87,8 +88,15 @@ export function createRunManifest({
     capability_runtime: capabilityRuntimePolicy,
     capability_runtime_approved: false,
     confidence: { architecture: null, requirements: null, scope: null },
+    complexity: {},
     gates: { stack: entry.gate_stack ?? null, results: {} },
-    swarm: { task_launches_this_phase: 0, phase: pending[0], agents: [] },
+    swarm: {
+      task_launches_this_phase: 0,
+      phase: pending[0],
+      agents: [],
+      target_agents: {},
+      wave_plan: {},
+    },
     enforcement: { edit_allowed: false, hook_version: 2 },
     created_at: now,
     updated_at: now,
@@ -134,6 +142,7 @@ export function createRunManifest({
 
   manifest.updated_at = now;
   writeJson(`${runDir(runId)}/run.json`, manifest);
+  bootstrapSwarmSizing(runId, manifest);
 
   if (conversationId) {
     saveActiveRun(conversationId, {

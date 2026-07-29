@@ -16,9 +16,32 @@ export function resolveCursorBin() {
     return process.env.CURSOR_AGENT_BIN;
   }
   if (fs.existsSync(DEFAULT_CURSOR_BIN)) return DEFAULT_CURSOR_BIN;
-  const which = spawnSync("which", ["cursor"], { encoding: "utf8" });
-  if (which.status === 0 && which.stdout.trim()) return which.stdout.trim();
+  const home = process.env.HOME || "";
+  for (const cand of [
+    `${home}/.local/bin/cursor`,
+    `${home}/.local/bin/agent`,
+    `${home}/.local/bin/cursor-agent`,
+  ]) {
+    if (fs.existsSync(cand)) return cand;
+  }
+  const whichCursor = spawnSync("which", ["cursor"], { encoding: "utf8" });
+  if (whichCursor.status === 0 && whichCursor.stdout.trim()) {
+    return whichCursor.stdout.trim();
+  }
+  const whichAgent = spawnSync("which", ["agent"], { encoding: "utf8" });
+  if (whichAgent.status === 0 && whichAgent.stdout.trim()) {
+    return whichAgent.stdout.trim();
+  }
   return null;
+}
+
+/** Linux `agent` binary vs macOS `cursor agent` subcommand. */
+export function cursorAgentArgv(bin, agentArgs) {
+  const base = String(bin).split("/").pop();
+  if (base === "agent" || base === "cursor-agent") {
+    return [...agentArgs];
+  }
+  return ["agent", ...agentArgs];
 }
 
 function runCursorAgent(args, { timeoutMs = 120_000 } = {}) {
@@ -27,7 +50,7 @@ function runCursorAgent(args, { timeoutMs = 120_000 } = {}) {
     return { ok: false, status: 127, stdout: "", stderr: "cursor binary not found" };
   }
 
-  return spawnSync(bin, ["agent", ...args], {
+  return spawnSync(bin, cursorAgentArgv(bin, args), {
     encoding: "utf8",
     timeout: timeoutMs,
     env: { ...process.env },

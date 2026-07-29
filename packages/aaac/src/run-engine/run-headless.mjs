@@ -22,7 +22,21 @@ function resolveCursorBin() {
   const mac =
     "/Applications/Cursor.app/Contents/Resources/app/bin/cursor";
   if (fs.existsSync(mac)) return mac;
+  const home = process.env.HOME || "";
+  for (const cand of [
+    `${home}/.local/bin/cursor`,
+    `${home}/.local/bin/agent`,
+    `${home}/.local/bin/cursor-agent`,
+  ]) {
+    if (fs.existsSync(cand)) return cand;
+  }
   return "cursor";
+}
+
+function cursorAgentArgv(bin, agentArgs) {
+  const base = String(bin).split("/").pop();
+  if (base === "agent" || base === "cursor-agent") return [...agentArgs];
+  return ["agent", ...agentArgs];
 }
 
 function runEngineCapture(scriptName, argv, targetDir) {
@@ -76,8 +90,7 @@ async function tryPhaseRunner(targetDir, runId, { autoApprove }) {
 
 function runCursorOnce({ workdir, prompt, model, timeoutMs }) {
   const bin = resolveCursorBin();
-  const args = [
-    "agent",
+  const agentArgs = [
     "-p",
     "-f",
     "--trust",
@@ -91,9 +104,10 @@ function runCursorOnce({ workdir, prompt, model, timeoutMs }) {
   ];
   const apiKey = process.env.CURSOR_API_KEY?.trim();
   if (apiKey) {
-    args.push("--api-key", apiKey);
+    agentArgs.push("--api-key", apiKey);
   }
-  args.push(prompt);
+  agentArgs.push(prompt);
+  const args = cursorAgentArgv(bin, agentArgs);
   return new Promise((resolve) => {
     const child = spawn(bin, args, {
       cwd: workdir,

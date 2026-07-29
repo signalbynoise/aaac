@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { createLogger } from "./logger.mjs";
 import { composePhasePrompt } from "./prompt-compose.mjs";
-import { isCursorAuthenticated, resolveCursorBin } from "./cursor-auth.mjs";
+import { isCursorAuthenticated, resolveCursorBin, cursorAgentArgv } from "./cursor-auth.mjs";
 import {
   filterCursorCliStderr,
   hasSubstantiveCursorCliOutput,
@@ -48,8 +48,7 @@ function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000) {
 
   const modelId = process.env.CURSOR_MODEL?.trim() || "composer-2.5";
   // stream-json emits tool_call NDJSON for Phase B metering (text format cannot).
-  const args = [
-    "agent",
+  const agentArgs = [
     "-p",
     "-f",
     "--trust",
@@ -61,14 +60,16 @@ function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000) {
   ];
   const apiKey = process.env.CURSOR_API_KEY?.trim();
   if (apiKey) {
-    args.push("--api-key", apiKey);
+    agentArgs.push("--api-key", apiKey);
   }
-  args.push(prompt);
+  agentArgs.push(prompt);
+  const args = cursorAgentArgv(bin, agentArgs);
 
   log.info("cursor-cli", "Invoking cursor agent (stream-json)", {
     cwd: workspaceRoot,
     model: modelId,
     api_key: Boolean(apiKey),
+    bin,
   });
 
   const child = spawn(bin, args, {

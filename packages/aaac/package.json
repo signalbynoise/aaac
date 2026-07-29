@@ -28,11 +28,7 @@
   "exports": {
     ".": "./src/cli.mjs",
     "./install": "./src/lib/install.mjs",
-    "./run-engine/agent-progress-contract": {
-      "browser": "./src/run-engine/agent-progress-contract.mjs",
-      "node": "./src/run-engine/swarm-telemetry.mjs",
-      "default": "./src/run-engine/agent-progress-contract.mjs"
-    },
+    "./run-engine/agent-progress-contract": "./src/run-engine/agent-progress-contract.mjs",
     "./run-engine/reconcile-run-status": "./src/run-engine/reconcile-run-status.mjs",
     "./run-engine/swarm-agent-specs": "./src/run-engine/swarm-agent-specs.mjs",
     "./run-engine/expected-agent-specs": "./src/run-engine/expected-agent-specs.mjs",

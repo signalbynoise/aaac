@@ -64,6 +64,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@ludecker/agentic-bridge": "workspace:*",
     "@huggingface/transformers": "^4.2.0",
     "better-sqlite3": "^12.11.1",
     "usearch": "^2.26.0",

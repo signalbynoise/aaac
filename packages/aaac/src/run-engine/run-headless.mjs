@@ -24,13 +24,13 @@ function resolveCursorBin() {
   if (fs.existsSync(mac)) return mac;
   const home = process.env.HOME || "";
   for (const cand of [
-    `${home}/.local/bin/cursor`,
     `${home}/.local/bin/agent`,
     `${home}/.local/bin/cursor-agent`,
+    `${home}/.local/bin/cursor`,
   ]) {
     if (fs.existsSync(cand)) return cand;
   }
-  return "cursor";
+  return "agent";
 }
 
 function cursorAgentArgv(bin, agentArgs) {

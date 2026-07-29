@@ -20,8 +20,10 @@ Commands:
   log-dump    Print Run manifest log + decisions
   debug-run   One-shot Run status summary
   dispatch    Dispatch a Run from Agentic OS (no chat required)
+  run         Dispatch + drive Run to completion headlessly (cursor-agent)
   list-runs   List runs under state/runs/
   approve-run Approve or reject a blocked Run gate
+  experience-export  List/export evidence-backed lessons for global corpus promotion
 
 Quick start:
   1. npx @ludecker/aaac@latest init   (or: pnpm dlx @ludecker/aaac@latest init --yes)
@@ -164,6 +166,48 @@ function cmdDispatch(args, argv) {
   runEngineScript("dispatch-run.mjs", [prompt, ...extra], targetDir);
 }
 
+async function cmdRun(args, argv) {
+  const targetDir = args.dir ? path.resolve(args.dir) : process.cwd();
+  const autoApprove = argv.includes("--auto-approve") || argv.includes("--yes") || args.yes;
+  const json = argv.includes("--json");
+  const passthrough = argv.filter(
+    (a) =>
+      a !== "run" &&
+      a !== "--dir" &&
+      a !== args.dir &&
+      a !== "--auto-approve" &&
+      a !== "--yes" &&
+      a !== "-y" &&
+      a !== "--json" &&
+      a !== "--force",
+  );
+  const prompt = passthrough.filter((a) => !a.startsWith("-")).join(" ").trim();
+  if (!prompt) {
+    console.error(
+      'Usage: aaac run "/command domain \\"intent\\"" [--dir <path>] [--auto-approve] [--json]',
+    );
+    process.exit(1);
+  }
+  const { runAaacHeadless } = await import("./run-engine/run-headless.mjs");
+  try {
+    await runAaacHeadless(prompt, {
+      targetDir,
+      autoApprove,
+      json: json || true,
+      model: process.env.CURSOR_MODEL || "composer-2.5",
+    });
+  } catch (err) {
+    if (!json && err?.result) {
+      console.error(JSON.stringify(err.result));
+    } else if (!json) {
+      console.error(err.message ?? err);
+    } else if (err?.result) {
+      console.log(JSON.stringify({ ...err.result, ok: false }));
+    }
+    process.exit(1);
+  }
+}
+
 function cmdListRuns(args, argv) {
   const targetDir = args.dir ? path.resolve(args.dir) : process.cwd();
   const extra = argv.includes("--json") ? ["--json"] : ["--json"];
@@ -181,6 +225,12 @@ function cmdApproveRun(args, argv) {
     process.exit(1);
   }
   runEngineScript("approve-run.mjs", passthrough.slice(runIdx), targetDir);
+}
+
+function cmdExperienceExport(args, argv) {
+  const targetDir = args.dir ? path.resolve(args.dir) : process.cwd();
+  const passthrough = argv.filter((a) => a !== "experience-export" && a !== "--dir");
+  runEngineScript("export-global-lesson-candidates.mjs", passthrough, targetDir);
 }
 
 async function main() {
@@ -213,12 +263,20 @@ async function main() {
     cmdDispatch(args, argv);
     return;
   }
+  if (sub === "run") {
+    await cmdRun(args, argv);
+    return;
+  }
   if (sub === "list-runs") {
     cmdListRuns(args, argv);
     return;
   }
   if (sub === "approve-run") {
     cmdApproveRun(args, argv);
+    return;
+  }
+  if (sub === "experience-export") {
+    cmdExperienceExport(args, argv);
     return;
   }
 

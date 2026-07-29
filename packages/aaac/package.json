@@ -27,7 +27,18 @@
   },
   "exports": {
     ".": "./src/cli.mjs",
-    "./install": "./src/lib/install.mjs"
+    "./install": "./src/lib/install.mjs",
+    "./run-engine/agent-progress-contract": {
+      "browser": "./src/run-engine/agent-progress-contract.mjs",
+      "node": "./src/run-engine/swarm-telemetry.mjs",
+      "default": "./src/run-engine/agent-progress-contract.mjs"
+    },
+    "./run-engine/reconcile-run-status": "./src/run-engine/reconcile-run-status.mjs",
+    "./run-engine/swarm-agent-specs": "./src/run-engine/swarm-agent-specs.mjs",
+    "./run-engine/expected-agent-specs": "./src/run-engine/expected-agent-specs.mjs",
+    "./run-engine/swarm-telemetry": "./src/run-engine/swarm-telemetry.mjs",
+    "./run-engine/estimate-token-cost": "./src/run-engine/estimate-token-cost.mjs",
+    "./run-engine/load-model-pricing": "./src/run-engine/load-model-pricing.mjs"
   },
   "files": [
     "src/",
@@ -42,6 +53,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
+    "@types/better-sqlite3": "^7.6.13",
     "vitest": "^3.2.4",
     "yaml": "^2.8.0"
   },
@@ -50,5 +62,11 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "better-sqlite3": "^12.11.1",
+    "usearch": "^2.26.0",
+    "yaml": "^2.8.0"
   }
 }

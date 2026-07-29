@@ -1,0 +1,27 @@
+{
+  "name": "@ludecker/agentic-bridge",
+  "version": "0.1.0",
+  "description": "Agentic OS local bridge — run dispatch, phase runner, Cursor adapter",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./phase-event-contract": "./src/phase-event-contract.mjs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ludecker/aaac": "workspace:*"
+  },
+  "optionalDependencies": {
+    "@cursor/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

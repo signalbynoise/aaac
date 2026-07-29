@@ -78,6 +78,12 @@ async function tryPhaseRunner(targetDir, runId, { autoApprove }) {
     const runner = new bridge.PhaseRunner(targetDir);
     if (autoApprove) {
       runner.on("approval-required", ({ runId: id }) => {
+        // Persist approval (incl. capability_runtime_approved) before unblocking the runner.
+        runEngineCapture(
+          "approve-run.mjs",
+          [id, "--approve", "--reason", "aaac run --auto-approve"],
+          targetDir,
+        );
         runner.resolveApproval(id, true, "aaac run --auto-approve");
       });
     }

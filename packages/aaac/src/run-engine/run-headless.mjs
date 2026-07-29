@@ -276,13 +276,19 @@ export async function runAaacHeadless(prompt, {
   }
   const runId = payload.run_id;
 
-  let finalManifest =
-    (await tryPhaseRunner(abs, runId, { autoApprove })) ||
-    (await driveWithCursorAgent(abs, runId, {
+  let finalManifest = await tryPhaseRunner(abs, runId, { autoApprove });
+  if (
+    !finalManifest ||
+    (finalManifest.status !== "completed" &&
+      finalManifest.status !== "failed" &&
+      finalManifest.status !== "cancelled")
+  ) {
+    finalManifest = await driveWithCursorAgent(abs, runId, {
       model,
       autoApprove,
       timeoutMs,
-    }));
+    });
+  }
 
   finalManifest = finalManifest || readManifest(abs, runId);
   const status = finalManifest?.status || "unknown";

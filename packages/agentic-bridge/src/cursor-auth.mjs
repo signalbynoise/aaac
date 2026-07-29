@@ -15,22 +15,25 @@ export function resolveCursorBin() {
   if (process.env.CURSOR_AGENT_BIN && fs.existsSync(process.env.CURSOR_AGENT_BIN)) {
     return process.env.CURSOR_AGENT_BIN;
   }
+  if (process.env.CURSOR_BIN && fs.existsSync(process.env.CURSOR_BIN)) {
+    return process.env.CURSOR_BIN;
+  }
   if (fs.existsSync(DEFAULT_CURSOR_BIN)) return DEFAULT_CURSOR_BIN;
   const home = process.env.HOME || "";
   for (const cand of [
-    `${home}/.local/bin/cursor`,
     `${home}/.local/bin/agent`,
     `${home}/.local/bin/cursor-agent`,
+    `${home}/.local/bin/cursor`,
   ]) {
     if (fs.existsSync(cand)) return cand;
-  }
-  const whichCursor = spawnSync("which", ["cursor"], { encoding: "utf8" });
-  if (whichCursor.status === 0 && whichCursor.stdout.trim()) {
-    return whichCursor.stdout.trim();
   }
   const whichAgent = spawnSync("which", ["agent"], { encoding: "utf8" });
   if (whichAgent.status === 0 && whichAgent.stdout.trim()) {
     return whichAgent.stdout.trim();
+  }
+  const whichCursor = spawnSync("which", ["cursor"], { encoding: "utf8" });
+  if (whichCursor.status === 0 && whichCursor.stdout.trim()) {
+    return whichCursor.stdout.trim();
   }
   return null;
 }

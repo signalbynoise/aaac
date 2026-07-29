@@ -74,7 +74,10 @@ function listCompletedPhases(manifest) {
 async function tryPhaseRunner(targetDir, runId, { autoApprove }) {
   try {
     const bridge = await import("@ludecker/agentic-bridge");
-    if (!bridge?.PhaseRunner) return null;
+    if (!bridge?.PhaseRunner) {
+      console.error("[aaac run] @ludecker/agentic-bridge PhaseRunner missing");
+      return null;
+    }
     const runner = new bridge.PhaseRunner(targetDir);
     if (autoApprove) {
       runner.on("approval-required", ({ runId: id }) => {
@@ -89,7 +92,11 @@ async function tryPhaseRunner(targetDir, runId, { autoApprove }) {
     }
     await runner.executeRun(runId);
     return readManifest(targetDir, runId);
-  } catch {
+  } catch (err) {
+    console.error(
+      "[aaac run] PhaseRunner failed, will fall back to cursor drive:",
+      err?.stack || err?.message || err,
+    );
     return null;
   }
 }

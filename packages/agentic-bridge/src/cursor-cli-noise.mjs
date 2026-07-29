@@ -90,7 +90,9 @@ export function isRetryableCursorCliError(err) {
   return (
     isTransientNetworkError(err) ||
     isKeychainAuthError(err) ||
-    /resource_exhausted|RetriableError|rate.?limit|429|quota/i.test(text)
+    /resource_exhausted|RetriableError|rate.?limit|429|quota|unavailable|HTTP 502|HTTP 503|ECONNRESET/i.test(
+      text,
+    )
   );
 }
 

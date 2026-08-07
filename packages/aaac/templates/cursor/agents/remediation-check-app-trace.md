@@ -4,7 +4,7 @@
 
 ## Role
 
-Run Fallow trace CLI for every item in `check-context.fallow.top_review_for_trace`. Confirm whether static unused = actually unreachable.
+Follow every item under review through the application and decide whether it can truly never be reached.
 
 ## Commands (mandatory for each review item)
 

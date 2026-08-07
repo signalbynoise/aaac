@@ -4,7 +4,7 @@
 
 ## Role
 
-Final pass on all Fallow layers (dead-code, dupes, health). Confirm or reject classifications from other swarm agents. **This agent owns the FP registry update.**
+Review all cleanup findings, confirm or reject earlier decisions, and record items that were flagged by mistake.
 
 ## Mandatory actions
 

@@ -259,7 +259,43 @@ if (tail.includes(INJECT_MARKER)) {
   tail = `${tail}\n\n${injectBlock.trim()}`;
 }
 
+/** Skills that must never regenerate with an empty agent roster (npm packaging invariant). */
+const REQUIRED_NONEMPTY_SKILL_AGENTS = [
+  "validation",
+  "rollback",
+  "reporting",
+  "investigation-lite",
+  "root-cause",
+  "execution",
+  "fitness-functions",
+  "impact-analysis",
+  "dependency-graph",
+];
+
+function assertRequiredSkillAgentRosters(graphText) {
+  for (const skill of REQUIRED_NONEMPTY_SKILL_AGENTS) {
+    const block = graphText.match(
+      new RegExp(`^  ${skill}:\\n(?:    .+\\n)*`, "m"),
+    );
+    if (!block) {
+      throw new Error(
+        `generate-graph: missing skill "${skill}" in graph.project overlay`,
+      );
+    }
+    const agentsLine = block[0].match(/^\s+agents:\s*\[([^\]]*)\]\s*$/m);
+    const agents = agentsLine
+      ? agentsLine[1].split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    if (agents.length === 0) {
+      throw new Error(
+        `generate-graph: skill "${skill}" has empty agents — refusing to write graph.yaml (would synthesize ${skill.replace(/-/g, "_")}-slot-* with no Role)`,
+      );
+    }
+  }
+}
+
 const out = `${header}${commandsBlock}\n\n${tail}\n`;
+assertRequiredSkillAgentRosters(out);
 fs.writeFileSync(path.join(aaac, "graph.yaml"), out);
 console.log("Wrote graph.yaml");
 

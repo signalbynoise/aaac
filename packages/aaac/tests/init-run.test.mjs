@@ -2,10 +2,12 @@ import { describe, expect, it, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { loadRegistry } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
 import { beforeSubmitPromptHook, uniqueConversationId } from './fixtures/hook-payloads.mjs';
+import path from 'node:path';
 import {
   cleanupRun,
   runManifestPath,
   conversationActivePath,
+  runArtifactsDir,
 } from './fixtures/run-state.mjs';
 import { initRun } from './fixtures/run-engine-spawn.mjs';
 
@@ -91,6 +93,17 @@ describe('init-run', () => {
       expect(manifest.pending).toEqual(expectedPending.slice(1));
       expect(manifest.enforcement.edit_allowed).toBe(false);
       expect(manifest.conversation_id).toBe(conversationId);
+      expect(manifest.swarm.expected_specs_phase).toBe(spec.firstPhase);
+      expect(manifest.swarm.expected_agent_specs.length).toBeGreaterThan(0);
+      expect(manifest.swarm.expected_agent_specs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(String),
+            path: expect.stringMatching(/^\.cursor\/agents\/.+\.md$/),
+            initial_summary: expect.any(String),
+          }),
+        ]),
+      );
 
       for (const phase of spec.includes) {
         expect(expectedPending).toContain(phase);
@@ -106,4 +119,25 @@ describe('init-run', () => {
       expect(active.edit_allowed).toBe(false);
     });
   }
+
+  it('writes artifacts/phase_context.json after create', async () => {
+    const conversationId = uniqueConversationId('init-phase-context');
+    const result = await initRun(
+      beforeSubmitPromptHook('/create-module ui "Phase context on create"', conversationId),
+    );
+    expect(result.json?.ok).toBe(true);
+
+    const runId = result.json.run_id;
+    created.push({ runId, conversationId });
+
+    const phaseContextPath = path.join(runArtifactsDir(runId), 'phase_context.json');
+    expect(fs.existsSync(phaseContextPath)).toBe(true);
+
+    const phaseContext = JSON.parse(fs.readFileSync(phaseContextPath, 'utf8'));
+    expect(phaseContext.run_id).toBe(runId);
+    expect(phaseContext.phase).toBe('discover');
+    expect(phaseContext.command).toBe('create-module');
+    expect(phaseContext.verb).toBe('create');
+    expect(Array.isArray(phaseContext.experience?.lessons)).toBe(true);
+  });
 });

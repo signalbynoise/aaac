@@ -53,6 +53,10 @@ All observability lives on the Run:
 | `decisions[]` | Why route/capability/gate |
 | `log[]` | Phase and skill events |
 | `checkpoints[]` | Resume points |
+| `swarm.expected_agent_specs` | Current phase graph roster with Role-derived summaries |
+| `metrics.total_tokens` | Exact latest-attempt agent sum, else exact conversation tokens |
+| `metrics.context_usage_percent` | Average context percent across metered latest-attempt agents |
+| `metrics.phase_count` | Phase metric records excluding internal swarm targets |
 
 **No** append to standalone `decision-log.md` or `execution-log.md`.
 
@@ -72,3 +76,14 @@ MCP providers (type `mcp`) are recorded in decisions but do not map to graph ski
 ## Report
 
 Final phase writes `artifacts.report` and sets `status: completed`.
+
+## Experience (post-completion)
+
+After capability evidence, `experience-evidence.mjs` writes:
+
+- `artifacts/reflection.json` — structured retrospective from metrics + checkpoints
+- Updates `state/lessons.json` — **evidence-backed** lessons (never anecdote-only)
+- Updates `state/experience-stats.json` — signature baselines (tokens, duration, success)
+- Optionally merges durable prefs into `state/workspace-memory.json`
+
+Orchestrators **must not** invent lessons in chat. Lessons and evidence come only from the experience processor / reflection artifact. `prepare-phase-context.mjs` is **auto-invoked on Run create and phase advance** (writes `artifacts/phase_context.json` with an `experience` block: lesson + evidence). The CLI remains available for manual refresh.

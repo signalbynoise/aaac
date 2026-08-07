@@ -20,6 +20,7 @@ import {
   saveSessionRun,
 } from "./lib.mjs";
 import { recordLog } from "./log.mjs";
+import { finalizeRunMetrics } from "./swarm-telemetry.mjs";
 
 export const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
@@ -122,6 +123,7 @@ export function markRunAbandoned(manifest, staleMs) {
 }
 
 export function persistReconciledRun(manifest) {
+  finalizeRunMetrics(manifest);
   writeJson(`${runDir(manifest.run_id)}/run.json`, manifest);
   syncRunSidecars(manifest);
   return manifest;

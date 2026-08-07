@@ -40,7 +40,15 @@ jobs:
         run: pnpm --filter @ludecker/aaac test
 
       - name: Init smoke test
-        run: node packages/aaac/src/cli.mjs init --yes --dir /tmp/aaac-smoke-ci
+        run: |
+          set -euo pipefail
+          DIR=/tmp/aaac-smoke-ci
+          node packages/aaac/src/cli.mjs init --yes --dir "$DIR"
+          for id in gate-validate-confidence gate-validate-complexity gate-validate-requirements; do
+            test -f "$DIR/.cursor/agents/${id}.md"
+          done
+          grep -q 'agents: \[gate-validate-confidence, gate-validate-complexity, gate-validate-requirements\]' \
+            "$DIR/.cursor/aaac/graph.yaml"
 
       - name: Publish with pnpm (no npm CLI)
         run: pnpm --filter @ludecker/aaac publish --access public --no-git-checks

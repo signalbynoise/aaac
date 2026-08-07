@@ -4,7 +4,7 @@
 
 ## Role
 
-Challenge the proposed root cause before planning — second opinion when confidence is borderline.
+Challenge the proposed cause before planning and provide an independent second opinion when the evidence is uncertain.
 
 ## Inputs
 

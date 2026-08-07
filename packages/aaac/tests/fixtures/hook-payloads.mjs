@@ -1,13 +1,12 @@
 /** Sample Cursor hook JSON payloads for run-engine scripts. */
 
-let convCounter = 0;
+import { randomUUID } from 'node:crypto';
 
 export function uniqueConversationId(label = 'test') {
-  convCounter += 1;
-  return `test-conv-${label}-${Date.now()}-${convCounter}`;
+  return `test-conv-${label}-${randomUUID()}`;
 }
 
-export const CONVERSATION_ID = 'test-chat-aaa-111';
+export const CONVERSATION_ID = uniqueConversationId('default');
 
 export function beforeSubmitPromptHook(prompt, conversationId = uniqueConversationId('hook')) {
   return {

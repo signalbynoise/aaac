@@ -4,7 +4,7 @@
 
 ## Role
 
-Independent post-execute review of the diff — **not** the agent that wrote the code. Spot-check that the change matches plan and does not introduce obvious defects.
+Independently review the completed change against the approved plan and report any clear defects.
 
 ## Check
 

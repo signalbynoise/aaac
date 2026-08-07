@@ -20,6 +20,7 @@ describe("verify-website-build config", () => {
     const result = spawnSync("node", [VERIFY_SCRIPT], {
       cwd: tmp,
       encoding: "utf8",
+      env: { ...process.env, AAAC_WORKSPACE_ROOT: tmp },
     });
 
     expect(result.status).toBe(0);

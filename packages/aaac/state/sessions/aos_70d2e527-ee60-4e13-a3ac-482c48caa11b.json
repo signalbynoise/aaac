@@ -1,0 +1,10 @@
+{
+  "run_id": "run_20260707_check-architecture-verify-aos_70d2",
+  "session_id": "aos_70d2e527-ee60-4e13-a3ac-482c48caa11b",
+  "command": "check-architecture",
+  "phase": "validate",
+  "status": "failed",
+  "origin": "agentic-os",
+  "started_at": "2026-07-07T10:19:20.519Z",
+  "updated_at": "2026-07-07T10:28:22.913Z"
+}

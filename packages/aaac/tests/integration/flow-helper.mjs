@@ -4,6 +4,7 @@ import {
   resolveSwarmMinimum,
 } from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
 import { resolveSwarmTarget } from '../../src/run-engine/resolve-swarm-target.mjs';
+import { resolveExpectedAgentSpecs } from '../../src/run-engine/expected-agent-specs.mjs';
 import { resolvePhaseArtifacts } from '../../../../.cursor/aaac/scripts/run-engine/context-budget.mjs';
 import {
   advancePhase,
@@ -52,6 +53,20 @@ async function satisfyArtifacts(runId, phase, manifest) {
   }
 }
 
+function assertCurrentPhaseRoster(manifest) {
+  if (!manifest.phase) return;
+  const expected = resolveExpectedAgentSpecs(manifest);
+  if (manifest.swarm?.expected_specs_phase !== manifest.phase) {
+    throw new Error(`stale expected roster for ${manifest.phase}`);
+  }
+  if (JSON.stringify(manifest.swarm?.expected_agent_specs) !== JSON.stringify(expected)) {
+    throw new Error(`unexpected graph roster for ${manifest.phase}`);
+  }
+  if (expected.some((spec) => !spec.initial_summary)) {
+    throw new Error(`missing Role summary for ${manifest.phase}`);
+  }
+}
+
 /**
  * Simulate a full AAAC run from init through completion.
  * @returns {{ runId: string, manifest: object }}
@@ -64,6 +79,7 @@ export async function simulateVerbFlow(prompt, conversationId) {
 
   const runId = init.json.run_id;
   let manifest = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
+  assertCurrentPhaseRoster(manifest);
 
   while (manifest.status === 'running' && manifest.phase !== 'report') {
     const phase = manifest.phase;
@@ -81,6 +97,7 @@ export async function simulateVerbFlow(prompt, conversationId) {
     }
 
     manifest = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
+    assertCurrentPhaseRoster(manifest);
   }
 
   if (manifest.phase === 'report') {

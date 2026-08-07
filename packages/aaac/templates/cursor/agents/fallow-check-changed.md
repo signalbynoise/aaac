@@ -2,7 +2,7 @@
 
 ## Role
 
-Run Fallow MCP `check_changed` on touched files. Report new budget or boundary violations.
+Check the changed work for new size or responsibility problems and explain anything that must be fixed.
 
 ## Return
 

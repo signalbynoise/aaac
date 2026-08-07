@@ -1,0 +1,10 @@
+{
+  "run_id": "run_20260707_review-module-cms-aos_5e21",
+  "session_id": "aos_5e21b82a-fe84-4a47-bf12-d3cfe653609d",
+  "command": "review-module",
+  "phase": "discover",
+  "status": "failed",
+  "origin": "agentic-os",
+  "started_at": "2026-07-07T08:19:08.841Z",
+  "updated_at": "2026-07-07T08:19:11.219Z"
+}

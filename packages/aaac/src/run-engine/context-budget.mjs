@@ -24,11 +24,17 @@ function readIntField(content, fieldName, fallback) {
   return match ? Number(match[1]) : fallback;
 }
 
-/** @returns {{ compaction: typeof DEFAULT_COMPACTION, handoff: { check_discover: string } }} */
+const DEFAULT_EXPERIENCE = {
+  max_lessons: 5,
+  max_warnings: 3,
+};
+
+/** @returns {{ compaction: typeof DEFAULT_COMPACTION, experience: typeof DEFAULT_EXPERIENCE, handoff: { check_discover: string } }} */
 export function loadContextBudget() {
   if (!fs.existsSync(CONTEXT_BUDGET_PATH)) {
     return {
       compaction: { ...DEFAULT_COMPACTION },
+      experience: { ...DEFAULT_EXPERIENCE },
       handoff: { check_discover: "artifacts/discover_brief.yaml" },
     };
   }
@@ -39,9 +45,17 @@ export function loadContextBudget() {
     compaction[key] = readIntField(content, key, DEFAULT_COMPACTION[key]);
   }
 
+  const experience = { ...DEFAULT_EXPERIENCE };
+  // Prefer values under the experience: block when present
+  const expBlock = content.match(/^experience:\s*\n((?:[ \t]+.+\n?)*)/m);
+  const expSrc = expBlock?.[1] ?? content;
+  experience.max_lessons = readIntField(expSrc, "max_lessons", DEFAULT_EXPERIENCE.max_lessons);
+  experience.max_warnings = readIntField(expSrc, "max_warnings", DEFAULT_EXPERIENCE.max_warnings);
+
   const handoffMatch = content.match(/check_discover:\s*(\S+)/);
   return {
     compaction,
+    experience,
     handoff: {
       check_discover: handoffMatch?.[1] ?? "artifacts/discover_brief.yaml",
     },

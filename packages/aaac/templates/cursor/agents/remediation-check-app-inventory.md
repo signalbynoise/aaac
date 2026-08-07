@@ -4,7 +4,7 @@
 
 ## Role
 
-Map Fallow `unused_files` and `review` inventory to **live app surfaces**: Vite entry points, workers (`src/workers/**`), hooks (`*Worker*`), overlay renderer barrels, lazy routes, Playwright-critical imports.
+Decide whether items marked as unused still support parts of the live application and identify anything that must be protected.
 
 ## Inputs (mandatory)
 

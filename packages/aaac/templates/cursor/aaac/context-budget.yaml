@@ -45,6 +45,10 @@ swarm:
   ssot: aaac/swarm-sizing.yaml
   prefer_waves_over_monolith: true
 
+experience:
+  max_lessons: 5
+  max_warnings: 3
+
 telemetry:
   # Fields for Run schema / Agentic OS (implementation in /update-module aaac)
   track:

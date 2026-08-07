@@ -27,6 +27,8 @@ import {
   loadObjectMaturity,
 } from "./capability-evidence.mjs";
 import { bootstrapSwarmSizing } from "./swarm-sizing-hooks.mjs";
+import { preparePhaseContext } from "./prepare-phase-context.mjs";
+import { finalizeRunMetrics } from "./swarm-telemetry.mjs";
 
 async function readStdin() {
   return new Promise((resolve) => {
@@ -73,6 +75,7 @@ if (isUserStopIntent(prompt) && conversationId) {
         reason: "User requested stop",
         evidence: prompt.trim(),
       });
+      finalizeRunMetrics(existing);
       writeJson(`${runDir(active.run_id)}/run.json`, existing);
       cancelledRunId = active.run_id;
     }
@@ -247,6 +250,11 @@ manifest.updated_at = now;
 writeJson(`${runDir(runId)}/run.json`, manifest);
 const bootstrapped = bootstrapSwarmSizing(runId, manifest);
 writeJson(`${runDir(runId)}/run.json`, bootstrapped);
+try {
+  await preparePhaseContext(runId);
+} catch {
+  // Initial Lessons Gate soft-fail — do not block Run create
+}
 saveActiveRun(conversationId, {
   run_id: runId,
   conversation_id: conversationId,

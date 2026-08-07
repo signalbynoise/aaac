@@ -27,7 +27,7 @@ if (!parsed) {
 }
 
 const resolvedSessionId = sessionId ?? `aos_${randomUUID()}`;
-const { manifest, runId } = createRunManifest({
+const { manifest, runId } = await createRunManifest({
   parsed,
   origin: "agentic-os",
   sessionId: resolvedSessionId,

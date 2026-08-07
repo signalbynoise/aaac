@@ -35,6 +35,7 @@ describe("remediation-config", () => {
     const result = spawnSync("node", ["--input-type=module", "-e", script], {
       cwd: tmp,
       encoding: "utf8",
+      env: { ...process.env, AAAC_WORKSPACE_ROOT: tmp },
     });
 
     expect(result.status).toBe(0);
@@ -130,7 +131,11 @@ describe("init-campaign", () => {
     const result = spawnSync(
       "node",
       [path.join(cursorAaac, "scripts/remediation/init-campaign.mjs"), "--run-id", runId, "--scope", "whole-repo"],
-      { cwd: tmp, encoding: "utf8" },
+      {
+        cwd: tmp,
+        encoding: "utf8",
+        env: { ...process.env, AAAC_WORKSPACE_ROOT: tmp },
+      },
     );
 
     expect(result.status).toBe(0);

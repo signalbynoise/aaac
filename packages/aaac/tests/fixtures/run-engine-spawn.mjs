@@ -1,14 +1,13 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { RUN_ENGINE_DIR, REPO_ROOT } from './paths.mjs';
+import { RUN_ENGINE_DIR, REPO_ROOT, SOURCE_REPO_ROOT } from './paths.mjs';
 
 /**
- * Run a run-engine CLI script with optional stdin JSON.
+ * Run a Node CLI script with optional stdin JSON.
  * @returns {{ code: number, stdout: string, stderr: string, json: object|null }}
  */
-export function spawnRunEngine(script, args = [], stdinObj = null) {
+function spawnNodeScript(scriptPath, args = [], stdinObj = null) {
   return new Promise((resolve, reject) => {
-    const scriptPath = path.join(RUN_ENGINE_DIR, script);
     const proc = spawn('node', [scriptPath, ...args], {
       cwd: REPO_ROOT,
       env: { ...process.env },
@@ -42,6 +41,15 @@ export function spawnRunEngine(script, args = [], stdinObj = null) {
       resolve({ code: code ?? 1, stdout, stderr, json });
     });
   });
+}
+
+export function spawnRunEngine(script, args = [], stdinObj = null) {
+  return spawnNodeScript(path.join(RUN_ENGINE_DIR, script), args, stdinObj);
+}
+
+export function spawnPackageRunEngine(script, args = [], stdinObj = null) {
+  const scriptPath = path.join(SOURCE_REPO_ROOT, 'packages/aaac/src/run-engine', script);
+  return spawnNodeScript(scriptPath, args, stdinObj);
 }
 
 export async function recordTaskLaunch(conversationId, hookOverrides = null) {

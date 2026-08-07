@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   ACTIVE_RUNS_DIR,
   REPO_ROOT,
@@ -7,11 +8,8 @@ import {
 } from './paths.mjs';
 import { CONVERSATION_ID } from './hook-payloads.mjs';
 
-let counter = 0;
-
 export function nextRunId(label) {
-  counter += 1;
-  return `run_test_${Date.now()}_${counter}_${label}`;
+  return `run_test_${label}_${randomUUID()}`;
 }
 
 export function conversationActivePath(conversationId) {

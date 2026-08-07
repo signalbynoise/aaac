@@ -4,7 +4,7 @@
 
 ## Role
 
-For top `true_positive` file deletions and large dupes groups: compute fan-in, import cycles, and downstream test breakage risk.
+Measure how widely proposed removals are used and identify loops or later checks that could break.
 
 ## Inputs
 

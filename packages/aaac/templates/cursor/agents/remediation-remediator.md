@@ -2,7 +2,7 @@
 
 ## Role
 
-Execute the **Remediator** step when `remediator-gate.mjs` or `debt-sweep-gate.mjs` exits **3** (`action: remediate`).
+Apply the requested cleanup fixes, repeat the review, and continue until the work passes or reaches a genuine block.
 
 ## Critical rule
 

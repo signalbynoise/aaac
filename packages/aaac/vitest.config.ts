@@ -7,7 +7,7 @@ export default defineConfig({
     include: ['tests/**/*.test.mjs'],
     exclude: ['tests/log.test.mjs'],
     testTimeout: 60_000,
-    fileParallelism: false,
+    setupFiles: ['tests/fixtures/test-workspace.mjs'],
   },
   resolve: {
     alias: {

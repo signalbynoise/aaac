@@ -1,0 +1,52 @@
+# Experience graph retrieval constants (SSOT)
+# Consumed by experience/paths.mjs — keep in sync with docs.
+
+version: 1
+
+semantic_candidates: 32
+lexical_candidates: 16
+graph_expansion_hops: 1
+max_neighbours_per_seed: 8
+rerank_limit: 96
+final_lessons: 5
+max_warnings: 3
+
+rrf_k: 60
+mmr_lambda: 0.7
+
+hnsw:
+  metric: cos
+  connectivity: 16
+  ef_construction: 100
+  ef_search: 48
+  dimensions: 384
+
+embedding:
+  # hash matches experience/packaged-index (ships with npm; works offline).
+  # Set AAAC_EMBEDDING_PROVIDER=local|openai and rebuild for higher-quality vectors.
+  default_provider: hash
+  packaged_provider: hash
+  local_model: Xenova/all-MiniLM-L6-v2
+  remote_model: text-embedding-3-small
+  dimensions: 384
+
+slots:
+  - meaning
+  - trigger
+  - failure
+  - remedy
+
+ranking:
+  semantic_similarity: 0.38
+  trigger_similarity: 0.16
+  structural_match: 0.12
+  outcome_value: 0.14
+  repository_affinity: 0.08
+  recency: 0.06
+  graph_support: 0.06
+  contradiction_penalty: 0.15
+  failure_penalty: 0.10
+  redundancy_penalty: 0.08
+  bayes_alpha: 1
+  bayes_beta: 1
+  recency_half_life_days: 730

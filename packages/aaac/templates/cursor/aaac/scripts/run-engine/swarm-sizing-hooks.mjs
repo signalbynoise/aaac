@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { loadEnforcement, loadRunManifest, writeJson, runDir } from "./lib.mjs";
 import { applySwarmTargetsToManifest, resolveSwarmTargetDetail } from "./resolve-swarm-target.mjs";
 import { loadSwarmSizing } from "./load-swarm-sizing.mjs";
+import { applyExpectedAgentSpecs } from "./expected-agent-specs.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -87,12 +88,14 @@ export function bootstrapSwarmSizing(runId, manifest) {
     "bootstrap",
   ]);
   if (result.status !== 0) {
+    applyExpectedAgentSpecs(manifest, { phase: manifest.phase });
     return manifest;
   }
   const refreshed = loadRunManifest(runId) ?? manifest;
   const firstPhase = refreshed.phase;
   if (firstPhase) {
     applySwarmTargetsToManifest(refreshed, [firstPhase], enforcement);
+    applyExpectedAgentSpecs(refreshed, { phase: firstPhase });
     writeJson(path.join(runDir(runId), "run.json"), refreshed);
   }
   return refreshed;
@@ -102,6 +105,7 @@ export function applyNextPhaseSwarmTarget(runId, manifest, nextPhase) {
   if (!nextPhase) return manifest;
   const enforcement = loadEnforcement();
   applySwarmTargetsToManifest(manifest, [nextPhase], enforcement);
+  applyExpectedAgentSpecs(manifest, { phase: nextPhase });
   const detail = resolveSwarmTargetDetail(nextPhase, manifest, enforcement);
   manifest.phase_metrics = manifest.phase_metrics ?? {};
   manifest.phase_metrics[`${nextPhase}_swarm_target`] = {

@@ -73,7 +73,11 @@ describe('reconcile-run-status', () => {
     const conversationId = uniqueConversationId('supersede');
     const oldRunId = nextRunId('old');
     const newRunId = nextRunId('new');
-    const oldManifest = makeManifest(oldRunId, { conversation_id: conversationId });
+    const oldManifest = makeManifest(oldRunId, {
+      conversation_id: conversationId,
+      created_at: '2026-06-26T10:00:00.000Z',
+      updated_at: '2026-06-26T10:01:00.000Z',
+    });
     seedRun(oldManifest, conversationId);
     created.push({ runId: oldRunId, conversationId }, { runId: newRunId, conversationId });
 
@@ -83,6 +87,10 @@ describe('reconcile-run-status', () => {
     const updated = loadRunManifest(oldRunId);
     expect(updated.status).toBe('cancelled');
     expect(updated.blocked_reason).toContain(newRunId);
+    expect(updated.completed_at).toBeTruthy();
+    expect(typeof updated.metrics?.duration_ms).toBe('number');
+    expect(updated.metrics.duration_ms).toBeGreaterThanOrEqual(0);
+    expect(updated.metrics.token_source).toBeTruthy();
   });
 
   it('syncRunSidecars clears active-run when run completes', () => {

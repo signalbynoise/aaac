@@ -6,6 +6,14 @@
 
 You express intent; the architecture determines execution.
 
+### Agent card progress contract
+
+Agent cards render semantic progress owned by `@ludecker/aaac`, never technical activity. At launch, the resolved agent spec's `Role` paragraph atomically seeds `initial_summary` and `last_progress`. During work, only an explicit structured `UpdateCurrentStep.current_step` may replace `last_progress`. Completion seals a valid `final_summary`, or retains the last validated semantic summary.
+
+Tool names, commands, paths, filenames, stdout, and completion metrics remain structured diagnostics and never become card narrative. Manifest writers use an advisory lock and atomic rename so native hooks and Agentic OS processes cannot lose concurrent agent updates. The bridge normalizes live IPC and manifest replay through one phase-event contract, while UI code only renders canonical fields.
+
+Published installs mirror the progress contract and register `postToolUse`, so source, installed runtime, and templates have the same lifecycle behavior.
+
 ---
 
 ## Part 1 — For everyone

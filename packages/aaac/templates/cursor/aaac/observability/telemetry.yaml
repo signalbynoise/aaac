@@ -24,6 +24,15 @@ log_on:
   - evidence_aggregated
   - capability_promoted
   - evidence_aggregation_failed
+  - experience_processed
+  - lesson_upserted
+  - reflection_written
+  - experience_aggregation_failed
+  - experience_retrieved
+  - experience_index_rebuilt
+  - experience_embed_failed
+  - experience_index_upsert_failed
+  - experience_index_upserted
   - skill_loaded
   - doc_loaded
   - agent_spawned
@@ -40,16 +49,6 @@ run_fields:
   checkpoints: resume points with artifact refs
   artifacts: plan, investigation, impact, fitness, rollback, report
   gates.results: per-gate pass/fail
-
-model_routing_telemetry:
-  event: agent_spawned
-  fields:
-    - model
-    - expected_model
-    - expected_tier
-    - model_routing_source
-    - model_mismatch
-  note: v1 is guidance + telemetry only; mismatch does not hard-block Task launch
 
 required_log_fields:
   - at

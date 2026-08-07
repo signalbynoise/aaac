@@ -34,4 +34,22 @@ describe("package.json publish manifest", () => {
     expect(result.stderr).not.toMatch(/bin\[aaac\].*invalid/i);
     expect(result.stderr).not.toMatch(/auto-corrected/i);
   });
+
+  it("published template installs an executable postToolUse progress hook", () => {
+    const hooks = JSON.parse(
+      fs.readFileSync(path.join(PKG_DIR, "templates/cursor/hooks.json"), "utf8"),
+    );
+    expect(hooks.hooks.postToolUse).toContainEqual(
+      expect.objectContaining({
+        command: ".cursor/hooks/aaac-post-tool.sh",
+        failClosed: false,
+      }),
+    );
+
+    const hookPath = path.join(PKG_DIR, "templates/cursor/hooks/aaac-post-tool.sh");
+    const hook = fs.readFileSync(hookPath, "utf8");
+    expect(hook.startsWith("#!/usr/bin/env bash")).toBe(true);
+    expect(hook).toContain("record-subagent-progress.mjs");
+    expect(fs.statSync(hookPath).mode & 0o111).not.toBe(0);
+  });
 });

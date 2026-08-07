@@ -1,5 +1,8 @@
 import { CONVERSATION_ID, uniqueConversationId } from './hook-payloads.mjs';
 import { nextRunId } from './run-state.mjs';
+import { loadEnforcement } from '../../src/run-engine/lib.mjs';
+import { applySwarmTargetsToManifest } from '../../src/run-engine/resolve-swarm-target.mjs';
+import { applyExpectedAgentSpecs } from '../../src/run-engine/expected-agent-specs.mjs';
 
 const CREATE_PENDING = [
   'discover',
@@ -46,7 +49,7 @@ const CHECK_PENDING = [
 function baseManifest({ command, verb, object, pending, phase, runId, conversationId }) {
   const now = '2026-06-06T12:00:00.000Z';
   const rest = pending.slice(pending.indexOf(phase) + 1);
-  return {
+  return withPhaseRoster({
     run_id: runId,
     conversation_id: conversationId ?? CONVERSATION_ID,
     command,
@@ -69,11 +72,24 @@ function baseManifest({ command, verb, object, pending, phase, runId, conversati
     capabilities_resolved: {},
     confidence: { architecture: null, requirements: null, scope: null },
     gates: { stack: 'pre_execute', results: {} },
-    swarm: { task_launches_this_phase: 0, phase },
+    swarm: {
+      task_launches_this_phase: 0,
+      phase,
+      agents: [],
+      target_agents: {},
+      wave_plan: {},
+    },
     enforcement: { edit_allowed: phase === 'execute', hook_version: 2 },
     created_at: now,
     updated_at: now,
-  };
+  });
+}
+
+export function withPhaseRoster(manifest, phase = manifest.phase, targetOverride = null) {
+  applySwarmTargetsToManifest(manifest, [phase], loadEnforcement());
+  if (targetOverride != null) manifest.swarm.target_agents[phase] = targetOverride;
+  applyExpectedAgentSpecs(manifest, { phase });
+  return manifest;
 }
 
 export function createModuleManifest(phase = 'discover', runId = nextRunId('create-module'), conversationId) {

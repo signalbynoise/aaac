@@ -3,8 +3,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Monorepo root (ludecker/) */
-export const REPO_ROOT = path.resolve(__dirname, '../../../..');
+/** Physical source checkout and isolated workspace root for this test worker. */
+export const SOURCE_REPO_ROOT = path.resolve(__dirname, '../../../..');
+export const REPO_ROOT = process.env.AAAC_WORKSPACE_ROOT
+  ? path.resolve(process.env.AAAC_WORKSPACE_ROOT)
+  : SOURCE_REPO_ROOT;
 
 export const AAAC_ROOT = path.join(REPO_ROOT, '.cursor/aaac');
 export const GRAPH_PATH = path.join(AAAC_ROOT, 'graph.yaml');

@@ -8,120 +8,97 @@ import path from "path";
 const PHASES_REL = "lifecycle/phases.json";
 const GRAPH_REL = "graph.yaml";
 
-const REMEDIATION_CHECK_SWARM_AGENTS = [
-  "remediation-check-app-inventory",
-  "remediation-check-app-ssot",
-  "remediation-check-app-trace",
-  "remediation-check-architecture-boundaries",
-  "remediation-check-architecture-deps",
-  "remediation-check-architecture-decomposition",
-  "remediation-check-risk",
-];
-
-const INVESTIGATION_LITE_AGENTS = [
-  "investigate-lite-exists",
-  "investigate-lite-dependencies",
-  "investigate-lite-constraints",
-];
-
 function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function flushGraphSkill(state) {
+  if (!state.currentSkill) return;
+  if (state.agents.length) {
+    const target = state.listMode === "optional_agents"
+      ? state.optionalSkills
+      : state.skills;
+    target[state.currentSkill] = [...state.agents];
+  }
+  state.agents = [];
+  state.listMode = null;
+}
+
+function parseInlineAgentList(line, key) {
+  const match = line.match(new RegExp(`^\\s+${key}: \\[(.+)\\]\\s*$`));
+  return match
+    ? match[1].split(",").map((value) => value.trim()).filter(Boolean)
+    : null;
+}
+
+function processGraphSkillLine(state, line) {
+  if (line.startsWith("skills:")) {
+    state.inSkills = true;
+    return;
+  }
+  if (state.inSkills && /^agents:/.test(line) && !line.startsWith("  ")) {
+    flushGraphSkill(state);
+    state.inSkills = false;
+    state.currentSkill = null;
+    return;
+  }
+  if (!state.inSkills) return;
+
+  const skillMatch = line.match(/^  ([\w/-]+):\s*$/);
+  if (skillMatch) {
+    flushGraphSkill(state);
+    state.currentSkill = skillMatch[1];
+    return;
+  }
+  if (!state.currentSkill) return;
+
+  const inlineAgents = parseInlineAgentList(line, "agents");
+  if (inlineAgents) {
+    state.skills[state.currentSkill] = inlineAgents;
+    state.currentSkill = null;
+    state.listMode = null;
+    state.agents = [];
+    return;
+  }
+  const inlineOptional = parseInlineAgentList(line, "optional_agents");
+  if (inlineOptional) {
+    state.optionalSkills[state.currentSkill] = inlineOptional;
+    return;
+  }
+  if (/^\s+(?:optional_)?agents:\s*$/.test(line)) {
+    flushGraphSkill(state);
+    state.listMode = line.includes("optional_agents")
+      ? "optional_agents"
+      : "agents";
+    state.agents = [];
+    return;
+  }
+  if (!state.listMode) return;
+
+  const itemMatch = line.match(/^\s+- ([\w-]+)\s*$/);
+  if (itemMatch) {
+    state.agents.push(itemMatch[1]);
+    return;
+  }
+  if (!/^\s+-/.test(line) && !/^\s*$/.test(line)) {
+    flushGraphSkill(state);
+  }
+}
+
 function parseGraphSkillsAgents(graphText) {
-  const skills = {};
-  const optionalSkills = {};
-  const lines = graphText.split("\n");
-  let inSkills = false;
-  let currentSkill = null;
-  let listMode = null;
-  let agents = [];
-
-  function flushSkill() {
-    if (!currentSkill) return;
-    if (agents.length) {
-      if (listMode === "optional_agents") {
-        optionalSkills[currentSkill] = [...agents];
-      } else {
-        skills[currentSkill] = [...agents];
-      }
-    }
-    agents = [];
-    listMode = null;
+  const state = {
+    skills: {},
+    optionalSkills: {},
+    inSkills: false,
+    currentSkill: null,
+    listMode: null,
+    agents: [],
+  };
+  for (const line of graphText.split("\n")) {
+    processGraphSkillLine(state, line);
   }
-
-  for (const line of lines) {
-    if (line.startsWith("skills:")) {
-      inSkills = true;
-      continue;
-    }
-    if (inSkills && /^agents:/.test(line) && !line.startsWith("  ")) {
-      flushSkill();
-      inSkills = false;
-      currentSkill = null;
-      continue;
-    }
-    if (!inSkills) continue;
-
-    const skillMatch = line.match(/^  ([\w/-]+):\s*$/);
-    if (skillMatch) {
-      flushSkill();
-      currentSkill = skillMatch[1];
-      continue;
-    }
-
-    if (!currentSkill) continue;
-
-    const inlineAgents = line.match(/^\s+agents: \[(.+)\]\s*$/);
-    if (inlineAgents) {
-      skills[currentSkill] = inlineAgents[1]
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      currentSkill = null;
-      listMode = null;
-      agents = [];
-      continue;
-    }
-
-    const inlineOptional = line.match(/^\s+optional_agents: \[(.+)\]\s*$/);
-    if (inlineOptional) {
-      optionalSkills[currentSkill] = inlineOptional[1]
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      continue;
-    }
-
-    if (/^\s+agents:\s*$/.test(line)) {
-      flushSkill();
-      listMode = "agents";
-      agents = [];
-      continue;
-    }
-
-    if (/^\s+optional_agents:\s*$/.test(line)) {
-      flushSkill();
-      listMode = "optional_agents";
-      agents = [];
-      continue;
-    }
-
-    if (listMode) {
-      const itemMatch = line.match(/^\s+- ([\w-]+)\s*$/);
-      if (itemMatch) {
-        agents.push(itemMatch[1]);
-        continue;
-      }
-      if (!/^\s+-/.test(line) && !/^\s*$/.test(line)) {
-        flushSkill();
-      }
-    }
-  }
-
-  flushSkill();
-
-  return { skills, optionalSkills };
+  flushGraphSkill(state);
+  return { skills: state.skills, optionalSkills: state.optionalSkills };
 }
 
 function parseGraphAgentPaths(graphText) {
@@ -173,6 +150,17 @@ export function loadPhasesConfig(aaacRoot) {
   return readJsonFile(path.join(aaacRoot, PHASES_REL));
 }
 
+/** @returns {{ id: string, path: string, relPath: string, cursorPath: string } | null} */
+export function resolveAgentSpecById({ aaacRoot, id }) {
+  if (typeof id !== "string" || !id.trim()) return null;
+  const normalizedId = id.trim();
+  const { agentPaths } = loadGraphSwarmConfig(aaacRoot);
+  const relPath = agentPaths[normalizedId];
+  if (!relPath) return null;
+  const cursorPath = `.cursor/${relPath}`;
+  return { id: normalizedId, path: cursorPath, relPath, cursorPath };
+}
+
 /** Resolve skill id for swarm agent lookup (check discover → check skill, etc.). */
 export function resolveSwarmSkillId(phase, manifest, phasesConfig) {
   if (phase === "discover" && manifest?.verb === "check") {
@@ -192,15 +180,14 @@ export function resolveSwarmSkillId(phase, manifest, phasesConfig) {
   return entry.skill ?? entry.skills?.[0] ?? null;
 }
 
-function fallbackAgentIds(skillId, phase) {
-  if (skillId === "remediation-check-swarm") return REMEDIATION_CHECK_SWARM_AGENTS;
-  if (skillId === "investigation-lite" || phase === "investigate_lite") {
-    return INVESTIGATION_LITE_AGENTS;
-  }
-  return [];
+/** Recoverable slots when graph skill has path but no agents (stale installs). */
+export function synthesizeFallbackAgentIds(phase, skillId, count) {
+  const base = (skillId || phase || "swarm").replace(/[^\w-]+/g, "-");
+  const n = Math.max(0, Number(count) || 0);
+  return Array.from({ length: n }, (_, index) => `${base}-slot-${index + 1}`);
 }
 
-function selectAgentIds(mandatory, optional, targetCount) {
+function selectAgentIds(mandatory, optional, targetCount, { phase, skillId } = {}) {
   const selected = [];
   const seen = new Set();
 
@@ -225,10 +212,14 @@ function selectAgentIds(mandatory, optional, targetCount) {
     selected.push(`${id}-wave-${selected.length}`);
   }
 
+  if (selected.length === 0 && targetCount > 0) {
+    return synthesizeFallbackAgentIds(phase, skillId, targetCount);
+  }
+
   return selected.slice(0, targetCount);
 }
 
-/** @returns {Array<{ id: string, path: string, relPath: string, cursorPath: string }>} */
+/** @returns {Array<{ id: string, path: string, relPath: string, cursorPath: string, synthetic?: boolean }>} */
 export function resolveAgentSpecsForPhase({
   aaacRoot,
   phase,
@@ -241,21 +232,30 @@ export function resolveAgentSpecsForPhase({
 
   const mandatory = skillId ? skillAgents[skillId] ?? [] : [];
   const optional = skillId ? optionalSkillAgents[skillId] ?? [] : [];
-  let agentIds = mandatory.length ? mandatory : fallbackAgentIds(skillId, phase);
+  let agentIds = mandatory;
+  let synthetic = false;
 
   if (count != null && count > 0) {
-    agentIds = selectAgentIds(
-      agentIds,
-      optional.length ? optional : fallbackAgentIds(skillId, phase),
-      count,
-    );
+    agentIds = selectAgentIds(agentIds, optional, count, { phase, skillId });
+    synthetic = mandatory.length === 0 && optional.length === 0;
   }
 
   return agentIds.map((id) => {
-    const baseId = id.replace(/-wave-\d+$/, "");
-    const relPath = agentPaths[baseId] ?? `agents/${baseId}.md`;
+    const baseId = id.replace(/-wave-\d+$/, "").replace(/-slot-\d+$/, "");
+    // Keep wave/slot id for slot identity; path lookup uses baseId.
+    // Synthetic slots bind to the phase skill so prompts stay useful without agent md files.
+    const relPath = agentPaths[baseId]
+      ?? (synthetic
+        ? `skills/shared/${skillId || phase}/SKILL.md`
+        : `agents/${baseId}.md`);
     const cursorPath = `.cursor/${relPath}`;
-    return { id: baseId, path: cursorPath, relPath, cursorPath };
+    return {
+      id,
+      path: cursorPath,
+      relPath,
+      cursorPath,
+      ...(synthetic ? { synthetic: true } : {}),
+    };
   });
 }
 

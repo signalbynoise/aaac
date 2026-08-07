@@ -26,6 +26,12 @@
         "failClosed": false
       }
     ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/aaac-post-tool.sh",
+        "failClosed": false
+      }
+    ],
     "stop": [
       {
         "command": ".cursor/hooks/aaac-stop.sh",

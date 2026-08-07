@@ -21,6 +21,19 @@ const phases = JSON.parse(
 const gates = JSON.parse(
   fs.readFileSync(path.join(aaac, "governance/gates.json"), "utf8"),
 );
+const registryPath = path.join(aaac, "runtime-registry.json");
+
+function readExistingRegistry() {
+  try {
+    const text = fs.readFileSync(registryPath, "utf8");
+    return {
+      registry: JSON.parse(text),
+      text,
+    };
+  } catch {
+    return { registry: null, text: null };
+  }
+}
 
 function composeRuntimePhases(verbDef) {
   const work = verbDef.work_phases ?? [];
@@ -100,16 +113,39 @@ for (const [alias, canonical] of Object.entries(aliases)) {
   }
 }
 
-const out = {
+const payload = {
   version: 1,
-  generated_at: new Date().toISOString(),
   aliases,
   gate_phases: gatePhases,
   commands,
 };
 
-fs.writeFileSync(
-  path.join(aaac, "runtime-registry.json"),
-  `${JSON.stringify(out, null, 2)}\n`,
-);
-console.log(`Wrote runtime-registry.json (${Object.keys(commands).length} commands)`);
+const existing = readExistingRegistry();
+const { generated_at: existingGeneratedAt, ...existingPayload } =
+  existing.registry ?? {};
+const semanticPayloadUnchanged =
+  existing.registry !== null &&
+  JSON.stringify(existingPayload) === JSON.stringify(payload);
+const generatedAt =
+  semanticPayloadUnchanged && typeof existingGeneratedAt === "string"
+    ? existingGeneratedAt
+    : new Date().toISOString();
+const out = {
+  version: payload.version,
+  generated_at: generatedAt,
+  aliases: payload.aliases,
+  gate_phases: payload.gate_phases,
+  commands: payload.commands,
+};
+const outputText = `${JSON.stringify(out, null, 2)}\n`;
+
+if (outputText === existing.text) {
+  console.log(
+    `Unchanged runtime-registry.json (${Object.keys(commands).length} commands)`,
+  );
+} else {
+  fs.writeFileSync(registryPath, outputText);
+  console.log(
+    `Wrote runtime-registry.json (${Object.keys(commands).length} commands)`,
+  );
+}

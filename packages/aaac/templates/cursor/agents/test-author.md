@@ -4,7 +4,7 @@
 
 ## Role
 
-Author behavioral tests for changes made in `execute`. Read plan `tests_to_add[]`, implementation diff, and domain inventory test conventions.
+Write behavior checks for the completed change by following the approved plan and the project's existing testing habits.
 
 ## Must
 

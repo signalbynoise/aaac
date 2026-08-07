@@ -51,7 +51,13 @@ describe('advance-phase', () => {
     const min =
       resolveSwarmTarget('discover', seeded, enforcement) ??
       enforcement.swarm_min_agents.discover;
-    seeded.swarm = { task_launches_this_phase: min, phase: 'discover' };
+    seeded.swarm.task_launches_this_phase = min;
+    seeded.swarm.expected_specs_phase = 'execute';
+    seeded.swarm.expected_agent_specs = [{
+      id: 'code-author',
+      path: '.cursor/agents/code-author.md',
+      initial_summary: 'Implement the approved production changes within the assigned scope',
+    }];
     seedRun(seeded, conversationId);
     runs.push({ runId, conversationId });
     writeArtifact(
@@ -68,6 +74,60 @@ describe('advance-phase', () => {
     const manifest = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
     expect(manifest.completed).toContain('discover');
     expect(manifest.enforcement.edit_allowed).toBe(false);
+    expect(manifest.swarm.expected_specs_phase).toBe('investigate_lite');
+    expect(manifest.swarm.expected_agent_specs.map(({ id }) => id)).toEqual([
+      'investigate-lite-exists',
+      'investigate-lite-dependencies',
+      'investigate-lite-constraints',
+    ]);
+    expect(manifest.swarm.expected_agent_specs.every(
+      ({ initial_summary: summary }) => typeof summary === 'string' && summary.length > 0,
+    )).toBe(true);
+  });
+
+  it('refreshes phase_context.json with new phase on non-terminal advance', async () => {
+    const conversationId = uniqueConversationId('advance-phase-context');
+    const runId = nextRunId('advance-phase-context');
+    const enforcement = loadEnforcement();
+    const seeded = createModuleManifest('discover', runId, conversationId);
+    const min =
+      resolveSwarmTarget('discover', seeded, enforcement) ??
+      enforcement.swarm_min_agents.discover;
+    seeded.swarm = { task_launches_this_phase: min, phase: 'discover' };
+    seedRun(seeded, conversationId);
+    runs.push({ runId, conversationId });
+
+    writeArtifact(
+      runId,
+      'artifacts/phase_context.json',
+      JSON.stringify({
+        run_id: runId,
+        phase: 'discover',
+        experience: { lessons: [] },
+      }),
+    );
+    writeArtifact(
+      runId,
+      'artifacts/discover_brief.yaml',
+      'answer: partial\nsummary: test\n',
+    );
+    writeArtifact(runId, 'artifacts/discovery-brief.md', '# Discover\n');
+
+    const result = await advancePhase(runId, 'discover');
+    expect(result.code).toBe(0);
+    expect(result.json?.phase).toBe('investigate_lite');
+
+    const phaseContextPath = path.join(
+      REPO_ROOT,
+      '.cursor/aaac/state/runs',
+      runId,
+      'artifacts/phase_context.json',
+    );
+    const phaseContext = JSON.parse(fs.readFileSync(phaseContextPath, 'utf8'));
+    expect(phaseContext.run_id).toBe(runId);
+    expect(phaseContext.phase).toBe('investigate_lite');
+    expect(phaseContext.completed).toContain('discover');
+    expect(Array.isArray(phaseContext.experience?.lessons)).toBe(true);
   });
 
   it('check verb discover requires check_swarm minimum (3), not discover (4)', async () => {

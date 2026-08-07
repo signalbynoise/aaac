@@ -43,6 +43,15 @@ Execution Layer
 
 Knowledge Layer
 ├─ Documentation               docs/agentic_architecture.md, docs/architecture.md, …
+├─ Packaged global lessons     .cursor/aaac/experience/global-lessons.json
+├─ Packaged vector index       .cursor/aaac/experience/packaged-index/ (ships with npm)
+├─ Retrieval config            .cursor/aaac/experience/retrieval.yaml
+├─ Project lessons (derived)   .cursor/aaac/state/lessons.json
+├─ Experience stats (derived)  .cursor/aaac/state/experience-stats.json
+├─ Workspace memory (derived)  .cursor/aaac/state/workspace-memory.json
+├─ Experience index (derived)  .cursor/aaac/state/experience-index/ (seeded from packaged-index)
+├─ Durable knowledge           .cursor/aaac/knowledge/
+├─ Experience engine (modular) .cursor/aaac/scripts/run-engine/experience/
 
 Contracts Layer (cross-cutting)
 ├─ Schema                      .cursor/aaac/contract-schema.md
@@ -69,6 +78,8 @@ Contracts Layer (cross-cutting)
 | Policies | Governance | Mandatory governance |
 | Contracts | Contracts | Input/output invariants |
 | Documentation | Knowledge | System knowledge |
+| Experience stores | Knowledge | Evidence-backed lessons + execution stats (derived) |
+| Packaged global lessons | Knowledge | Corpus shipped with `@ludecker/aaac` |
 
 ## Questions each layer answers
 
@@ -81,7 +92,7 @@ Contracts Layer (cross-cutting)
 | Run | Where are we? Why? What was decided? |
 | Execution | Who does the work? |
 | Contracts | What must be true in/out? |
-| Knowledge | What does the system mean? |
+| Knowledge | What does the system mean? What have prior runs taught us? |
 
 ## Load order (mutating commands)
 
@@ -91,6 +102,7 @@ Policies → Ontology → Graph → Create Run
 → Orchestrator → Capabilities resolved (recorded on Run)
 → Execute phases → Update Run → Report
 → Run completes → capability-evidence.mjs → update capability-stats.json + evaluate promotion
+→ experience-evidence.mjs → reflection + lessons.json + experience-stats.json (evidence-backed)
 ```
 
 ## Deprecated

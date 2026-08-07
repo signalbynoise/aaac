@@ -1,6 +1,6 @@
 {
   "name": "@ludecker/aaac",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "Agentic Architecture as Code (AAAC) — installable Cursor agent framework",
   "type": "module",
   "license": "MIT",

@@ -354,8 +354,9 @@ export function cancelRunManifest(manifest, evidence = "user_stop") {
   manifest.awaiting_approval = false;
   manifest.blocked_reason = null;
   manifest.updated_at = isoNow();
+  manifest.edit_allowed = false;
   if (manifest.enforcement) {
-    manifest.enforcement.edit_allowed = true;
+    manifest.enforcement.edit_allowed = false;
   }
   return manifest;
 }

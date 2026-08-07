@@ -79,6 +79,7 @@ skills:
   execution:
     path: skills/shared/execution
     depends: [governance/implementation]
+    agents: [code-author]
   test-authoring:
     path: skills/shared/test-authoring
     agents: [test-author]
@@ -92,6 +93,7 @@ skills:
     agents: [boundary-review, doc-conformance, implementation-review]
   reporting:
     path: skills/shared/reporting
+    agents: [report-completeness-review, report-factual-review]
   architecture:
     path: skills/shared/architecture
     agents: [boundary-review, dependency-analysis, system-decomposition]
@@ -109,21 +111,25 @@ skills:
       - fix-inventory-confirm
   root-cause:
     path: skills/shared/root-cause
-    agents: [fix-hypothesis-validate]
+    agents: [root-cause-analyst, fix-hypothesis-validate]
   investigation-lite:
     path: skills/shared/investigation-lite
+    agents: [investigate-lite-exists, investigate-lite-dependencies, investigate-lite-constraints]
   validation:
     path: skills/shared/validation
+    agents: [gate-validate-confidence, gate-validate-complexity, gate-validate-requirements]
   impact-analysis:
     path: skills/shared/impact-analysis
-    agents: [impact-analysis]
+    agents: [impact-analysis, dependency-analysis]
   dependency-graph:
     path: skills/shared/dependency-graph
-    agents: [dependency-analysis]
+    agents: [dependency-analysis, boundary-review]
   fitness-functions:
     path: skills/shared/fitness-functions
+    agents: [boundary-review, doc-conformance, fallow-check-changed]
   rollback:
     path: skills/shared/rollback
+    agents: [gate-rollback-feasibility, gate-rollback-verification]
   run:
     path: skills/shared/run
   check:
@@ -153,6 +159,7 @@ skills:
     path: skills/shared/remediation
   remediation-check-swarm:
     path: skills/shared/remediation/check-swarm
+    agents: [remediation-check-app-inventory, remediation-check-app-ssot, remediation-check-app-trace, remediation-check-architecture-boundaries, remediation-check-architecture-deps, remediation-check-architecture-decomposition, remediation-check-risk]
   governance/implementation:
     path: skills/shared/governance/implementation
 
@@ -181,6 +188,12 @@ agents:
     path: agents/check-capability-trace.md
   impact-analysis:
     path: agents/impact-analysis.md
+  investigate-lite-exists:
+    path: agents/investigate-lite-exists.md
+  investigate-lite-dependencies:
+    path: agents/investigate-lite-dependencies.md
+  investigate-lite-constraints:
+    path: agents/investigate-lite-constraints.md
   fix-repro:
     path: agents/fix-repro.md
   fix-code-path:
@@ -199,6 +212,24 @@ agents:
     path: agents/fix-repro-verify.md
   fix-hypothesis-validate:
     path: agents/fix-hypothesis-validate.md
+  root-cause-analyst:
+    path: agents/root-cause-analyst.md
+  gate-validate-confidence:
+    path: agents/gate-validate-confidence.md
+  gate-validate-complexity:
+    path: agents/gate-validate-complexity.md
+  gate-validate-requirements:
+    path: agents/gate-validate-requirements.md
+  gate-rollback-feasibility:
+    path: agents/gate-rollback-feasibility.md
+  gate-rollback-verification:
+    path: agents/gate-rollback-verification.md
+  report-completeness-review:
+    path: agents/report-completeness-review.md
+  report-factual-review:
+    path: agents/report-factual-review.md
+  code-author:
+    path: agents/code-author.md
   test-author:
     path: agents/test-author.md
   doc-conformance:

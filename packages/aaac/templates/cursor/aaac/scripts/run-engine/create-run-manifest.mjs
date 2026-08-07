@@ -23,8 +23,9 @@ import {
   loadObjectMaturity,
 } from "./capability-evidence.mjs";
 import { bootstrapSwarmSizing } from "./swarm-sizing-hooks.mjs";
+import { preparePhaseContext } from "./prepare-phase-context.mjs";
 
-export function createRunManifest({
+export async function createRunManifest({
   parsed,
   origin = "cursor-chat",
   sessionId = null,
@@ -87,6 +88,13 @@ export function createRunManifest({
     capabilities_resolved: capabilitiesResolved,
     capability_runtime: capabilityRuntimePolicy,
     capability_runtime_approved: false,
+    capability_evidence_processed: false,
+    capability_evidence_outcomes: [],
+    outcome: null,
+    reflection: null,
+    lessons: [],
+    experience_processed: false,
+    experience_outcomes: [],
     confidence: { architecture: null, requirements: null, scope: null },
     complexity: {},
     gates: { stack: entry.gate_stack ?? null, results: {} },
@@ -142,7 +150,12 @@ export function createRunManifest({
 
   manifest.updated_at = now;
   writeJson(`${runDir(runId)}/run.json`, manifest);
-  bootstrapSwarmSizing(runId, manifest);
+  Object.assign(manifest, bootstrapSwarmSizing(runId, manifest));
+  try {
+    await preparePhaseContext(runId);
+  } catch {
+    // Initial Lessons Gate soft-fail — do not block Run create
+  }
 
   if (conversationId) {
     saveActiveRun(conversationId, {

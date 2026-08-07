@@ -30,7 +30,7 @@ import {
 } from "./context-budget.mjs";
 import {
   archivePhaseSwarm,
-  aggregateRunMetrics,
+  finalizeRunMetrics,
   computePhaseDurationMs,
 } from "./swarm-telemetry.mjs";
 import { recordLog } from "./log.mjs";
@@ -46,6 +46,9 @@ import {
   resolveCapabilitiesWithRuntime,
   loadObjectMaturity,
 } from "./capability-evidence.mjs";
+import { processRunExperience } from "./experience/process.mjs";
+import { preparePhaseContext } from "./prepare-phase-context.mjs";
+import { writeStageSummary } from "./write-stage-summary.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -314,6 +317,31 @@ recordLog(manifest, {
   level: "info",
 });
 
+
+try {
+  const stageSummary = writeStageSummary(runId, completedPhase, {
+    manifest,
+    enforcement,
+  });
+  recordLog(manifest, {
+    event: "stage_summary_written",
+    phase: completedPhase,
+    phase_kind: manifest.phase_kind,
+    detail: `status=${stageSummary.status}${
+      stageSummary.reason ? ` reason=${stageSummary.reason}` : ""
+    }`,
+    level: stageSummary.status === "failed" ? "warn" : "info",
+  });
+} catch (err) {
+  recordLog(manifest, {
+    event: "stage_summary_failed",
+    phase: completedPhase,
+    phase_kind: manifest.phase_kind,
+    detail: String(err?.message ?? err).slice(0, 300),
+    level: "warn",
+  });
+}
+
 let nextPhase = manifest.pending.shift() ?? null;
 
 if (nextPhase === "execute" && !force) {
@@ -380,7 +408,7 @@ if (!nextPhase) {
   manifest.status = "completed";
   manifest.phase = "report";
   manifest.completed_at = isoNow();
-  manifest.metrics = aggregateRunMetrics(manifest);
+  finalizeRunMetrics(manifest);
   manifest.enforcement.edit_allowed = false;
   recordLog(manifest, {
     event: "run_completed",
@@ -429,6 +457,70 @@ if (!nextPhase) {
       level: "warn",
     });
   }
+
+  try {
+    const experienceResult = await processRunExperience(runId, {
+      manifest,
+      skipManifestWrite: true,
+    });
+    if (experienceResult.ok && !experienceResult.skipped) {
+      manifest.outcome = {
+        status: experienceResult.outcome.status,
+        quality: experienceResult.outcome.quality,
+        gate_retries: experienceResult.outcome.gate_retries,
+        rollback_used: experienceResult.outcome.rollback_used,
+        human_interventions: experienceResult.outcome.human_interventions,
+      };
+      manifest.reflection = {
+        path: "artifacts/reflection.json",
+        goal_achieved: experienceResult.reflection.goal_achieved,
+        largest_bottleneck: experienceResult.reflection.largest_bottleneck,
+        biggest_waste: experienceResult.reflection.biggest_waste,
+        most_valuable_artifact: experienceResult.reflection.most_valuable_artifact,
+        reusable_lesson: experienceResult.reflection.reusable_lesson,
+        recommendation: experienceResult.reflection.recommendation,
+        confidence: experienceResult.reflection.confidence,
+      };
+      manifest.lessons = experienceResult.lessons ?? [];
+      manifest.experience_processed = true;
+      manifest.experience_outcomes = experienceResult.experience_outcomes ?? [];
+      manifest.artifacts = {
+        ...(manifest.artifacts ?? {}),
+        reflection: "artifacts/reflection.json",
+      };
+      recordLog(manifest, {
+        event: "experience_processed",
+        phase: "report",
+        phase_kind: "work",
+        detail: `lessons=${(experienceResult.lessons ?? []).length}`,
+        level: "info",
+      });
+      recordLog(manifest, {
+        event: "reflection_written",
+        phase: "report",
+        phase_kind: "work",
+        detail: "artifacts/reflection.json",
+        level: "info",
+      });
+      for (const lesson of experienceResult.lessons ?? []) {
+        recordLog(manifest, {
+          event: "lesson_upserted",
+          phase: "report",
+          phase_kind: "work",
+          detail: `${lesson.id}:observed=${lesson.evidence?.observed_runs}:confidence=${lesson.evidence?.confidence}`,
+          level: "info",
+        });
+      }
+    }
+  } catch (err) {
+    recordLog(manifest, {
+      event: "experience_aggregation_failed",
+      phase: "report",
+      phase_kind: "work",
+      detail: String(err.message ?? err).slice(0, 300),
+      level: "warn",
+    });
+  }
 } else {
   archivePhaseSwarm(manifest, completedPhase);
   const priorAgents = manifest.swarm?.agents ?? [];
@@ -442,6 +534,11 @@ if (!nextPhase) {
   };
   manifest.enforcement.edit_allowed = isEditPhase(nextPhase, enforcement);
   applyNextPhaseSwarmTarget(runId, manifest, nextPhase);
+  try {
+    await preparePhaseContext(runId, manifest);
+  } catch {
+    // soft-fail — do not block phase advance
+  }
 
   recordLog(manifest, {
     event: "phase_start",

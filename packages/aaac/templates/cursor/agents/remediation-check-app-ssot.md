@@ -4,7 +4,7 @@
 
 ## Role
 
-For each Fallow `review` / `true_positive` export: who owns the symbol? Is it consumed via barrel re-export, dynamic import, worker postMessage, or external package API?
+Find who owns each item under review and determine whether other parts of the application still rely on it.
 
 ## Inputs (mandatory)
 

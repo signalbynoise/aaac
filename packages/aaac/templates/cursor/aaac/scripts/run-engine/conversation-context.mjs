@@ -1,5 +1,8 @@
 /**
  * Conversation-level context metrics — align with Cursor Context Usage panel.
+ *
+ * SSOT for run chrome only (`manifest.metrics.conversation_*` / context_usage_percent).
+ * Never gates, suppresses, or invents per-agent meters — those seal via applyAgentComplete.
  */
 import fs from "fs";
 import path from "path";

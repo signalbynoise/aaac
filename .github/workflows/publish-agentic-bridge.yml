@@ -1,0 +1,31 @@
+name: Publish @ludecker/agentic-bridge
+
+on:
+  push:
+    tags:
+      - "agentic-bridge-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Agentic bridge package tests
+        run: pnpm --filter @ludecker/agentic-bridge test
+
+      - name: Publish with pnpm (no npm CLI)
+        run: pnpm --filter @ludecker/agentic-bridge publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -4,24 +4,43 @@
   "description": "Agentic OS local bridge — run dispatch, phase runner, Cursor adapter",
   "type": "module",
   "license": "MIT",
+  "author": "Hans-Erik Lydecker",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eriklydecker/ludecker.git",
+    "directory": "packages/agentic-bridge"
+  },
+  "homepage": "https://ludecker.com/guide/install-aaac",
+  "bugs": {
+    "url": "https://github.com/eriklydecker/ludecker/issues"
+  },
   "exports": {
     ".": "./src/index.mjs",
     "./phase-event-contract": "./src/phase-event-contract.mjs"
   },
+  "files": [
+    "src/"
+  ],
   "scripts": {
     "test": "vitest run",
+    "test:e2e:cli-usage": "LIVE_CURSOR_USAGE_E2E=1 vitest run tests/e2e-cli-usage-path.test.mjs",
+    "test:e2e:sdk-usage": "LIVE_CURSOR_USAGE_E2E=1 vitest run tests/e2e-sdk-usage-path.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "dependencies": {
-    "@ludecker/aaac": "workspace:*"
+  "peerDependencies": {
+    "@ludecker/aaac": "^1.2.5"
   },
   "optionalDependencies": {
     "@cursor/sdk": "^1.0.0"
   },
   "devDependencies": {
+    "@ludecker/aaac": "workspace:*",
     "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

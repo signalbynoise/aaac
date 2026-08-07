@@ -78,12 +78,18 @@ Review before publishing an `aaac-v*` release. Project-local stores under `.curs
 
 ## Publish (maintainers)
 
-Authenticate with a registry token in `.npmrc` (used by pnpm, not the `npm` CLI):
+`@ludecker/aaac` depends on `@ludecker/agentic-bridge`. CI publishes the bridge first (if that version is not already on npm), then aaac.
+
+Authenticate with a registry token in `.npmrc` (used by pnpm, not the `npm` CLI), or use tags:
 
 ```bash
-pnpm --filter @ludecker/aaac publish --access public --no-git-checks
-git tag aaac-v1.1.0
-git push origin aaac-v1.1.0
+# Preferred: tag aaac — workflow publishes bridge (if needed) then aaac
+git tag aaac-v1.2.6
+git push origin aaac-v1.2.6
+
+# Optional: bridge-only release
+git tag agentic-bridge-v0.1.0
+git push origin agentic-bridge-v0.1.0
 ```
 
-CI publishes on `aaac-v*` tags via `.github/workflows/publish-aaac.yml` (`NPM_TOKEN` secret).
+CI: `.github/workflows/publish-aaac.yml` (`aaac-v*`) and `.github/workflows/publish-agentic-bridge.yml` (`agentic-bridge-v*`). Secret: `NPM_TOKEN`.

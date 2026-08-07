@@ -22,6 +22,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Agentic bridge package tests
+        run: pnpm --filter @ludecker/agentic-bridge test
+
+      - name: Publish agentic-bridge if missing or behind
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          LOCAL=$(node -p "require('./packages/agentic-bridge/package.json').version")
+          CURRENT=$(npm view @ludecker/agentic-bridge version 2>/dev/null || true)
+          if [ "$CURRENT" = "$LOCAL" ]; then
+            echo "agentic-bridge@$LOCAL already on npm — skip"
+          else
+            echo "Publishing @ludecker/agentic-bridge@$LOCAL (registry has '${CURRENT:-none}')"
+            pnpm --filter @ludecker/agentic-bridge publish --access public --no-git-checks
+          fi
+
       - name: AAAC package tests
         run: pnpm --filter @ludecker/aaac test
 

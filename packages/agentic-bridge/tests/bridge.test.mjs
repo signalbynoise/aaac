@@ -294,7 +294,9 @@ describe("phase-log-stream", () => {
     expect(progress).not.toHaveProperty("detail");
     expect(progress).not.toHaveProperty("semanticSummary");
     expect(completed).not.toHaveProperty("detail");
-    expect(completed.metrics).toEqual({ tokens: 400, context: 2 });
+    expect(completed.metrics).toMatchObject({ tokens: 400, context: 2 });
+    expect(completed.metrics).not.toHaveProperty("detail");
+    expect(completed.metrics).not.toHaveProperty("semanticSummary");
   });
 });
 
@@ -392,14 +394,32 @@ describe("cursor-adapter activity formatting", () => {
 });
 
 describe("cursor-auth", () => {
-  it("getCursorAuthStatus returns shape", () => {
-    const status = getCursorAuthStatus();
+  it("getCursorAuthStatus is awaitable and returns shape", async () => {
+    const pending = getCursorAuthStatus();
+    expect(pending).toBeInstanceOf(Promise);
+    const status = await pending;
     expect(status).toHaveProperty("loggedIn");
     expect(status).toHaveProperty("email");
   });
 
-  it("isCursorAuthenticated matches status", () => {
-    expect(isCursorAuthenticated()).toBe(getCursorAuthStatus().loggedIn);
+  it("isCursorAuthenticated matches status", async () => {
+    const [authenticated, status] = await Promise.all([
+      isCursorAuthenticated(),
+      getCursorAuthStatus(),
+    ]);
+    expect(authenticated).toBe(status.loggedIn);
+  });
+
+  it("cursor-auth.mjs forbids spawnSync", () => {
+    const authSource = readBridgeSource("../src/cursor-auth.mjs");
+    expectSourceContract(authSource, {
+      required: [
+        /import\s*\{\s*spawn\s*\}\s*from\s*["']child_process["']/,
+        /export async function getCursorAuthStatus/,
+      ],
+      // Comment may mention prior spawnSync result shape; forbid import/call only.
+      forbidden: [/\bspawnSync\s*\(/, /import\s*\{[^}]*\bspawnSync\b/],
+    });
   });
 });
 
@@ -423,6 +443,27 @@ Tip: use --model <id>`;
       { id: "claude-sonnet-5-high", pickerLabel: "Sonnet 5 1M" },
     ]);
   });
+
+  it("listCursorModels is awaitable", async () => {
+    const { listCursorModels } = await import("../src/cursor-models.mjs");
+    const pending = listCursorModels();
+    expect(pending).toBeInstanceOf(Promise);
+    const result = await pending;
+    expect(result).toHaveProperty("models");
+    expect(result).toHaveProperty("source");
+    expect(Array.isArray(result.models)).toBe(true);
+  });
+
+  it("cursor-models.mjs forbids spawnSync", () => {
+    const modelsSource = readBridgeSource("../src/cursor-models.mjs");
+    expectSourceContract(modelsSource, {
+      required: [
+        /import\s*\{\s*spawn\s*\}\s*from\s*["']child_process["']/,
+        /export async function listCursorModels/,
+      ],
+      forbidden: [/\bspawnSync\s*\(/, /import\s*\{[^}]*\bspawnSync\b/],
+    });
+  });
 });
 describe("aaac workspace", () => {
   it("getAaacStatus returns ready for monorepo root", async () => {
@@ -445,7 +486,7 @@ describe("aaac workspace", () => {
 
   it("installAaacInWorkspace returns alreadyInstalled when ready", async () => {
     const { installAaacInWorkspace } = await import("../src/install-workspace.mjs");
-    const result = installAaacInWorkspace(REPO_ROOT);
+    const result = await installAaacInWorkspace(REPO_ROOT);
     expect(result.ok).toBe(true);
     expect(result.alreadyInstalled).toBe(true);
   });
@@ -729,12 +770,47 @@ describe("agentic-bridge", () => {
     expect(typeof result.stdout).toBe("string");
   });
 
+  it(
+    "runEngineScript times out and kills hung child within bound",
+    async () => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-timeout-"));
+      const runEngineDir = path.join(tmp, ".cursor/aaac/scripts/run-engine");
+      fs.mkdirSync(runEngineDir, { recursive: true });
+      const hangScript = path.join(runEngineDir, "hang-forever.mjs");
+      fs.writeFileSync(
+        hangScript,
+        "setInterval(() => {}, 60_000);\n",
+        "utf8",
+      );
+
+      const timeoutMs = 250;
+      const started = Date.now();
+      try {
+        const result = await runEngineScript(tmp, "hang-forever.mjs", [], {
+          timeoutMs,
+        });
+        const elapsed = Date.now() - started;
+
+        expect(result.ok).toBe(false);
+        expect(result.status).toBeNull();
+        expect(result.stderr).toBe(`runEngineScript timed out after ${timeoutMs}ms`);
+        // Settle on timeout; SIGKILL grace is 2s — stay well under a hung default.
+        expect(elapsed).toBeLessThan(timeoutMs + 3_000);
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+    10_000,
+  );
+
   it("paths.mjs runEngineScript uses spawn not spawnSync", () => {
     const pathsSource = readBridgeSource("../src/paths.mjs");
     expectSourceContract(pathsSource, {
       required: [
         /import\s*\{\s*spawn\s*\}\s*from\s*["']child_process["']/,
         /const child = spawn\(/,
+        /timeoutMs/,
+        /child\.kill\(["']SIGTERM["']\)/,
       ],
       forbidden: [/spawnSync/],
     });

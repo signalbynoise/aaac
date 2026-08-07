@@ -1,9 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { sanitizeRunManifestView } from "../../../apps/agentic-os/src/shared/domain/run-manifest-sanitize.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
+const SANITIZE_MODULE = path.join(
+  REPO_ROOT,
+  "apps/agentic-os/src/shared/domain/run-manifest-sanitize.ts",
+);
+const HAS_AGENTIC_OS = fs.existsSync(SANITIZE_MODULE);
+const { sanitizeRunManifestView } = HAS_AGENTIC_OS
+  ? await import(SANITIZE_MODULE)
+  : { sanitizeRunManifestView: null };
+
 const RUN_SCHEMA = JSON.parse(
   fs.readFileSync(
     path.join(REPO_ROOT, "packages/aaac/templates/cursor/aaac/run/schema.json"),
@@ -26,7 +34,7 @@ function runView(overrides = {}) {
   };
 }
 
-describe("AAAC run UI contract", () => {
+describe.skipIf(!HAS_AGENTIC_OS)("AAAC run UI contract", () => {
   it("preserves a sealed semantic Role summary at the 180-character boundary", () => {
     const summary = (
       "Preserve this complete semantic Role summary through the UI contract while keeping ownership clear and all phase outcomes understandable to readers without exposing technical details " +

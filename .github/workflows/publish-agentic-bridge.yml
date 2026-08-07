@@ -23,10 +23,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Bridge export smoke
+        working-directory: packages/agentic-bridge
         run: |
           set -euo pipefail
           node --input-type=module -e "
-            import('@ludecker/agentic-bridge').then((m) => {
+            import('./src/index.mjs').then((m) => {
               if (typeof m.PhaseRunner !== 'function') {
                 throw new Error('PhaseRunner missing from @ludecker/agentic-bridge');
               }

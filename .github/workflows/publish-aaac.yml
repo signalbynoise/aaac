@@ -43,6 +43,7 @@ jobs:
         run: node packages/aaac/src/cli.mjs init --yes --dir /tmp/aaac-smoke-ci
 
       - name: Headless run import smoke (bridge resolves)
+        working-directory: packages/aaac
         run: |
           set -euo pipefail
           node --input-type=module -e "

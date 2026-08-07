@@ -5,6 +5,12 @@ import { parseArgs } from "./lib/paths.mjs";
 import { installAaac, runGenerators } from "./lib/install.mjs";
 import { resolveCursorRoot } from "./lib/paths.mjs";
 import { runEngineScript } from "./lib/run-engine-paths.mjs";
+import {
+  formatExternalPrerequisitesConsole,
+  loadExternalPrerequisites,
+  promptAndInstallPrerequisites,
+} from "./lib/external-prerequisites.mjs";
+import { runInstallSweep } from "./lib/sweep-project-docs.mjs";
 
 function printHelp() {
   console.log(`@ludecker/aaac — Agentic Architecture as Code
@@ -32,7 +38,7 @@ Quick start:
 
 Options:
   --dir <path>   Target project directory (default: cwd)
-  --yes, -y      Non-interactive defaults
+  --yes, -y      Non-interactive defaults (skips Yes/No for Fallow etc.)
   --force        Backup existing .cursor/ and replace
 
 Install (no npm CLI required):
@@ -95,18 +101,37 @@ async function cmdInit(args) {
     force: args.force,
   });
 
+  const aaacRoot = path.join(options.targetDir, ".cursor", "aaac");
+  const catalog = loadExternalPrerequisites(aaacRoot);
+  console.log(formatExternalPrerequisitesConsole(catalog));
+
+  const interactive =
+    !args.yes && Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
+  const { outcomes } = await promptAndInstallPrerequisites(options.targetDir, {
+    catalog,
+    interactive,
+    askFn: ask,
+  });
+
+  const refreshed = runInstallSweep(options.targetDir, {
+    docsRoot: options.docsRoot,
+    projectName: options.projectName,
+    installOutcomes: outcomes,
+    prerequisitesCatalog: catalog,
+  });
+
   console.log(`
 Agentic OS is ready.
 
   .cursor/     → ${cursorDest}
   docs/        → ${docsDest}
-  sweep report → ${sweepReportPath}
+  sweep report → ${refreshed.reportPath || sweepReportPath}
 
 Next steps:
 
   1. Open this project in Cursor
   2. Settings → Hooks → enable Hooks, then restart Cursor
-  3. Read the install sweep report (docs/rules/framework inventory + recommendations)
+  3. Read the install sweep report (includes external prerequisites — Fallow, etc.)
 
 Then use any command, for example:
 

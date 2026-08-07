@@ -26,9 +26,9 @@ npx @ludecker/aaac@latest init --yes --dir /path/to/your/repo
 
 After that, slash commands work — no domain overlay, resolvers, or manual `generate` step required. `init` already generates `graph.yaml` and all commands.
 
-**Install report:** `init` writes `.cursor/aaac/state/install-sweep-report.md` — a read-only inventory of docs, Cursor rules, and AAAC framework markdown in your repo, with recommendations (no merges or aliases).
+**Install report:** `init` writes `.cursor/aaac/state/install-sweep-report.md` — a read-only inventory of docs, Cursor rules, AAAC framework markdown, and **external prerequisites** (Cursor Hooks, Node, Fallow, etc.).
 
-**Install report:** `init` writes `.cursor/aaac/state/install-sweep-report.md` — a read-only inventory of docs, Cursor rules, and AAAC framework markdown in your repo, with recommendations (no merges or aliases).
+**Interactive extras:** when you run `init` in a TTY (without `--yes`), AAAC lists those prerequisites and can install recommended tools (e.g. **Fallow** as a `devDependency`) if you answer Yes. Non-interactive `--yes` skips third-party installs and only documents them in the report.
 
 ## Example commands
 
@@ -58,6 +58,17 @@ Only needed after you edit `ontology.json` or `graph.project.yaml`:
 npx @ludecker/aaac@latest generate
 pnpm dlx @ludecker/aaac@latest generate
 ```
+
+## Experience export (maintainers)
+
+After runs accumulate evidence-backed lessons locally, export promote-able candidates (strips local run IDs; keeps evidence aggregates):
+
+```bash
+npx @ludecker/aaac@latest experience-export
+npx @ludecker/aaac@latest experience-export --write packages/aaac/templates/cursor/aaac/experience/global-lessons.json
+```
+
+Review before publishing an `aaac-v*` release. Project-local stores under `.cursor/aaac/state/` are never published.
 
 ## Links
 

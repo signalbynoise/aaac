@@ -1,5 +1,9 @@
 import fs from "fs";
 import path from "path";
+import {
+  formatExternalPrerequisitesMarkdown,
+  loadExternalPrerequisites,
+} from "./external-prerequisites.mjs";
 
 /** @typedef {'docs' | 'rules' | 'framework'} SweepCategory */
 
@@ -193,8 +197,23 @@ export function buildRecommendations(ctx) {
  * @param {Parameters<typeof buildRecommendations>[0]} ctx
  */
 export function formatInstallSweepReport(ctx) {
-  const { after, docsRoot, projectName = "project", installedAt } = ctx;
+  const {
+    after,
+    docsRoot,
+    projectName = "project",
+    installedAt,
+    targetDir,
+    prerequisitesCatalog,
+    installOutcomes,
+  } = ctx;
   const recommendations = buildRecommendations(ctx);
+  const catalog =
+    prerequisitesCatalog ??
+    loadExternalPrerequisites(
+      targetDir
+        ? path.join(path.resolve(targetDir), ".cursor", "aaac")
+        : undefined,
+    );
   const lines = [
     "# AAAC install — docs / rules / framework inventory",
     "",
@@ -233,6 +252,11 @@ export function formatInstallSweepReport(ctx) {
       : ["_None found._"]),
   );
 
+  lines.push(
+    formatExternalPrerequisitesMarkdown(catalog, installOutcomes ?? []).trimEnd(),
+    "",
+  );
+
   lines.push("", "## Recommendations", "");
   for (const [i, rec] of recommendations.entries()) {
     lines.push(`${i + 1}. **${rec.kind}** — ${rec.message}`);
@@ -243,6 +267,7 @@ export function formatInstallSweepReport(ctx) {
     "",
     `- Edit \`${normalizeRel(docsRoot)}/project_context.md\` for project-specific paths.`,
     "- Enable Cursor Hooks (Settings → Hooks) and restart Cursor.",
+    "- Review **External prerequisites** above (Fallow recommended for verify / remediate).",
     "- Optional: add domain resolvers in `.cursor/aaac/graph.project.yaml`.",
     "",
   );
@@ -265,7 +290,13 @@ export function writeInstallSweepReport(targetDir, markdown) {
 
 /**
  * @param {string} root
- * @param {{ docsRoot: string; projectName: string; before?: ReturnType<typeof snapshotProjectDocs> }} params
+ * @param {{
+ *   docsRoot: string;
+ *   projectName: string;
+ *   before?: ReturnType<typeof snapshotProjectDocs>;
+ *   installOutcomes?: object[];
+ *   prerequisitesCatalog?: object;
+ * }} params
  */
 export function runInstallSweep(root, params) {
   const after = sweepProjectDocs(root, {
@@ -281,6 +312,9 @@ export function runInstallSweep(root, params) {
     docsRoot: params.docsRoot,
     projectName: params.projectName,
     installedAt: new Date().toISOString(),
+    targetDir: root,
+    installOutcomes: params.installOutcomes,
+    prerequisitesCatalog: params.prerequisitesCatalog,
   });
   const reportPath = writeInstallSweepReport(root, markdown);
   return { after, before, reportPath, markdown };

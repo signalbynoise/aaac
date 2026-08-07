@@ -12,7 +12,11 @@ export const REPO_ROOT = process.env.AAAC_WORKSPACE_ROOT
 export const AAAC_ROOT = path.join(REPO_ROOT, '.cursor/aaac');
 export const GRAPH_PATH = path.join(AAAC_ROOT, 'graph.yaml');
 export const ENFORCEMENT_PATH = path.join(AAAC_ROOT, 'enforcement.json');
-export const RUN_ENGINE_DIR = path.join(AAAC_ROOT, 'scripts/run-engine');
+/** Package SSOT — do not spawn dogfood copies (avoids CI drift vs packages/aaac/src). */
+export const RUN_ENGINE_DIR = path.join(
+  SOURCE_REPO_ROOT,
+  'packages/aaac/src/run-engine',
+);
 export const STATE_ROOT = path.join(AAAC_ROOT, 'state');
 export const RUNS_ROOT = path.join(STATE_ROOT, 'runs');
 export const ACTIVE_RUNS_DIR = path.join(STATE_ROOT, 'active-runs');

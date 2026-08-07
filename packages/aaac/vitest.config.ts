@@ -11,10 +11,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@aaac-engine': path.resolve(
-        __dirname,
-        '../../.cursor/aaac/scripts/run-engine',
-      ),
+      '@aaac-engine': path.resolve(__dirname, 'src/run-engine'),
     },
   },
 });

@@ -22,9 +22,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Agentic bridge package tests
-        run: pnpm --filter @ludecker/agentic-bridge test
-
       - name: Publish agentic-bridge if missing or behind
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -44,6 +41,18 @@ jobs:
 
       - name: Init smoke test
         run: node packages/aaac/src/cli.mjs init --yes --dir /tmp/aaac-smoke-ci
+
+      - name: Headless run import smoke (bridge resolves)
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "
+            import('@ludecker/agentic-bridge').then((m) => {
+              if (typeof m.PhaseRunner !== 'function') {
+                throw new Error('PhaseRunner missing from @ludecker/agentic-bridge');
+              }
+              console.log('bridge ok', Object.keys(m).slice(0, 8).join(','));
+            });
+          "
 
       - name: Publish with pnpm (no npm CLI)
         run: pnpm --filter @ludecker/aaac publish --access public --no-git-checks

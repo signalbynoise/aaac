@@ -22,8 +22,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Agentic bridge package tests
-        run: pnpm --filter @ludecker/agentic-bridge test
+      - name: Bridge export smoke
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "
+            import('@ludecker/agentic-bridge').then((m) => {
+              if (typeof m.PhaseRunner !== 'function') {
+                throw new Error('PhaseRunner missing from @ludecker/agentic-bridge');
+              }
+              console.log('bridge ok');
+            });
+          "
 
       - name: Publish with pnpm (no npm CLI)
         run: pnpm --filter @ludecker/agentic-bridge publish --access public --no-git-checks

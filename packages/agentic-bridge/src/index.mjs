@@ -81,4 +81,7 @@ export {
   computeUsageContextPercent,
   resolveModelContextWindow,
 } from "./cursor-usage.mjs";
-export { parseStreamJsonLine } from "./stream-json-tools.mjs";
+export {
+  parseStreamJsonLine,
+  createStreamJsonLineBuffer,
+} from "./stream-json-tools.mjs";

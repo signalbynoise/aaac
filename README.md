@@ -24,3 +24,7 @@ pnpm test
 ## Supabase
 
 Optional AAAC run persistence migrations live under `supabase/migrations/`. Consumers apply them to their own project when enabling AAAC telemetry.
+
+## CI secrets
+
+Add repository secret `NPM_TOKEN` (same as previously on `ludecker`) so `aaac-v*` / `agentic-bridge-v*` publish workflows can push to npm.

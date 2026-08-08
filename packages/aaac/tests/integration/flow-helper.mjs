@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import {
   loadEnforcement,
   resolveSwarmMinimum,
-} from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+} from '../../src/run-engine/lib.mjs';
 import { resolveSwarmTarget } from '../../src/run-engine/resolve-swarm-target.mjs';
 import { resolveExpectedAgentSpecs } from '../../src/run-engine/expected-agent-specs.mjs';
-import { resolvePhaseArtifacts } from '../../../../.cursor/aaac/scripts/run-engine/context-budget.mjs';
+import { resolvePhaseArtifacts } from '../../src/run-engine/context-budget.mjs';
 import {
   advancePhase,
   initRun,

@@ -9,10 +9,10 @@ import {
   validateExecuteAgentSpec,
   normalizePhaseArtifactPath,
   runDir,
-} from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+} from '../src/run-engine/lib.mjs';
 import { writeArtifact, nextRunId, seedRun, cleanupRun } from './fixtures/run-state.mjs';
 import { createModuleManifest } from './fixtures/sample-manifests.mjs';
-import { loadEnforcement } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import { loadEnforcement } from '../src/run-engine/lib.mjs';
 import { uniqueConversationId } from './fixtures/hook-payloads.mjs';
 
 describe('artifact content gates', () => {

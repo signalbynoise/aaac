@@ -2,6 +2,7 @@ import { afterAll, describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { AAAC_ROOT, REPO_ROOT } from "./fixtures/paths.mjs";
 import {
   loadGraphSwarmConfig,
   resolveAgentSpecById,
@@ -9,17 +10,16 @@ import {
   resolveSwarmSkillId,
   synthesizeFallbackAgentIds,
   loadPhasesConfig,
-} from "../src/run-engine/swarm-agent-specs.mjs";
+} from '../src/run-engine/swarm-agent-specs.mjs';
 import {
   extractRoleInitialSummary,
   validateInitialSummary,
-} from "../src/run-engine/agent-progress-contract.mjs";
-import { validateStageSummaryEntry } from "../src/run-engine/write-stage-summary.mjs";
+} from '../src/run-engine/agent-progress-contract.mjs';
+import { validateStageSummaryEntry } from '../src/run-engine/write-stage-summary.mjs';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
-const AAAC_ROOT = path.join(REPO_ROOT, ".cursor/aaac");
 const CURSOR_ROOT = path.join(REPO_ROOT, ".cursor");
-const TEMPLATE_CURSOR_ROOT = path.join(REPO_ROOT, "packages/aaac/templates/cursor");
+const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..");
+const TEMPLATE_CURSOR_ROOT = path.join(PACKAGE_ROOT, "templates/cursor");
 const TEMPLATE_GRAPH_PATH = path.join(TEMPLATE_CURSOR_ROOT, "aaac/graph.project.yaml");
 const TEMPLATE_AAAC_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-template-graph-"));
 const PHASE_ROSTERS = [
@@ -76,7 +76,7 @@ const PHASE_ROSTERS = [
 fs.mkdirSync(path.join(TEMPLATE_AAAC_ROOT, "lifecycle"), { recursive: true });
 fs.copyFileSync(TEMPLATE_GRAPH_PATH, path.join(TEMPLATE_AAAC_ROOT, "graph.yaml"));
 fs.copyFileSync(
-  path.join(AAAC_ROOT, "lifecycle/phases.json"),
+  path.join(TEMPLATE_CURSOR_ROOT, "aaac/lifecycle/phases.json"),
   path.join(TEMPLATE_AAAC_ROOT, "lifecycle/phases.json"),
 );
 

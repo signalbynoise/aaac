@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateRunMetrics,
   finalizeRunMetrics,
-} from "../src/run-engine/swarm-telemetry.mjs";
+} from '../src/run-engine/swarm-telemetry.mjs';
 
 function baseManifest(overrides = {}) {
   return {

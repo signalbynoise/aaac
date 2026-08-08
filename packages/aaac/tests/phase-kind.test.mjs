@@ -3,7 +3,7 @@ import {
   loadRegistry,
   phaseKind,
   isGatePhase,
-} from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+} from '../src/run-engine/lib.mjs';
 
 describe('phaseKind', () => {
   const registry = loadRegistry();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUserStopIntent } from "../../../.cursor/aaac/scripts/run-engine/lib.mjs";
+import { isUserStopIntent } from '../src/run-engine/lib.mjs';
 
 describe("isUserStopIntent", () => {
   it("matches explicit stop commands", () => {

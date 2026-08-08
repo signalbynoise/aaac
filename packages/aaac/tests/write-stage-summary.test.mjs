@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractSealedStageMetrics,
   validateStageSummaryEntry,
-} from "../src/run-engine/write-stage-summary.mjs";
+} from '../src/run-engine/write-stage-summary.mjs';
 
 const TECHNICAL_LAYMAN_CASES = [
   [

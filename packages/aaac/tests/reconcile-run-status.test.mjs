@@ -7,8 +7,8 @@ import {
   reconcileStaleRun,
   supersedeIncompleteRuns,
   syncRunSidecars,
-} from '../../../.cursor/aaac/scripts/run-engine/reconcile-run-status.mjs';
-import { loadRunManifest } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+} from '../src/run-engine/reconcile-run-status.mjs';
+import { loadRunManifest } from '../src/run-engine/lib.mjs';
 import {
   cleanupRun,
   conversationActivePath,

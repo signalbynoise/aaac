@@ -5,7 +5,7 @@ import {
   loadRegistry,
   isTestPath,
   isPathAllowedForPhase,
-} from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+} from '../src/run-engine/lib.mjs';
 import { ENFORCEMENT_PATH } from './fixtures/paths.mjs';
 
 describe('enforcement.json', () => {

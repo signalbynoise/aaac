@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { loadRegistry } from '../../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import { loadRegistry } from '../../src/run-engine/lib.mjs';
 import { uniqueConversationId } from '../fixtures/hook-payloads.mjs';
 import { cleanupRun, simulateVerbFlow } from './flow-helper.mjs';
 

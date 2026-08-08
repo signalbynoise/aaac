@@ -11,7 +11,7 @@ import {
   buildPostgrestHeaders,
   syncRunToSupabase,
   MAX_INLINE_ARTIFACT_BYTES,
-} from "../../.cursor/aaac/scripts/run-engine/persist-run.mjs";
+} from '../src/run-engine/persist-run.mjs';
 import { nextRunId, seedRun, writeArtifact, cleanupRun } from "./fixtures/run-state.mjs";
 
 describe("persist-run", () => {

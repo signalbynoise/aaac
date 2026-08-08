@@ -5,13 +5,13 @@ import {
   tierLookup,
   getPhaseClass,
   resolveSwarmFloor,
-} from "../src/run-engine/load-swarm-sizing.mjs";
+} from '../src/run-engine/load-swarm-sizing.mjs';
 import {
   resolveSwarmTargetDetail,
   applySwarmTargetsToManifest,
-} from "../src/run-engine/resolve-swarm-target.mjs";
-import { resolveSwarmWaves } from "../src/run-engine/resolve-swarm-waves.mjs";
-import { computeBootstrapScopeScore } from "../src/run-engine/swarm-complexity-lib.mjs";
+} from '../src/run-engine/resolve-swarm-target.mjs';
+import { resolveSwarmWaves } from '../src/run-engine/resolve-swarm-waves.mjs';
+import { computeBootstrapScopeScore } from '../src/run-engine/swarm-complexity-lib.mjs';
 
 describe("load-swarm-sizing", () => {
   beforeEach(() => resetSwarmSizingCache());

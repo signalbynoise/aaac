@@ -11,7 +11,7 @@ import {
   processRunEvidence,
   loadCapabilityStats,
   CAPABILITY_STATS_PATH,
-} from "../../.cursor/aaac/scripts/run-engine/capability-evidence.mjs";
+} from '../src/run-engine/capability-evidence.mjs';
 import { nextRunId, seedRun, cleanupRun, writeArtifact } from "./fixtures/run-state.mjs";
 import { uniqueConversationId } from "./fixtures/hook-payloads.mjs";
 

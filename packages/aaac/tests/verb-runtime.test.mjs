@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadRegistry } from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+import { loadRegistry } from '../src/run-engine/lib.mjs';
 import { loadVerbRuntimeFromGraph } from './fixtures/graph-verb-runtime.mjs';
 
 const VERB_COMMANDS = {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   extractConversationContextFromHook,
   resolveContextWindowSize,
-} from "../src/run-engine/conversation-context.mjs";
+} from '../src/run-engine/conversation-context.mjs';
 
 describe("conversation-context", () => {
   it("extractConversationContextFromHook reads preCompact fields", () => {

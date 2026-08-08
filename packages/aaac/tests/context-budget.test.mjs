@@ -7,9 +7,9 @@ import {
   validateDiscoverBriefContent,
   validateContextBudgetArtifacts,
   CONTEXT_BUDGET_PATH,
-} from "../../../.cursor/aaac/scripts/run-engine/context-budget.mjs";
-import { loadEnforcement } from "../../../.cursor/aaac/scripts/run-engine/lib.mjs";
-import { resolveSwarmTarget } from "../src/run-engine/resolve-swarm-target.mjs";
+} from '../src/run-engine/context-budget.mjs';
+import { loadEnforcement } from '../src/run-engine/lib.mjs';
+import { resolveSwarmTarget } from '../src/run-engine/resolve-swarm-target.mjs';
 import {
   seedRun,
   cleanupRun,

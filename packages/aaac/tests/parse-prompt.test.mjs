@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   loadRegistry,
   parseAaacPrompt,
-} from '../../../.cursor/aaac/scripts/run-engine/lib.mjs';
+} from '../src/run-engine/lib.mjs';
 
 describe('parseAaacPrompt', () => {
   it('parses /create-module with domain and quoted intent', () => {

@@ -15,15 +15,15 @@ import {
   formatHookProgressSummary,
   normalizeSubagentId,
   estimateUsageFromCharCount,
-} from "../src/run-engine/swarm-telemetry.mjs";
+} from '../src/run-engine/swarm-telemetry.mjs';
 import {
   extractRoleInitialSummary,
   validateCurrentStep,
   validateFinalSummary,
   validateInitialSummary,
   validateSealedSummary,
-} from "../src/run-engine/agent-progress-contract.mjs";
-import { buildPhaseRows, buildAgentRows } from "../src/run-engine/persist-run.mjs";
+} from '../src/run-engine/agent-progress-contract.mjs';
+import { buildPhaseRows, buildAgentRows } from '../src/run-engine/persist-run.mjs';
 
 function baseManifest(overrides = {}) {
   return {

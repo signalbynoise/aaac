@@ -8,8 +8,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(__dirname, "../../..");
-const EXP = path.join(REPO_ROOT, "packages/aaac/src/run-engine/experience");
+const EXP = path.join(PACKAGE_ROOT, "src/run-engine/experience");
+const TEMPLATE_RETRIEVAL_YAML = path.join(
+  PACKAGE_ROOT,
+  "templates/cursor/aaac/experience/retrieval.yaml",
+);
 
 describe("experience-retrieval", () => {
   let tmpRoot;
@@ -36,10 +41,7 @@ describe("experience-retrieval", () => {
     );
     fs.writeFileSync(
       path.join(aaac, "experience", "retrieval.yaml"),
-      fs.readFileSync(
-        path.join(REPO_ROOT, ".cursor/aaac/experience/retrieval.yaml"),
-        "utf8",
-      ),
+      fs.readFileSync(TEMPLATE_RETRIEVAL_YAML, "utf8"),
     );
     fs.writeFileSync(
       path.join(aaac, "experience", "global-lessons.json"),

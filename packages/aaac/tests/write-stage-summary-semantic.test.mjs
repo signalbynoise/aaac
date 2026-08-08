@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   parseStageSummariesYaml,
   writeStageSummary,
-} from "../src/run-engine/write-stage-summary.mjs";
+} from '../src/run-engine/write-stage-summary.mjs';
 import {
   cleanupRun,
   nextRunId,

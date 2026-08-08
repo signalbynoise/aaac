@@ -9,7 +9,7 @@ import {
   filterLogByLevel,
   swarmCountForPhase,
   debugRunSummary,
-} from "../src/run-engine/log.mjs";
+} from '../src/run-engine/log.mjs';
 
 describe("log.mjs", () => {
   it("normalizeLevel defaults to info", () => {

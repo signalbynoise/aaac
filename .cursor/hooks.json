@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/aaac-before-submit.sh",
+        "matcher": "UserPromptSubmit"
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/aaac-pre-tool.sh",
+        "matcher": "Write|StrReplace|Delete|EditNotebook|ApplyPatch",
+        "failClosed": true
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": ".cursor/hooks/aaac-subagent-start.sh",
+        "failClosed": false
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": ".cursor/hooks/aaac-subagent-stop.sh",
+        "failClosed": false
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/aaac-post-tool.sh",
+        "failClosed": false
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/aaac-stop.sh",
+        "loop_limit": 5
+      }
+    ]
+  }
+}

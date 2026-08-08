@@ -3,8 +3,20 @@ export {
   compareSemver,
   resolveAaacVersionInfo,
   checkAaacVersionUpdate,
+  readBundledAaacVersion,
+  readInstalledAaacVersion,
 } from "./aaac-version.mjs";
-export { installAaacInWorkspace } from "./install-workspace.mjs";
+export {
+  fetchAaacPackageFromNpm,
+  resolveAaacNpmPackage,
+  resolveAaacCacheDir,
+} from "./aaac-npm-fetch.mjs";
+export {
+  installAaacInWorkspace,
+  ensureAaacCurrent,
+  resolveAaacEnsureAction,
+  workspaceHasIncompleteRuns,
+} from "./install-workspace.mjs";
 export { resolveWorkspacePaths, runEngineScript, parseJsonStdout } from "./paths.mjs";
 export {
   dispatchRun,

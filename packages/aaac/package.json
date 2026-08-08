@@ -7,12 +7,12 @@
   "author": "Hans-Erik Lydecker",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eriklydecker/ludecker.git",
+    "url": "git+https://github.com/signalbynoise/aaac.git",
     "directory": "packages/aaac"
   },
   "homepage": "https://ludecker.com/guide/install-aaac",
   "bugs": {
-    "url": "https://github.com/eriklydecker/ludecker/issues"
+    "url": "https://github.com/signalbynoise/aaac/issues"
   },
   "keywords": [
     "aaac",

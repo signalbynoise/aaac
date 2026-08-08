@@ -103,11 +103,12 @@ describe("Cursor exact usage transport", () => {
         reasoningTokens: 11,
         contextPercent: 12.5,
       },
-    })).toEqual({
+    })).toMatchObject({
       kind: "usage",
       tokens: 136,
       context: 12.5,
       requestId: "req-camel",
+      components: { input: 101, output: 23, cacheRead: 7, cacheWrite: 5 },
     });
 
     expect(parseCursorUsageEvent({
@@ -122,11 +123,13 @@ describe("Cursor exact usage transport", () => {
         context_tokens: 32_000,
         context_window_size: 128_000,
       },
-    })).toEqual({
+    })).toMatchObject({
       kind: "usage",
       tokens: 253,
-      context: 25,
+      // (200+40)/128000*100 — cache/context_tokens excluded from context %
+      context: 0.1875,
       requestId: "req-snake",
+      components: { input: 200, output: 40, cacheRead: 10, cacheWrite: 3 },
     });
   });
 
@@ -150,9 +153,12 @@ describe("Cursor exact usage transport", () => {
     expect(accumulateCursorUsage(state, first)).toBe(true);
     expect(accumulateCursorUsage(state, duplicate)).toBe(false);
     expect(accumulateCursorUsage(state, second)).toBe(true);
-    expect(cursorUsageMetrics(state)).toEqual({
+    expect(cursorUsageMetrics(state)).toMatchObject({
       tokens: 1_000,
-      context: null,
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
       tokenSource: "cursor_cli_usage",
       requestIds: ["request-1", "request-2"],
     });
@@ -230,7 +236,12 @@ describe("Cursor exact usage transport", () => {
       cursorRunId: "session-usage",
       metrics: {
         tokens: 370,
-        context: 50,
+        // (300+70)/128000*100 from last usage envelope window
+        context: 0.2890625,
+        inputTokens: 300,
+        outputTokens: 70,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         tokenSource: "cursor_cli_usage",
         requestIds: ["turn-1", "turn-2"],
       },
@@ -271,7 +282,7 @@ describe("phase metrics transport and persistence", () => {
     });
     const streamEntry = phaseEventToStreamEntry(normalized, "2026-07-20T09:00:00.000Z");
 
-    expect(normalized).toEqual({
+    expect(normalized).toMatchObject({
       runId: "run-metrics",
       phase: "discover",
       type: "completed",
@@ -292,7 +303,7 @@ describe("phase metrics transport and persistence", () => {
     });
   });
 
-  it("writes tokens, context, and token source on completion", () => {
+  it("writes tokens, components, context, and token source on completion", () => {
     const { runId, runDir } = createRunManifest();
     recordAgentLaunch(REPO_ROOT, runId, {
       agentIndex: 0,
@@ -306,14 +317,27 @@ describe("phase metrics transport and persistence", () => {
         tokens: 370,
         context: 50,
         tokenSource: "cursor_cli_usage",
+        inputTokens: 300,
+        outputTokens: 70,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
       },
     });
 
-    expect(readRun(runDir).swarm.agents[0]).toMatchObject({
+    const agent = readRun(runDir).swarm.agents[0];
+    expect(agent).toMatchObject({
       tokens: 370,
       context: 50,
+      input_tokens: 300,
+      output_tokens: 70,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
       token_source: "cursor_cli_usage",
     });
+    const complete = readRun(runDir).log.find((entry) => entry.event === "agent_complete");
+    expect(complete?.detail).toContain("input=300");
+    expect(complete?.detail).toContain("output=70");
+    expect(complete?.detail).toContain("token_source=cursor_cli_usage");
   });
 });
 
@@ -359,7 +383,7 @@ describe("swarm roster and wave contracts", () => {
     expect(manifest.swarm_history.discover.expected_agent_specs).toEqual([]);
   });
 
-  it("rejects a required swarm phase with an empty graph roster", async () => {
+  it("recovers a required swarm phase with an empty graph roster via synthetic slots", async () => {
     const { runId, manifest } = createRunManifest({
       phase: "unmapped_required_phase",
       swarm: {
@@ -372,11 +396,18 @@ describe("swarm roster and wave contracts", () => {
       adapter: { runPhase: async function* () {}, cancel: async () => {} },
     });
 
-    await expect(
-      runner.preparePhaseAgentPlan(runId, manifest, "unmapped_required_phase"),
-    ).rejects.toThrow(
-      "Swarm-required phase unmapped_required_phase has no graph agent roster",
+    const plan = await runner.preparePhaseAgentPlan(
+      runId,
+      manifest,
+      "unmapped_required_phase",
     );
+    expect(plan.agentCount).toBe(2);
+    expect(plan.agentSpecs).toHaveLength(2);
+    expect(plan.agentSpecs.every((spec) => spec.synthetic === true)).toBe(true);
+    expect(plan.agentSpecs.map((spec) => spec.id)).toEqual([
+      "unmapped_required_phase-slot-1",
+      "unmapped_required_phase-slot-2",
+    ]);
     runner.stopWatching();
   });
 

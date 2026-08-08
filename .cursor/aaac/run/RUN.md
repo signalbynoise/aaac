@@ -1,0 +1,89 @@
+# Run — primary execution object
+
+**Every AAAC command executes within a Run.** There is no standalone lifecycle execution or standalone logging.
+
+**Hook enforcement:** [.cursor/hooks.json](../../hooks.json) + [enforcement.json](../enforcement.json) block code edits until `execute`. Registry: [runtime-registry.json](../runtime-registry.json).
+
+Schema: [schema.json](schema.json)
+
+## Create Run (dispatch step 2.5 — after graph resolve, before orchestrator)
+
+1. Generate `run_id`: `run_{YYYYMMDD}_{short-slug}` or resume existing if user says `resume run_…`
+2. Compose runtime phases from [lifecycle/lifecycle.json](../lifecycle/lifecycle.json) + [governance/gates.json](../governance/gates.json):
+   - `pending` = work phases through `plan` + gate stack + work phases from `execute`
+3. Write manifest: `state/runs/{run_id}/run.json`
+4. Set `status: running`, `phase: first pending item`, `phase_kind: work`
+
+## Update Run (after every phase)
+
+1. Append to `log[]`
+2. Move phase from `pending` to `completed`
+3. Write checkpoint: `state/runs/{run_id}/checkpoints/{phase}.json`
+4. Store artifacts under `state/runs/{run_id}/artifacts/` — reference paths in `artifacts{}`
+5. Append routing/capability choices to `decisions[]`
+6. Persist `run.json`
+
+## Gate stack execution
+
+After `plan` completes:
+
+1. Set `phase_kind: gate`, `gates.stack` from lifecycle
+2. Run each gate in [governance/gates.json](../governance/gates.json) order
+3. On fail → `status: blocked`, `awaiting_approval: true`, `blocked_reason`, **STOP**
+4. On pass → record in `gates.results`, continue to `execute`
+
+## Human approval
+
+When `awaiting_approval: true`:
+
+```text
+STOP — awaiting approval
+Reason: {blocked_reason}
+Run: {run_id}
+```
+
+User approves → log decision, set `status: running`, `awaiting_approval: false`, retry or continue.
+
+## Observability
+
+All observability lives on the Run:
+
+| Field | Purpose |
+|-------|---------|
+| `decisions[]` | Why route/capability/gate |
+| `log[]` | Phase and skill events |
+| `checkpoints[]` | Resume points |
+| `swarm.expected_agent_specs` | Current phase graph roster with Role-derived summaries |
+| `metrics.total_tokens` | Exact latest-attempt agent sum, else exact conversation tokens |
+| `metrics.context_usage_percent` | Average context percent across metered latest-attempt agents |
+| `metrics.phase_count` | Phase metric records excluding internal swarm targets |
+
+**No** append to standalone `decision-log.md` or `execution-log.md`.
+
+## Capability resolution (record on Run)
+
+When resolving `object_capabilities` → providers:
+
+```yaml
+capabilities_resolved:
+  layer-boundaries:
+    providers: [architecture]
+    source: object module
+```
+
+MCP providers (type `mcp`) are recorded in decisions but do not map to graph skill keys.
+
+## Report
+
+Final phase writes `artifacts.report` and sets `status: completed`.
+
+## Experience (post-completion)
+
+After capability evidence, `experience-evidence.mjs` writes:
+
+- `artifacts/reflection.json` — structured retrospective from metrics + checkpoints
+- Updates `state/lessons.json` — **evidence-backed** lessons (never anecdote-only)
+- Updates `state/experience-stats.json` — signature baselines (tokens, duration, success)
+- Optionally merges durable prefs into `state/workspace-memory.json`
+
+Orchestrators **must not** invent lessons in chat. Lessons and evidence come only from the experience processor / reflection artifact. `prepare-phase-context.mjs` is **auto-invoked on Run create and phase advance** (writes `artifacts/phase_context.json` with an `experience` block: lesson + evidence). The CLI remains available for manual refresh.

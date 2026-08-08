@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { REPO_ROOT } from "./fixtures/paths.mjs";
+import { REPO_ROOT, SOURCE_REPO_ROOT } from "./fixtures/paths.mjs";
 
 const REMEDIATION_CONFIG = path.join(
   REPO_ROOT,
@@ -46,7 +46,7 @@ describe("remediation-config", () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("Lüdecker project.config includes remediation verify layers", async () => {
+  it("installed project.config includes remediation verify layers", async () => {
     const script = `
       import { loadRemediationConfig, resolveLayerKeys } from ${JSON.stringify(REMEDIATION_CONFIG)};
       const config = loadRemediationConfig();
@@ -59,7 +59,8 @@ describe("remediation-config", () => {
     expect(result.status).toBe(0);
     const json = JSON.parse(result.stdout.trim());
     expect(json.keys).toContain("typecheck");
-    expect(json.keys).toContain("playwright");
+    expect(json.keys).toContain("vitest");
+    expect(json.keys).toContain("build");
     expect(json.url).toMatch(/localhost/);
   });
 });
@@ -73,7 +74,7 @@ describe("remediate-app graph wiring", () => {
   });
 
   it("npm template ships remediate-app command and scripts", () => {
-    const command = path.join(REPO_ROOT, "packages/aaac/templates/cursor/commands/remediate-app.md");
+    const command = path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/commands/remediate-app.md");
     const initScript = path.join(
       REPO_ROOT,
       "packages/aaac/templates/cursor/aaac/scripts/remediation/init-campaign.mjs",
@@ -94,13 +95,13 @@ describe("init-campaign", () => {
     fs.mkdirSync(path.join(cursorAaac, "scripts", "run-engine"), { recursive: true });
 
     fs.copyFileSync(
-      path.join(REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/run-engine/lib.mjs"),
+      path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/run-engine/lib.mjs"),
       path.join(cursorAaac, "scripts/run-engine/lib.mjs"),
     );
     for (const file of fs.readdirSync(
-      path.join(REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/remediation"),
+      path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/remediation"),
     )) {
-      const src = path.join(REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/remediation", file);
+      const src = path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/remediation", file);
       const dest = path.join(cursorAaac, "scripts/remediation", file);
       if (fs.statSync(src).isDirectory()) {
         fs.cpSync(src, dest, { recursive: true });

@@ -1,0 +1,769 @@
+version: 1
+
+# AAAC execution graph — SSOT for command → orchestrator → skills → agents.
+# Regenerate: pnpm aaac:generate (or npx @ludecker/aaac generate)
+# Path convention: agents/, policies/, skills/, domains/ are relative to .cursor/
+# Ontology: .cursor/aaac/ontology.json — layers (code → data → product → system):
+#   code: function, component, module
+#   data: schema, model, migration
+#   product: feature, workflow, integration
+#   system: app, domain, architecture
+
+verbs: [create, update, fix, review, check, test, release, remove]
+objects: [function, component, module, schema, model, migration, feature, workflow, integration, app, domain, architecture]
+
+invalid_pairs:
+  - [release, function]
+  - [release, component]
+  - [release, module]
+  - [release, schema]
+  - [release, model]
+  - [release, migration]
+  - [release, workflow]
+  - [release, architecture]
+  - [release, domain]
+
+verb_work_phases:
+  create: [discover, investigate_lite, plan, execute, test_execute, verify, review_swarm, report]
+  update: [discover, investigate_lite, plan, execute, test_execute, verify, review_swarm, report]
+  fix: [discover, investigate_swarm, root_cause, plan, execute, test_execute, verify, review_swarm, report]
+  review: [discover, plan, report]
+  check: [discover, report]
+  test: [discover, plan, verify, report]
+  release: [execute, verify, report]
+  remove: [discover, investigate_lite, plan, execute, test_execute, verify, review_swarm, report]
+
+verb_gate_stack:
+  create: pre_execute
+  update: pre_execute
+  fix: pre_execute
+  review: null
+  check: pre_execute_minimal
+  test: null
+  release: release
+  remove: pre_execute
+
+governance_gate_stacks:
+  pre_execute: [validate, impact_analysis, dependency_graph, fitness_functions, rollback]
+  pre_execute_minimal: [validate, impact_analysis, dependency_graph, fitness_functions]
+  release: [validate]
+
+# Composed runtime: work through plan + gate stack + execute onward (see lifecycle.json runtime_compose)
+verb_runtime:
+  create: [discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, report]
+  update: [discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, report]
+  fix: [discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, report]
+  review: [discover, plan, report]
+  check: [discover, validate, impact_analysis, dependency_graph, fitness_functions, report]
+  test: [discover, plan, verify, report]
+  release: [validate, execute, verify, report]
+  remove: [discover, investigate_lite, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, report]
+
+# Exception commands — not verb×object; use for Run.pending when command matches
+command_workflows:
+  write-article: [parse, research_swarm, write, review, persist, report]
+  fix-module: [discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, report]
+  fix-bug: [discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, report]
+  remediate-app: [campaign_init, scan, check_swarm, plan_waves, execute, debt_sweep, satisfaction_gate, report]
+
+confidence:
+  architecture: 0.9
+  requirements: 0.8
+  scope: 0.8
+
+object_maturity:
+  function: evolving
+  component: evolving
+  module: critical
+  schema: protected
+  model: critical
+  migration: protected
+  feature: stable
+  workflow: stable
+  integration: critical
+  app: critical
+  domain: critical
+  architecture: protected
+
+maturity_rules:
+  protected:
+    requires_phases:
+      - impact_analysis
+      - dependency_graph
+      - rollback
+    investigation: lite_on_create_update_deep_on_fix
+  critical:
+    requires_phases:
+      - impact_analysis
+      - dependency_graph
+    investigation: lite_on_create_update_deep_on_fix
+  stable:
+    requires_phases:
+      - impact_analysis
+    investigation: lite_on_create_update_deep_on_fix
+  evolving:
+    requires_phases:
+      []
+    investigation: lite_on_create_update_deep_on_fix
+
+# Layer SSOT refs (see aaac/layers.md)
+lifecycle: aaac/lifecycle/lifecycle.json
+lifecycle_phases: aaac/lifecycle/phases.json
+governance_gates: aaac/governance/gates.json
+complexity: aaac/complexity.yaml
+context_budget: aaac/context-budget.yaml
+run: aaac/run/schema.json
+capabilities: aaac/capabilities/registry.json
+dependencies: aaac/dependencies.yaml
+fitness_functions: aaac/fitness-functions.yaml
+state: aaac/state/runs/
+observability: aaac/run/schema.json
+contracts: aaac/contracts/
+
+commands:
+  fix-bug:
+    orchestrator: verb-fix
+    object: feature
+  update-architecture:
+    orchestrator: update-doc
+  review-module:
+    orchestrator: review-module
+  review-incident:
+    orchestrator: review-incident
+  test-function:
+    orchestrator: test-function
+  release-app:
+    orchestrator: release-app
+  remediate-app:
+    orchestrator: remediate-app
+    object: app
+  module-update:
+    alias: update-module
+  update-doc:
+    alias: update-architecture
+  architecture:
+    alias: update-architecture
+  swarm-check:
+    alias: review-incident
+  refactor:
+    alias: review-module
+  create-function:
+    orchestrator: verb-create
+    object: function
+  create-component:
+    orchestrator: verb-create
+    object: component
+  create-module:
+    orchestrator: verb-create
+    object: module
+  create-schema:
+    orchestrator: verb-create
+    object: schema
+  create-model:
+    orchestrator: verb-create
+    object: model
+  create-migration:
+    orchestrator: verb-create
+    object: migration
+  create-feature:
+    orchestrator: verb-create
+    object: feature
+  create-workflow:
+    orchestrator: verb-create
+    object: workflow
+  create-integration:
+    orchestrator: verb-create
+    object: integration
+  create-app:
+    orchestrator: verb-create
+    object: app
+  create-domain:
+    orchestrator: verb-create
+    object: domain
+  create-architecture:
+    orchestrator: verb-create
+    object: architecture
+  update-function:
+    orchestrator: verb-update
+    object: function
+  update-component:
+    orchestrator: verb-update
+    object: component
+  update-module:
+    orchestrator: verb-update
+    object: module
+  update-schema:
+    orchestrator: verb-update
+    object: schema
+  update-model:
+    orchestrator: verb-update
+    object: model
+  update-migration:
+    orchestrator: verb-update
+    object: migration
+  update-feature:
+    orchestrator: verb-update
+    object: feature
+  update-workflow:
+    orchestrator: verb-update
+    object: workflow
+  update-integration:
+    orchestrator: verb-update
+    object: integration
+  update-app:
+    orchestrator: verb-update
+    object: app
+  update-domain:
+    orchestrator: verb-update
+    object: domain
+  fix-function:
+    orchestrator: verb-fix
+    object: function
+  fix-component:
+    orchestrator: verb-fix
+    object: component
+  fix-module:
+    orchestrator: verb-fix
+    object: module
+  fix-schema:
+    orchestrator: verb-fix
+    object: schema
+  fix-model:
+    orchestrator: verb-fix
+    object: model
+  fix-migration:
+    orchestrator: verb-fix
+    object: migration
+  fix-feature:
+    orchestrator: verb-fix
+    object: feature
+  fix-workflow:
+    orchestrator: verb-fix
+    object: workflow
+  fix-integration:
+    orchestrator: verb-fix
+    object: integration
+  fix-app:
+    orchestrator: verb-fix
+    object: app
+  fix-domain:
+    orchestrator: verb-fix
+    object: domain
+  fix-architecture:
+    orchestrator: verb-fix
+    object: architecture
+  review-function:
+    orchestrator: verb-review
+    object: function
+  review-component:
+    orchestrator: verb-review
+    object: component
+  review-schema:
+    orchestrator: verb-review
+    object: schema
+  review-model:
+    orchestrator: verb-review
+    object: model
+  review-migration:
+    orchestrator: verb-review
+    object: migration
+  review-feature:
+    orchestrator: verb-review
+    object: feature
+  review-workflow:
+    orchestrator: verb-review
+    object: workflow
+  review-integration:
+    orchestrator: verb-review
+    object: integration
+  review-app:
+    orchestrator: verb-review
+    object: app
+  review-domain:
+    orchestrator: verb-review
+    object: domain
+  review-architecture:
+    orchestrator: verb-review
+    object: architecture
+  check-function:
+    orchestrator: verb-check
+    object: function
+  check-component:
+    orchestrator: verb-check
+    object: component
+  check-module:
+    orchestrator: verb-check
+    object: module
+  check-schema:
+    orchestrator: verb-check
+    object: schema
+  check-model:
+    orchestrator: verb-check
+    object: model
+  check-migration:
+    orchestrator: verb-check
+    object: migration
+  check-feature:
+    orchestrator: verb-check
+    object: feature
+  check-workflow:
+    orchestrator: verb-check
+    object: workflow
+  check-integration:
+    orchestrator: verb-check
+    object: integration
+  check-app:
+    orchestrator: verb-check
+    object: app
+  check-domain:
+    orchestrator: verb-check
+    object: domain
+  check-architecture:
+    orchestrator: verb-check
+    object: architecture
+  test-component:
+    orchestrator: verb-test
+    object: component
+  test-module:
+    orchestrator: verb-test
+    object: module
+  test-schema:
+    orchestrator: verb-test
+    object: schema
+  test-model:
+    orchestrator: verb-test
+    object: model
+  test-migration:
+    orchestrator: verb-test
+    object: migration
+  test-feature:
+    orchestrator: verb-test
+    object: feature
+  test-workflow:
+    orchestrator: verb-test
+    object: workflow
+  test-integration:
+    orchestrator: verb-test
+    object: integration
+  test-app:
+    orchestrator: verb-test
+    object: app
+  test-domain:
+    orchestrator: verb-test
+    object: domain
+  test-architecture:
+    orchestrator: verb-test
+    object: architecture
+  release-feature:
+    orchestrator: verb-release
+    object: feature
+  release-integration:
+    orchestrator: verb-release
+    object: integration
+  remove-function:
+    orchestrator: verb-remove
+    object: function
+  remove-component:
+    orchestrator: verb-remove
+    object: component
+  remove-module:
+    orchestrator: verb-remove
+    object: module
+  remove-schema:
+    orchestrator: verb-remove
+    object: schema
+  remove-model:
+    orchestrator: verb-remove
+    object: model
+  remove-migration:
+    orchestrator: verb-remove
+    object: migration
+  remove-feature:
+    orchestrator: verb-remove
+    object: feature
+  remove-workflow:
+    orchestrator: verb-remove
+    object: workflow
+  remove-integration:
+    orchestrator: verb-remove
+    object: integration
+  remove-app:
+    orchestrator: verb-remove
+    object: app
+  remove-domain:
+    orchestrator: verb-remove
+    object: domain
+  remove-architecture:
+    orchestrator: verb-remove
+    object: architecture
+  update-api:
+    alias: update-integration
+  create-api:
+    alias: create-integration
+  fix-api:
+    alias: fix-integration
+  check-api:
+    alias: check-integration
+  test-api:
+    alias: test-integration
+  review-api:
+    alias: review-integration
+  remove-api:
+    alias: remove-integration
+  update-spec:
+    alias: update-architecture
+  create-spec:
+    alias: create-architecture
+  review-spec:
+    alias: review-architecture
+  fix-hook:
+    alias: fix-function
+  create-hook:
+    alias: create-function
+  review-hook:
+    alias: review-function
+  check-hook:
+    alias: check-function
+  create-endpoint:
+    alias: create-integration
+  update-endpoint:
+    alias: update-integration
+  fix-webhook:
+    alias: fix-integration
+  fix-query:
+    alias: fix-model
+  create-plugin:
+    alias: create-module
+  review-service:
+    alias: review-module
+  check-boundary:
+    alias: check-architecture
+  review-graph:
+    alias: review-architecture
+  check-inventory:
+    alias: check-module
+  create-skill:
+    alias: create-module
+  update-agent:
+    alias: update-module
+  review-dashboard:
+    alias: review-component
+  fix-pipeline:
+    alias: fix-workflow
+  release-pipeline:
+    alias: release-app
+  create-policy:
+    alias: create-architecture
+  update-policy:
+    alias: update-architecture
+  review-runbook:
+    alias: review-architecture
+  create-form:
+    alias: create-component
+  update-page:
+    alias: update-component
+  review-flow:
+    alias: review-workflow
+  update-flow:
+    alias: update-workflow
+  module-fix:
+    alias: fix-module
+  bug-fix:
+    alias: fix-bug
+
+
+
+orchestrators:
+  update-doc:
+    path: skills/shared/documentation/orchestrator
+    requires: [discovery, documentation, reporting]
+    readonly: true
+
+  review-incident:
+    path: skills/shared/investigation/orchestrator
+    requires: [discovery, investigation, reporting]
+    optional: [execution]
+
+  review-module:
+    path: skills/shared/architecture/orchestrator
+    requires: [discovery, architecture, reporting]
+    readonly: true
+
+  verb-check:
+    path: skills/shared/verbs/check/orchestrator
+    requires: [check, reporting]
+    readonly: true
+
+  test-function:
+    path: skills/shared/testing/orchestrator
+    requires: [discovery, testing, verification, reporting]
+
+  release-app:
+    path: skills/shared/platform-release/orchestrator
+    requires: [testing, verification, execution, reporting]
+
+  remediate-app:
+    path: skills/shared/remediation/orchestrator
+    requires: [remediation, discovery, check, execution, testing, verification, reporting]
+    check_swarm_skill: skills/shared/remediation/check-swarm
+    phases: [campaign_init, scan, check_swarm, plan_waves, execute, debt_sweep, satisfaction_gate, report]
+
+  verb-create:
+    path: skills/shared/verbs/create/orchestrator
+    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, module-authoring]
+
+  verb-update:
+    path: skills/shared/verbs/update/orchestrator
+    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
+
+  verb-fix:
+    path: skills/shared/verbs/fix/orchestrator
+    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
+    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, sync_inventory, report]
+
+  verb-review:
+    path: skills/shared/verbs/review/orchestrator
+    requires: [discovery, architecture, reporting]
+    readonly: true
+
+  verb-test:
+    path: skills/shared/verbs/test/orchestrator
+    requires: [discovery, planning, testing, verification, reporting]
+
+  verb-release:
+    path: skills/shared/verbs/release/orchestrator
+    requires: [testing, verification, execution, reporting]
+
+  verb-remove:
+    path: skills/shared/verbs/remove/orchestrator
+    requires: [discovery, remove, execution, testing, verification, reporting]
+
+object_capabilities:
+  function: []
+  component: [component-model, layer-boundaries, ui-design]
+  module: [layer-boundaries]
+  schema: [schema-model, database-design, security]
+  model: [data-model, schema-model]
+  migration: [migration-model, schema-model, database-design, security]
+  feature: [workflow-model, ux-design]
+  workflow: [workflow-model, ux-design]
+  integration: [integration-model, api-design]
+  app: [layer-boundaries, infrastructure]
+  domain: [domain-model, layer-boundaries]
+  architecture: [layer-boundaries, documentation]
+
+object_skills:
+  function: []
+  component: [component, architecture]
+  module: [architecture]
+  schema: [schema, architecture]
+  model: [model, schema]
+  migration: [migration, schema, architecture]
+  feature: [workflow, documentation]
+  workflow: [workflow, documentation]
+  integration: [integration]
+  app: [architecture, integration]
+  domain: [domain, architecture]
+  architecture: [architecture, documentation]
+
+object_skill_verbs:
+  module:
+    create: [module-authoring]
+    review: [architecture]
+  feature:
+    create: [module-authoring]
+
+skills:
+  discovery:
+    path: skills/shared/discovery
+    agents: [discovery-inventory, discovery-boundaries, discovery-ssot]
+  planning:
+    path: skills/shared/planning
+    agents: [plan-layer-map, plan-state-machines]
+  execution:
+    path: skills/shared/execution
+    depends: [governance/implementation]
+    agents: [code-author]
+  test-authoring:
+    path: skills/shared/test-authoring
+    agents: [test-author]
+  testing:
+    path: skills/shared/testing
+    agents: [unit-test-run, fallow-check-changed, fix-repro-verify]
+  verification:
+    path: skills/shared/verification
+  implementation-review:
+    path: skills/shared/implementation-review
+    agents: [boundary-review, doc-conformance, implementation-review]
+  reporting:
+    path: skills/shared/reporting
+    agents: [report-completeness-review, report-factual-review]
+  architecture:
+    path: skills/shared/architecture
+    agents: [boundary-review, dependency-analysis, system-decomposition]
+  documentation:
+    path: skills/shared/documentation
+  investigation:
+    path: skills/shared/investigation
+    agents:
+      - fix-repro
+      - fix-code-path
+      - fix-recent-changes
+      - fix-test-failures
+      - fix-regression-scope
+      - fix-runtime-evidence
+      - fix-inventory-confirm
+  root-cause:
+    path: skills/shared/root-cause
+    agents: [root-cause-analyst, fix-hypothesis-validate]
+  investigation-lite:
+    path: skills/shared/investigation-lite
+    agents: [investigate-lite-exists, investigate-lite-dependencies, investigate-lite-constraints]
+  validation:
+    path: skills/shared/validation
+    agents: [gate-validate-confidence, gate-validate-complexity, gate-validate-requirements]
+  impact-analysis:
+    path: skills/shared/impact-analysis
+    agents: [impact-analysis, dependency-analysis]
+  dependency-graph:
+    path: skills/shared/dependency-graph
+    agents: [dependency-analysis, boundary-review]
+  fitness-functions:
+    path: skills/shared/fitness-functions
+    agents: [boundary-review, doc-conformance, fallow-check-changed]
+  rollback:
+    path: skills/shared/rollback
+    agents: [gate-rollback-feasibility, gate-rollback-verification]
+  run:
+    path: skills/shared/run
+  check:
+    path: skills/shared/check
+    agents: [discovery-inventory, discovery-ssot, check-capability-trace]
+  component:
+    path: skills/shared/component
+  model:
+    path: skills/shared/model
+  migration:
+    path: skills/shared/migration
+  domain:
+    path: skills/shared/domain
+  schema:
+    path: skills/shared/schema
+  workflow:
+    path: skills/shared/workflow
+  integration:
+    path: skills/shared/integration
+  remove:
+    path: skills/shared/remove
+  module-authoring:
+    path: skills/shared/module-authoring
+  platform-release:
+    path: skills/shared/platform-release
+  remediation:
+    path: skills/shared/remediation
+  remediation-check-swarm:
+    path: skills/shared/remediation/check-swarm
+    agents: [remediation-check-app-inventory, remediation-check-app-ssot, remediation-check-app-trace, remediation-check-architecture-boundaries, remediation-check-architecture-deps, remediation-check-architecture-decomposition, remediation-check-risk]
+  governance/implementation:
+    path: skills/shared/governance/implementation
+
+agents:
+  discovery-inventory:
+    path: agents/discovery-inventory.md
+  discovery-boundaries:
+    path: agents/discovery-boundaries.md
+  discovery-ssot:
+    path: agents/discovery-ssot.md
+  plan-layer-map:
+    path: agents/plan-layer-map.md
+  plan-state-machines:
+    path: agents/plan-state-machines.md
+  boundary-review:
+    path: agents/boundary-review.md
+  dependency-analysis:
+    path: agents/dependency-analysis.md
+  system-decomposition:
+    path: agents/system-decomposition.md
+  unit-test-run:
+    path: agents/unit-test-run.md
+  fallow-check-changed:
+    path: agents/fallow-check-changed.md
+  check-capability-trace:
+    path: agents/check-capability-trace.md
+  impact-analysis:
+    path: agents/impact-analysis.md
+  investigate-lite-exists:
+    path: agents/investigate-lite-exists.md
+  investigate-lite-dependencies:
+    path: agents/investigate-lite-dependencies.md
+  investigate-lite-constraints:
+    path: agents/investigate-lite-constraints.md
+  fix-repro:
+    path: agents/fix-repro.md
+  fix-code-path:
+    path: agents/fix-code-path.md
+  fix-recent-changes:
+    path: agents/fix-recent-changes.md
+  fix-test-failures:
+    path: agents/fix-test-failures.md
+  fix-regression-scope:
+    path: agents/fix-regression-scope.md
+  fix-runtime-evidence:
+    path: agents/fix-runtime-evidence.md
+  fix-inventory-confirm:
+    path: agents/fix-inventory-confirm.md
+  fix-repro-verify:
+    path: agents/fix-repro-verify.md
+  fix-hypothesis-validate:
+    path: agents/fix-hypothesis-validate.md
+  root-cause-analyst:
+    path: agents/root-cause-analyst.md
+  gate-validate-confidence:
+    path: agents/gate-validate-confidence.md
+  gate-validate-complexity:
+    path: agents/gate-validate-complexity.md
+  gate-validate-requirements:
+    path: agents/gate-validate-requirements.md
+  gate-rollback-feasibility:
+    path: agents/gate-rollback-feasibility.md
+  gate-rollback-verification:
+    path: agents/gate-rollback-verification.md
+  report-completeness-review:
+    path: agents/report-completeness-review.md
+  report-factual-review:
+    path: agents/report-factual-review.md
+  code-author:
+    path: agents/code-author.md
+  test-author:
+    path: agents/test-author.md
+  doc-conformance:
+    path: agents/doc-conformance.md
+  implementation-review:
+    path: agents/implementation-review.md
+  release-git:
+    path: agents/release-git.md
+    wave: 1
+    blocking: true
+  remediation-check-app-inventory:
+    path: agents/remediation-check-app-inventory.md
+  remediation-check-app-ssot:
+    path: agents/remediation-check-app-ssot.md
+  remediation-check-app-trace:
+    path: agents/remediation-check-app-trace.md
+  remediation-check-architecture-boundaries:
+    path: agents/remediation-check-architecture-boundaries.md
+  remediation-check-architecture-deps:
+    path: agents/remediation-check-architecture-deps.md
+  remediation-check-architecture-decomposition:
+    path: agents/remediation-check-architecture-decomposition.md
+  remediation-check-risk:
+    path: agents/remediation-check-risk.md
+  remediation-remediator:
+    path: agents/remediation-remediator.md
+  remediation-e2e-gate:
+    path: agents/remediation-e2e-gate.md
+
+policies:
+  - policies/master-rules.md
+  - policies/implementation.md
+  - policies/mcp-and-deploy.md

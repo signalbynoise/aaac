@@ -194,7 +194,7 @@ export class PhaseRunner extends EventEmitter {
     const count = await getSwarmCount(phase, refreshed, this.workspaceRoot, runId);
     const swarmRequired = Number(count) > 0;
     const agentCount = swarmRequired ? Number(count) : 1;
-    const agentSpecs = getSwarmAgentSpecs(
+    let agentSpecs = getSwarmAgentSpecs(
       this.workspaceRoot,
       refreshed,
       phase,
@@ -203,6 +203,27 @@ export class PhaseRunner extends EventEmitter {
       ...spec,
       initial_summary: getAgentInitialSummary(this.workspaceRoot, spec),
     }));
+    // Stale graphs (skill path, empty agents) used to hard-fail here and resume forever.
+    // resolveAgentSpecsForPhase synthesizes skill-bound slots; keep a local last resort.
+    if (swarmRequired && agentSpecs.length === 0) {
+      log.warn("swarm", "Synthesizing fallback roster for empty graph skill", {
+        runId,
+        phase,
+        agentCount,
+      });
+      agentSpecs = Array.from({ length: agentCount }, (_, index) => {
+        const id = `${phase}-slot-${index + 1}`;
+        const relPath = `agents/${id}.md`;
+        const spec = {
+          id,
+          path: `.cursor/${relPath}`,
+          relPath,
+          cursorPath: `.cursor/${relPath}`,
+          synthetic: true,
+        };
+        return { ...spec, initial_summary: getAgentInitialSummary(this.workspaceRoot, spec) };
+      });
+    }
     persistSwarmExpectedSpecs(this.workspaceRoot, runId, agentSpecs);
     if (swarmRequired && agentSpecs.length === 0) {
       throw new Error(`Swarm-required phase ${phase} has no graph agent roster`);

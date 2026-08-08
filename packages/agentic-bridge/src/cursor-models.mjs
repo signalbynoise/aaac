@@ -2,11 +2,14 @@
  * Discover Cursor agent models via CLI (account-scoped) or SDK (API key).
  * @see https://cursor.com/docs/sdk/typescript#cursormodelslist
  */
+import { spawn } from "child_process";
 import { createLogger } from "./logger.mjs";
-import { getCursorAuthStatus, resolveCursorBin } from "./cursor-auth.mjs";
-import { spawnSync } from "child_process";
+import { getCursorAuthStatus, resolveCursorBin, cursorAgentArgv } from "./cursor-auth.mjs";
 
 const log = createLogger("agentic-bridge:cursor-models");
+
+const MODELS_TIMEOUT_MS = 30_000;
+const KILL_GRACE_MS = 2_000;
 
 /** @typedef {{ id: string, pickerLabel: string, isDefault?: boolean }} CursorModelOption */
 
@@ -44,17 +47,63 @@ export function parseCursorModelsCliOutput(stdout) {
   return models;
 }
 
-function runAgentModelsCli() {
-  const bin = resolveCursorBin();
+async function runAgentModelsCli() {
+  const bin = await resolveCursorBin();
   if (!bin) {
     return { ok: false, status: 127, stdout: "", stderr: "cursor binary not found" };
   }
 
-  return spawnSync(bin, ["agent", "models"], {
-    encoding: "utf8",
-    timeout: 30_000,
-    env: { ...process.env },
-    maxBuffer: 4 * 1024 * 1024,
+  const args = cursorAgentArgv(bin, ["models"]);
+
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, {
+      env: { ...process.env },
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let killTimer = null;
+
+    const settle = (payload) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      resolve(payload);
+    };
+
+    const timeoutTimer = setTimeout(() => {
+      child.kill("SIGTERM");
+      killTimer = setTimeout(() => {
+        child.kill("SIGKILL");
+      }, KILL_GRACE_MS);
+      settle({
+        ok: false,
+        status: null,
+        stdout,
+        stderr: `timed out after ${MODELS_TIMEOUT_MS}ms`,
+      });
+    }, MODELS_TIMEOUT_MS);
+
+    child.stdout?.on("data", (d) => {
+      stdout += String(d);
+    });
+    child.stderr?.on("data", (d) => {
+      stderr += String(d);
+    });
+    child.on("error", (err) => {
+      if (killTimer) clearTimeout(killTimer);
+      settle({ ok: false, status: 1, stdout, stderr: String(err) });
+    });
+    child.on("close", (code) => {
+      if (killTimer) clearTimeout(killTimer);
+      settle({
+        ok: (code ?? 1) === 0,
+        status: code ?? 1,
+        stdout,
+        stderr,
+      });
+    });
   });
 }
 
@@ -102,13 +151,13 @@ function sortCursorModels(models) {
  * @returns {Promise<{ models: CursorModelOption[], source: 'cli' | 'sdk' | 'none' }>}
  */
 export async function listCursorModels() {
-  const auth = getCursorAuthStatus();
+  const auth = await getCursorAuthStatus();
   if (!auth.loggedIn) {
     return { models: [], source: "none" };
   }
 
   if (auth.source === "cli" || auth.source === "env") {
-    const result = runAgentModelsCli();
+    const result = await runAgentModelsCli();
     if ((result.status ?? 1) === 0) {
       const models = sortCursorModels(parseCursorModelsCliOutput(result.stdout));
       if (models.length > 0) {

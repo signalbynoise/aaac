@@ -511,7 +511,6 @@ export function validatePhaseArtifactContent(runId, completedPhase, manifest, en
 /** Parse workspace .env.local files (website first, then repo root). */
 export function loadWorkspaceDotenv(repoRoot = REPO_ROOT) {
   const candidates = [
-    path.join(repoRoot, "apps/website/.env.local"),
     path.join(repoRoot, ".env.local"),
   ];
   const merged = {};

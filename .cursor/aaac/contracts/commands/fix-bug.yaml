@@ -1,0 +1,39 @@
+name: fix-bug
+purpose: Repair broken behavior in a domain (alias of fix-module workflow)
+inputs:
+  domain:
+    required: false
+    enum: [cms, ui, database, aaac]
+  intent:
+    required: true
+outputs:
+  investigation:
+    type: markdown
+    required: true
+  root_cause:
+    type: markdown
+    required: true
+  plan:
+    type: markdown
+    required: true
+  implementation:
+    type: code_changes
+  verification:
+    type: markdown
+    required: true
+  report:
+    type: markdown
+    required: true
+lifecycle_verb: fix
+workflow: fix-bug
+success_criteria:
+  - discovery swarm completed (4-6 agents)
+  - fix investigation swarm completed (7 parallel agents)
+  - root_cause confidence at least 0.7
+  - repro_status fixed after execute
+  - impact_analysis proceed yes or rollback defined
+failure_conditions:
+  - skip discovery or investigate_swarm phase
+  - root_cause confidence below 0.7
+  - symptom patch without root cause frame
+  - repro_status not_fixed while claiming success

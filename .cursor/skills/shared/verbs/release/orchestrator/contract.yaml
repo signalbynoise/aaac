@@ -1,0 +1,25 @@
+name: verb-release-orchestrator
+purpose: Deploy or ship per release-* command
+inputs:
+  domain:
+    required: false
+  intent:
+    required: true
+outputs:
+  report:
+    type: markdown
+success_criteria:
+  - All policies loaded including mcp-and-deploy
+  - tests pass before deploy steps
+  - render.yaml blueprint respected (no manual infra creation)
+  - health checks verified for API releases
+failure_conditions:
+  - deploy without verification
+  - manual Render service creation outside blueprint
+dependencies:
+  skills: [testing, verification, execution, reporting]
+  policies: [master-rules, implementation, mcp-and-deploy]
+  docs:
+    - docs/architecture.md
+verification:
+  - run_tests

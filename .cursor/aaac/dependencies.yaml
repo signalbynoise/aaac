@@ -1,0 +1,14 @@
+# Domain dependency graph — populate when you add bounded contexts.
+# SSOT for dependency-graph skill.
+
+version: 1
+
+domains: {}
+
+objects: {}
+
+risk_tags:
+  migrations: [migration, schema]
+  breaking_contracts: [integration, model, schema, migration]
+  auth: [integration, schema]
+  deployment: [app, integration]

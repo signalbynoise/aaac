@@ -1,0 +1,34 @@
+name: verb-create-orchestrator
+purpose: Create new code, config, or docs per create-* command
+inputs:
+  domain:
+    required: false
+  intent:
+    required: true
+outputs:
+  code_changes:
+    type: boolean
+  inventory_synced:
+    type: boolean
+  report:
+    type: markdown
+success_criteria:
+  - All policies loaded before execute
+  - domain inventory loaded when domains/<slug>/update/inventory exists
+  - object skills and module-authoring loaded when graph requires
+  - governance/implementation followed for all edits
+  - fallow check_changed clean on touched files
+failure_conditions:
+  - execute without approved plan
+  - skip module-authoring when object_skill_verbs lists it
+dependencies:
+  skills: [discovery, planning, execution, testing, verification, reporting, module-authoring]
+  policies: [master-rules, implementation, mcp-and-deploy]
+  docs:
+    - docs/master_rules.md
+    - docs/architecture.md
+    - docs/design_system.md
+verification:
+  - sync_inventory
+  - run_tests
+  - fallow_check_changed

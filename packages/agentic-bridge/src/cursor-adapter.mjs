@@ -36,13 +36,13 @@ export function formatAdapterStartedDetail(ctx) {
   return JSON.stringify(payload);
 }
 
-function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000) {
-  const bin = resolveCursorBin();
+async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000) {
+  const bin = await resolveCursorBin();
   if (!bin) {
     throw new Error("cursor agent binary not found — install Cursor or run Sign in with Cursor");
   }
 
-  if (!isCursorAuthenticated()) {
+  if (!(await isCursorAuthenticated())) {
     throw new Error("Not signed in to Cursor — use Sign in with Cursor in Agentic OS");
   }
 
@@ -236,7 +236,7 @@ function toPhaseStreamEvent(ctx, item) {
 async function spawnAgentWithRetry(ctx, prompt) {
   let spawned;
   await withCursorCliRetry(async () => {
-    spawned = runCursorAgentStreaming(ctx.workspaceRoot, prompt);
+    spawned = await runCursorAgentStreaming(ctx.workspaceRoot, prompt);
   }, { maxAttempts: 2, baseBackoffMs: 2000 });
   return spawned;
 }

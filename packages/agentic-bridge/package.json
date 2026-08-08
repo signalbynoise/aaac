@@ -7,12 +7,12 @@
   "author": "Hans-Erik Lydecker",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eriklydecker/ludecker.git",
+    "url": "git+https://github.com/signalbynoise/aaac.git",
     "directory": "packages/agentic-bridge"
   },
   "homepage": "https://ludecker.com/guide/install-aaac",
   "bugs": {
-    "url": "https://github.com/eriklydecker/ludecker/issues"
+    "url": "https://github.com/signalbynoise/aaac/issues"
   },
   "exports": {
     ".": "./src/index.mjs",

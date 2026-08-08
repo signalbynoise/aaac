@@ -1,0 +1,153 @@
+#!/usr/bin/env node
+/** preToolUse — deny code edits outside execute phase for THIS chat only. */
+import path from "path";
+import {
+  loadActiveRun,
+  loadRunManifest,
+  loadEnforcement,
+  isEditPhase,
+  isArtifactPath,
+  parentAssessmentBlocked,
+  parentProdEditBlocked,
+  isPathAllowedForPhase,
+  conversationIdFromHook,
+  runDir,
+  writeJson,
+  isoNow,
+} from "./lib.mjs";
+import { recordLog } from "./log.mjs";
+
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (c) => (input += c));
+process.stdin.on("end", () => {
+  const deny = (userMessage, agentMessage, detail) => {
+    console.log(JSON.stringify({ permission: "deny", user_message: userMessage, agent_message: agentMessage }));
+    process.exit(0);
+  };
+  const allow = () => {
+    console.log(JSON.stringify({ permission: "allow" }));
+    process.exit(0);
+  };
+
+  const persistEditEvent = (manifest, runId, event, detail) => {
+    recordLog(manifest, {
+      event,
+      phase: manifest.phase,
+      phase_kind: manifest.phase_kind,
+      detail,
+      level: "debug",
+    });
+    manifest.updated_at = isoNow();
+    writeJson(path.join(runDir(runId), "run.json"), manifest);
+  };
+
+  let hook;
+  try {
+    hook = JSON.parse(input || "{}");
+  } catch {
+    allow();
+  }
+
+  const toolName = hook.tool_name ?? hook.toolName ?? "";
+  if (!/^(Write|StrReplace|Delete|EditNotebook|ApplyPatch)$/i.test(toolName)) allow();
+
+  const conversationId = conversationIdFromHook(hook);
+  if (!conversationId) allow();
+
+  const active = loadActiveRun(conversationId);
+  if (
+    !active?.run_id ||
+    active.status === "completed" ||
+    active.status === "cancelled"
+  ) {
+    allow();
+  }
+
+  const manifest = loadRunManifest(active.run_id);
+  if (
+    !manifest ||
+    manifest.status === "completed" ||
+    manifest.status === "cancelled"
+  ) {
+    allow();
+  }
+  if (manifest.conversation_id && manifest.conversation_id !== conversationId) allow();
+
+  const enforcement = loadEnforcement();
+  const filePath =
+    hook.tool_input?.path ?? hook.toolInput?.path ?? hook.tool_input?.file_path ?? hook.arguments?.path ?? "";
+
+  if (filePath && isArtifactPath(filePath, enforcement)) {
+    const blocked = parentAssessmentBlocked(manifest, enforcement, filePath);
+    if (blocked) {
+      persistEditEvent(
+        manifest,
+        active.run_id,
+        "edit_denied",
+        `agent separation: phase ${blocked.phase} requires ${blocked.min} Task agents before decision artifact write (got ${blocked.launches})`,
+      );
+      deny(
+        `AAAC: phase "${blocked.phase}" requires ${blocked.min} independent Task agents before writing decision artifacts. Run: ${active.run_id}`,
+        `Agent separation: launch ${blocked.min} parallel Task subagents for "${blocked.phase}" first. Parent may merge outputs only — no self-assessment. Got ${blocked.launches}/${blocked.min}.`,
+      );
+    }
+    persistEditEvent(manifest, active.run_id, "edit_allowed", `artifact path: ${filePath}`);
+    allow();
+  }
+
+  if (manifest.awaiting_approval || manifest.status === "blocked") {
+    persistEditEvent(manifest, active.run_id, "edit_denied", `blocked at gate: ${manifest.blocked_reason ?? "approval"}`);
+    deny(`AAAC Run ${active.run_id} blocked at gate.`, `Run blocked. Run: ${active.run_id}`);
+  }
+
+  if (isEditPhase(manifest.phase, enforcement)) {
+    if (filePath && !isPathAllowedForPhase(filePath, manifest.phase, enforcement)) {
+      persistEditEvent(
+        manifest,
+        active.run_id,
+        "edit_denied",
+        `${toolName} path not allowed in phase ${manifest.phase}: ${filePath}`,
+      );
+      deny(
+        `AAAC: ${manifest.phase} phase cannot edit this path. Run: ${active.run_id}`,
+        `Phase "${manifest.phase}" scope violation${filePath ? `: ${filePath}` : ""}. Use test_execute for tests; launch code-author Task in execute for prod code.`,
+      );
+    }
+    const prodBlocked = parentProdEditBlocked(manifest, enforcement, filePath, hook);
+    if (prodBlocked) {
+      persistEditEvent(
+        manifest,
+        active.run_id,
+        "edit_denied",
+        `agent separation: parent cannot edit prod in phase ${prodBlocked.phase}`,
+      );
+      deny(
+        `AAAC: orchestrator cannot edit production code in "${prodBlocked.phase}". Run: ${active.run_id}`,
+        `Agent separation: launch 1 code-author Task subagent with artifacts/plan.yaml. Parent merges execute_summary.yaml only — never edit source files directly.`,
+      );
+    }
+    persistEditEvent(
+      manifest,
+      active.run_id,
+      "edit_allowed",
+      `${toolName} in phase ${manifest.phase}${filePath ? `: ${filePath}` : ""}`,
+    );
+    allow();
+  }
+  if (enforcement.artifact_write_phases?.includes(manifest.phase) && filePath) {
+    persistEditEvent(manifest, active.run_id, "edit_allowed", `artifact_write phase ${manifest.phase}`);
+    allow();
+  }
+
+  persistEditEvent(
+    manifest,
+    active.run_id,
+    "edit_denied",
+    `${toolName} blocked in phase ${manifest.phase}${filePath ? `: ${filePath}` : ""}`,
+  );
+  deny(
+    `AAAC: edits blocked in phase "${manifest.phase}" (this chat). Run: ${active.run_id}`,
+    `Cannot ${toolName} during "${manifest.phase}". Chat ${conversationId}. Advance phase first.`,
+  );
+});

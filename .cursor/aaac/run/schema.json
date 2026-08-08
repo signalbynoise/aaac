@@ -1,0 +1,258 @@
+{
+  "$schema": "aaac run — primary execution object",
+  "version": 1,
+  "description": "Every command executes within a Run. No standalone execution or logging.",
+  "run": {
+    "run_id": "run_{timestamp}_{slug}",
+    "origin": "agentic-os | cursor-chat",
+    "session_id": "aos_{uuid} | null",
+    "conversation_id": "string | null",
+    "execution": {
+      "adapter": "cursor-local | cursor-cloud | null",
+      "cursor_run_id": "string | null"
+    },
+    "command": "string",
+    "verb": "string",
+    "object": "string | null",
+    "domain": "string | null",
+    "intent": "string",
+    "orchestrator": "string",
+    "status": "pending | running | blocked | completed | failed | cancelled",
+    "phase": "string | null",
+    "phase_kind": "work | gate | null",
+    "awaiting_approval": false,
+    "blocked_reason": "string | null",
+    "completed": [],
+    "pending": [],
+    "decisions": [],
+    "artifacts": {},
+    "checkpoints": [],
+    "log": [],
+    "capabilities_resolved": {},
+    "capability_runtime": {},
+    "capability_runtime_approved": false,
+    "capability_evidence_processed": false,
+    "capability_evidence_outcomes": [],
+    "outcome": {
+      "status": "success | failure | partial | null",
+      "quality": "number | null",
+      "gate_retries": "number",
+      "rollback_used": "boolean",
+      "human_interventions": "number"
+    },
+    "reflection": {
+      "path": "artifacts/reflection.json | null",
+      "goal_achieved": "boolean | null",
+      "largest_bottleneck": "string | null",
+      "biggest_waste": "string | null",
+      "most_valuable_artifact": "string | null",
+      "reusable_lesson": "string | null",
+      "recommendation": "string | null",
+      "confidence": "number | null"
+    },
+    "lessons": [],
+    "experience_processed": false,
+    "experience_outcomes": [],
+    "confidence": {
+      "architecture": null,
+      "requirements": null,
+      "scope": null
+    },
+    "gates": {
+      "stack": "string | null",
+      "results": {}
+    },
+    "swarm": {
+      "task_launches_this_phase": 0,
+      "phase": "string | null",
+      "agents": [],
+      "target_agents": {},
+      "wave_plan": {},
+      "expected_specs_phase": "string | null",
+      "expected_agent_specs": [
+        {
+          "id": "string",
+          "path": "string",
+          "initial_summary": "Role-derived semantic text, max 180 chars"
+        }
+      ],
+      "artifact_bytes": "number | null",
+      "compaction_applied": "boolean | null",
+      "estimated_utilization": "number | null"
+    },
+    "complexity": {
+      "scope_score": "number | null",
+      "scope_breakdown": {},
+      "scope_source": "bootstrap | discover | remediation_scan | null",
+      "change_score": "number | null",
+      "change_breakdown": {},
+      "change_source": "plan | post_impact | null",
+      "plan_score_verified": "boolean | null"
+    },
+    "swarm_history": {},
+    "phase_metrics": {},
+    "swarm_agent_entry": {
+      "index": "number",
+      "phase": "string",
+      "subagent_id": "string | null",
+      "tokens": "number | null — total = input+output+cache_*; null when unavailable (never invent chars/4)",
+      "input_tokens": "number | null — sealed Cursor input component; null when unavailable",
+      "output_tokens": "number | null — sealed Cursor output component; null when unavailable",
+      "cache_read_tokens": "number | null — sealed Cursor cache-read component; null when unavailable",
+      "cache_write_tokens": "number | null — sealed Cursor cache-write component; null when unavailable",
+      "context": "number | null — (input+output)/window*100; cache excluded; null when unavailable",
+      "token_source": "cursor_hook | cursor_cli_usage | legacy_meter | unavailable",
+      "completed_at": "iso8601 | null — lifecycle seal; orthogonal to meters",
+      "duration_ms": "number | null",
+      "summary": "string | null"
+    },
+    "stage_metrics": {
+      "avg_tokens": "number | null — avg of sealed agent totals only; null if none metered",
+      "input_tokens": "number | null — sum of sealed agent input_tokens; null if none",
+      "output_tokens": "number | null — sum of sealed agent output_tokens; null if none",
+      "cache_read_tokens": "number | null — sum of sealed agent cache_read_tokens; null if none",
+      "cache_write_tokens": "number | null — sum of sealed agent cache_write_tokens; null if none",
+      "estimated_cost_usd": "number | null — only when metered + priced; never duration_share invent",
+      "cost_method": "string | null — provenance when cost present (input_output | blended_total | …)",
+      "cost_quality": "metered | blended | null"
+    },
+    "metrics": {
+      "duration_ms": "number | null",
+      "total_tokens": "number | null",
+      "conversation_tokens": "number | null — run chrome only; never gates agent/stage meters",
+      "metered_agent_count": "number — latest-attempt agents with exact token meters",
+      "avg_context_percent": "number | null — average context percent across metered latest-attempt agents",
+      "context_usage_percent": "number | null — compatibility alias of avg_context_percent",
+      "context_window_size": "number | null",
+      "context_source": "cursor_hook | transcript_estimate | null — transcript_estimate allowed for run chrome only",
+      "token_source": "cursor_hook | cursor_cli_usage | agent_aggregate | conversation | unavailable",
+      "token_source_compatibility": "phase_aggregate | legacy_meter — accepted by readers for historical manifests; new writers use exact structured sources",
+      "phase_count": "number | null — completed phase metrics excluding internal *_swarm_target records",
+      "completed_at": "iso8601 | null"
+    },
+    "completed_at": "iso8601 | null",
+    "context": {
+      "phases": {}
+    },
+    "created_at": "iso8601",
+    "updated_at": "iso8601"
+  },
+  "storage": {
+    "root": "aaac/state/runs/{run_id}/",
+    "manifest": "run.json",
+    "artifacts_dir": "artifacts/",
+    "checkpoints_dir": "checkpoints/"
+  },
+  "decision_entry": {
+    "at": "iso8601",
+    "phase": "string",
+    "decision": "string",
+    "reason": "string",
+    "evidence": "string"
+  },
+  "log_entry": {
+    "at": "iso8601",
+    "phase": "string",
+    "phase_kind": "work | gate",
+    "skill": "string | null",
+    "event": "phase_start | phase_complete | gate_pass | gate_fail | blocked | resumed | agent_spawned | agent_complete | agent_progress",
+    "detail": "string"
+  },
+  "checkpoint_entry": {
+    "phase": "string",
+    "at": "iso8601",
+    "artifact_refs": [],
+    "outputs_summary": "string"
+  },
+  "artifact_keys": [
+    "plan",
+    "investigation",
+    "root_cause",
+    "impact",
+    "dependency_graph",
+    "fitness",
+    "rollback",
+    "report",
+    "reflection"
+  ],
+  "lesson_entry": {
+    "id": "string",
+    "lesson": "string",
+    "problem": "string | null",
+    "solution": "string | null",
+    "tags": [],
+    "scope": "project | global",
+    "status": "active | outdated | superseded",
+    "evidence": {
+      "observed_runs": "number",
+      "successful_runs": "number",
+      "failed_runs": "number",
+      "contradicted_runs": "number",
+      "token_savings_pct": "number | null",
+      "average_runtime_improvement_pct": "number | null",
+      "confidence": "number",
+      "last_run_id": "string | null",
+      "updated_at": "iso8601"
+    },
+    "supporting_run_ids": []
+  },
+  "experience_stores": {
+    "lessons": "aaac/state/lessons.json",
+    "experience_stats": "aaac/state/experience-stats.json",
+    "workspace_memory": "aaac/state/workspace-memory.json",
+    "packaged_global_lessons": "aaac/experience/global-lessons.json",
+    "retrieval_config": "aaac/experience/retrieval.yaml",
+    "packaged_index": "aaac/experience/packaged-index/",
+    "packaged_index_meta": "aaac/experience/packaged-index/meta.json",
+    "packaged_index_vectors": "aaac/experience/packaged-index/vectors.json",
+    "experience_index": "aaac/state/experience-index/",
+    "index_meta_sqlite": "aaac/state/experience-index/meta.sqlite",
+    "index_meta_json_fallback": "aaac/state/experience-index/meta.json",
+    "index_vectors_usearch": "aaac/state/experience-index/vectors.usearch",
+    "index_vectors_json_fallback": "aaac/state/experience-index/vectors.json"
+  },
+  "experience_phase_context": {
+    "lessons": [
+      {
+        "id": "string",
+        "lesson": "string",
+        "solution": "string | null",
+        "reason": "string",
+        "scope": "string",
+        "source": "local | packaged",
+        "evidence": {}
+      }
+    ],
+    "warnings": ["string"],
+    "retrieval": {
+      "provider": "string",
+      "candidates": "number",
+      "latency_ms": "number",
+      "mode": "hybrid | empty"
+    }
+  },
+  "experience_embedding_env": {
+    "AAAC_EMBEDDING_PROVIDER": "local | openai | stub | hash",
+    "AAAC_EMBEDDING_MODEL": "optional model id",
+    "AAAC_EMBEDDING_API_KEY": "required for openai",
+    "AAAC_EMBEDDING_BASE_URL": "optional OpenAI-compatible base URL"
+  },
+  "plan_complexity_fields": [
+    "requirement_map",
+    "complexity_score",
+    "complexity_breakdown",
+    "reuse",
+    "modify",
+    "create",
+    "rejected_alternatives"
+  ],
+  "resume": {
+    "read_manifest": "state/runs/{run_id}/run.json",
+    "continue_from": "phase field when status running or blocked with user approval"
+  },
+  "human_approval": {
+    "when_blocked": "Set awaiting_approval true; do not execute until user approves in chat",
+    "on_approve": "status running; retry failed gate or continue pending",
+    "record_decision": "User approved gate {phase}: {reason}"
+  }
+}

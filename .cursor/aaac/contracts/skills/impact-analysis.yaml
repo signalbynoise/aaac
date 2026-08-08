@@ -1,0 +1,17 @@
+name: impact-analysis
+purpose: Pre-execute blast radius and risk analysis
+outputs:
+  affected:
+    type: list
+    required: true
+  risk:
+    type: list
+    required: true
+  blast_radius:
+    type: enum
+    values: [low, medium, high]
+    required: true
+  proceed:
+    type: boolean
+    required: true
+gate: true

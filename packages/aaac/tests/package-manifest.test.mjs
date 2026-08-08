@@ -22,7 +22,7 @@ describe("package.json publish manifest", () => {
   });
 
   it("repository.url uses git+https form expected by npm pkg fix", () => {
-    expect(PKG_JSON.repository.url).toBe("git+https://github.com/eriklydecker/ludecker.git");
+    expect(PKG_JSON.repository.url).toBe("git+https://github.com/signalbynoise/aaac.git");
   });
 
   it("npm pack does not warn about bin entry", () => {

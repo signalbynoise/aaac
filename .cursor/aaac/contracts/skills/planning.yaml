@@ -1,0 +1,17 @@
+name: planning
+purpose: Plan mutating changes with complexity score and requirement map before execute
+applies_to_verbs: [create, update, fix]
+outputs:
+  plan:
+    type: object
+    required_for_verbs: [create, update, fix]
+    required_fields:
+      - requirement_map
+      - complexity_score
+      - complexity_breakdown
+      - reuse
+      - modify
+      - create
+      - rejected_alternatives
+    store_at: Run.artifacts.plan
+readonly: true

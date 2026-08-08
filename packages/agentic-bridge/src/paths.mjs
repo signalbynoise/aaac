@@ -20,7 +20,6 @@ export function resolveWorkspacePaths(workspaceRoot) {
 
 function loadWorkspaceDotenv(workspaceRoot) {
   const candidates = [
-    path.join(workspaceRoot, "apps/website/.env.local"),
     path.join(workspaceRoot, ".env.local"),
   ];
   const merged = {};
@@ -62,12 +61,14 @@ function appendBounded(current, chunk, maxBytes) {
   return next.slice(0, maxBytes);
 }
 
-export function runEngineScript(workspaceRoot, scriptName, argv = []) {
+export function runEngineScript(workspaceRoot, scriptName, argv = [], options = {}) {
   const { runEngineDir } = resolveWorkspacePaths(workspaceRoot);
   const scriptPath = path.join(runEngineDir, scriptName);
   if (!fs.existsSync(scriptPath)) {
     throw new Error(`Run engine script not found: ${scriptPath}`);
   }
+
+  const timeoutMs = options.timeoutMs ?? 120_000;
 
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [scriptPath, ...argv], {
@@ -81,12 +82,27 @@ export function runEngineScript(workspaceRoot, scriptName, argv = []) {
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let killTimer = null;
 
     const settle = (payload) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timeoutTimer);
       resolve(payload);
     };
+
+    const timeoutTimer = setTimeout(() => {
+      child.kill("SIGTERM");
+      killTimer = setTimeout(() => {
+        child.kill("SIGKILL");
+      }, 2_000);
+      settle({
+        ok: false,
+        status: null,
+        stdout,
+        stderr: `runEngineScript timed out after ${timeoutMs}ms`,
+      });
+    }, timeoutMs);
 
     child.stdout?.on("data", (d) => {
       stdout = appendBounded(stdout, String(d), MAX_BUFFER);
@@ -95,9 +111,11 @@ export function runEngineScript(workspaceRoot, scriptName, argv = []) {
       stderr = appendBounded(stderr, String(d), MAX_BUFFER);
     });
     child.on("error", (err) => {
+      if (killTimer) clearTimeout(killTimer);
       settle({ ok: false, status: 1, stdout, stderr: String(err) });
     });
     child.on("close", (code) => {
+      if (killTimer) clearTimeout(killTimer);
       settle({
         ok: (code ?? 1) === 0,
         status: code ?? 1,

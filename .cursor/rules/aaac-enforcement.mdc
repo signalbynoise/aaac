@@ -1,0 +1,58 @@
+---
+description: AAAC pipeline enforcement — hooks block edits until Run reaches execute phase. Applies to ALL slash commands.
+alwaysApply: true
+---
+
+# AAAC enforcement (mandatory)
+
+**Runtime SSOT:** [.cursor/hooks.json](../hooks.json), [.cursor/aaac/enforcement.json](../aaac/enforcement.json)
+
+Every AAAC slash command (`/fix-module`, `/update-module`, `/write-article`, …) **must** execute inside a **Run**. This is not optional.
+
+## Prerequisites
+
+1. **Cursor Hooks enabled** — Settings → Hooks; restart Cursor after `.cursor/hooks.json` changes
+2. **Registry current** — `node .cursor/aaac/generate-graph.mjs`
+
+## Hook behavior (automatic)
+
+| Hook | Effect |
+|------|--------|
+| `beforeSubmitPrompt` | Detects `/command` → creates Run scoped to **`conversation_id`** (this chat only) |
+| `preToolUse` | **Denies** edits outside allowed phases; **phase-scoped paths** — `execute` = prod only, `test_execute` = tests only |
+| `subagentStart` | Counts Task launches for swarm phase validation |
+| `stop` | Follow-up if Run not `completed` |
+
+## Agent obligations
+
+1. **First action** after AAAC command: confirm Run exists for **this chat** (`.cursor/aaac/state/active-runs/{conversation_id}.json`). If missing, the `beforeSubmitPrompt` hook creates it automatically.
+2. **Never skip phases.** Complete swarms, write Run artifacts, then advance:
+   ```bash
+   node .cursor/aaac/scripts/run-engine/advance-phase.mjs <run_id> <phase>
+   ```
+3. **Swarm minimums** (enforced by advance-phase) — **all decision phases**, not just post-execute:
+   - `discover`: 4 Task agents (check verbs: `check_swarm` 3)
+   - `investigate_lite`: 3 Task agents
+   - `plan`: 2 Task agents
+   - `validate`, `impact_analysis`, `dependency_graph`, `fitness_functions`, `rollback`: 2–3 Task agents each
+   - `investigate_swarm`: 7 Task agents
+   - `root_cause`: 2 Task agents
+   - `research_swarm`: 6 Task agents
+   - `execute`: 1 code-author Task agent (mutating verbs)
+   - `test_execute`: 1 test-author Task agent (mutating verbs)
+   - `verify`: 3 Task agents (all create/update/fix — not fix-only)
+   - `review_swarm`: 3 readonly reviewers (mutating verbs)
+   - `report`: 2 readonly reviewers
+4. **Orchestrator vs editor:** Parent must **never** edit production code — launch **1 code-author** Task in `execute`. Hooks deny parent prod writes.
+5. **Agent separation (mutating verbs):** Parent must **never** assess, score, validate, investigate, plan, verify, or review in its own context. Launch independent Task subagents per phase; parent merges only. See [.cursor/policies/agent-separation.md](../policies/agent-separation.md). Hard enforcement: `gate-write.mjs` + `advance-phase.mjs` + dynamic targets in [swarm-sizing.yaml](../aaac/swarm-sizing.yaml) (`manifest.swarm.target_agents`).
+6. **Verify gate (create / update / fix):** before advancing past `verify`, run:
+   ```bash
+   node .cursor/aaac/scripts/run-engine/verify-website-build.mjs --run-id <run_id>
+   ```
+   `advance-phase.mjs verify` runs this automatically and blocks on missing static assets or failed `vite build` (catches favicon/path regressions).
+7. **Edits:** prod code via **code-author subagent** in `execute`; test files in `test_execute` only. Run artifacts under `.cursor/aaac/state/runs/` anytime.
+6. **Complete the Run** — advance through `report`, set status completed.
+
+## If edit is denied
+
+Continue the pipeline — do not work around hooks. Full dispatch: [.cursor/aaac/dispatch.md](../aaac/dispatch.md)

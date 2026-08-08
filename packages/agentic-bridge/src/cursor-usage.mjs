@@ -60,11 +60,11 @@ function exactTokenTotal(payload) {
 
 function readWindowFromYaml(model) {
   const candidates = [
-    path.resolve(__dirname, "../../../.cursor/aaac/model-pricing.yaml"),
     path.resolve(
       __dirname,
       "../../aaac/templates/cursor/aaac/model-pricing.yaml",
     ),
+    path.resolve(__dirname, "../../../.cursor/aaac/model-pricing.yaml"),
   ];
   const key = String(model || "")
     .trim()
@@ -155,6 +155,8 @@ export function parseCursorUsageEvent(event, { model = null } = {}) {
   if (!payload) return null;
   const tokens = exactTokenTotal(payload);
   if (tokens == null) return null;
+  const input = readNumber(payload, "inputTokens", "input_tokens");
+  const output = readNumber(payload, "outputTokens", "output_tokens");
   const components = readComponents(payload);
   const modelSlug =
     model ||
@@ -162,18 +164,31 @@ export function parseCursorUsageEvent(event, { model = null } = {}) {
     payload?.model ||
     process.env.CURSOR_MODEL ||
     null;
-  const contextWindow = resolveModelContextWindow(modelSlug, event);
+  const envelope = { ...event, ...payload };
+  const contextWindow = resolveModelContextWindow(modelSlug, envelope);
+  const explicitContext =
+    exactNonNegativeNumber(payload.contextPercent) ??
+    exactNonNegativeNumber(payload.context_percent) ??
+    exactNonNegativeNumber(payload.context_percentage) ??
+    exactNonNegativeNumber(event?.context_percentage);
+  const derivedContext =
+    input != null || output != null
+      ? computeUsageContextPercent({
+          input: input ?? 0,
+          output: output ?? 0,
+          model: modelSlug,
+          contextWindow,
+          envelope,
+        })
+      : null;
   return {
     kind: "usage",
     tokens,
     components,
-    context: computeUsageContextPercent({
-      input: components.input,
-      output: components.output,
-      model: modelSlug,
-      contextWindow,
-      envelope: event,
-    }),
+    context:
+      explicitContext != null && explicitContext <= 100
+        ? explicitContext
+        : derivedContext,
     contextWindow,
     requestId: usageRequestId(event, payload),
   };
@@ -233,6 +248,10 @@ export function cursorUsageMetrics(state) {
     return {
       tokens: null,
       components: null,
+      inputTokens: null,
+      outputTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
       context: null,
       contextMean: null,
       tokenSource: "unavailable",
@@ -250,9 +269,14 @@ export function cursorUsageMetrics(state) {
         ? state.contextSamples.reduce((a, b) => a + b, 0) /
           state.contextSamples.length
         : state.context;
+  const components = { ...state.components };
   return {
     tokens: state.tokens,
-    components: { ...state.components },
+    components,
+    inputTokens: components.input,
+    outputTokens: components.output,
+    cacheReadTokens: components.cacheRead,
+    cacheWriteTokens: components.cacheWrite,
     context: cumulative ?? state.context,
     contextMean,
     tokenSource: "cursor_cli_usage",

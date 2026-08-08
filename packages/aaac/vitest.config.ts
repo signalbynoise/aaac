@@ -8,6 +8,9 @@ export default defineConfig({
     exclude: ['tests/log.test.mjs'],
     testTimeout: 60_000,
     setupFiles: ['tests/fixtures/test-workspace.mjs'],
+    pool: 'forks',
+    fileParallelism: false,
+    maxWorkers: 1,
   },
   resolve: {
     alias: {

@@ -187,6 +187,39 @@ export function appendPhaseOutput(
   });
 }
 
+function usageComponentFields(metrics, unavailable) {
+  if (unavailable) {
+    return {
+      input_tokens: null,
+      output_tokens: null,
+      cache_read_tokens: null,
+      cache_write_tokens: null,
+    };
+  }
+  const fromComponents = metrics.components ?? {};
+  const numberOrNull = (raw) => {
+    return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : null;
+  };
+  return {
+    input_tokens:
+      numberOrNull(metrics.inputTokens) ??
+      numberOrNull(metrics.input_tokens) ??
+      numberOrNull(fromComponents.input),
+    output_tokens:
+      numberOrNull(metrics.outputTokens) ??
+      numberOrNull(metrics.output_tokens) ??
+      numberOrNull(fromComponents.output),
+    cache_read_tokens:
+      numberOrNull(metrics.cacheReadTokens) ??
+      numberOrNull(metrics.cache_read_tokens) ??
+      numberOrNull(fromComponents.cacheRead),
+    cache_write_tokens:
+      numberOrNull(metrics.cacheWriteTokens) ??
+      numberOrNull(metrics.cache_write_tokens) ??
+      numberOrNull(fromComponents.cacheWrite),
+  };
+}
+
 function persistCompletionMetricProvenance(manifest, completion, metrics) {
   const tokenSource = normalizeTokenSource(metrics.tokenSource) ?? "unavailable";
   completion.agentEntry.token_source = tokenSource;
@@ -195,9 +228,23 @@ function persistCompletionMetricProvenance(manifest, completion, metrics) {
   }
   const completionLog = manifest.log?.at(-1);
   if (completionLog?.event === "agent_complete") {
-    completionLog.detail = [completionLog.detail, `token_source=${tokenSource}`]
-      .filter(Boolean)
-      .join(" ");
+    const parts = [
+      completionLog.detail,
+      `token_source=${tokenSource}`,
+      completion.agentEntry.input_tokens != null
+        ? `input=${completion.agentEntry.input_tokens}`
+        : null,
+      completion.agentEntry.output_tokens != null
+        ? `output=${completion.agentEntry.output_tokens}`
+        : null,
+      completion.agentEntry.cache_read_tokens != null
+        ? `cache_read=${completion.agentEntry.cache_read_tokens}`
+        : null,
+      completion.agentEntry.cache_write_tokens != null
+        ? `cache_write=${completion.agentEntry.cache_write_tokens}`
+        : null,
+    ];
+    completionLog.detail = parts.filter(Boolean).join(" ");
   }
 }
 
@@ -208,6 +255,7 @@ export function recordAgentComplete(
 ) {
   const tokenSource = normalizeTokenSource(metrics.tokenSource) ?? "unavailable";
   const metricsUnavailable = tokenSource === "unavailable";
+  const components = usageComponentFields(metrics, metricsUnavailable);
   const manifest = mutateRun(workspaceRoot, runId, (current) => {
     const completion = applyAgentComplete(current, {
       agentIndex,
@@ -217,6 +265,7 @@ export function recordAgentComplete(
       tokens: metricsUnavailable ? null : metrics.tokens ?? null,
       context: metricsUnavailable ? null : metrics.context ?? null,
       tokenSource,
+      ...components,
     });
     persistCompletionMetricProvenance(current, completion, {
       ...metrics,

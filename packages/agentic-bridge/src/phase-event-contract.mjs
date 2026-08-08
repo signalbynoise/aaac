@@ -47,11 +47,27 @@ function parseDetailNumber(detail, key) {
 function parseCompletionMetrics(detail) {
   const tokens = parseDetailNumber(detail, "tokens");
   const context = parseDetailNumber(detail, "context");
+  const inputTokens = parseDetailNumber(detail, "input");
+  const outputTokens = parseDetailNumber(detail, "output");
+  const cacheReadTokens = parseDetailNumber(detail, "cache_read");
+  const cacheWriteTokens = parseDetailNumber(detail, "cache_write");
   const sourceMatch = String(detail ?? "").match(/(?:^|\s)token_source=([\w-]+)/);
-  if (tokens == null && context == null && !sourceMatch) return null;
+  if (
+    tokens == null &&
+    context == null &&
+    inputTokens == null &&
+    outputTokens == null &&
+    !sourceMatch
+  ) {
+    return null;
+  }
   return {
     tokens,
     context,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
     tokenSource: sourceMatch?.[1] ?? (tokens != null ? "cursor_hook" : "unavailable"),
   };
 }
@@ -72,6 +88,17 @@ export function normalizeTokenSource(value) {
   return TOKEN_SOURCES.has(source) ? source : null;
 }
 
+function componentFromMetrics(value, camelKey, snakeKey, nestedKey) {
+  const numberOrNull = (raw) => {
+    return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : null;
+  };
+  return (
+    numberOrNull(value?.[camelKey]) ??
+    numberOrNull(value?.[snakeKey]) ??
+    numberOrNull(value?.components?.[nestedKey])
+  );
+}
+
 function normalizeMetrics(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const numberOrNull = (raw) => {
@@ -79,9 +106,26 @@ function normalizeMetrics(value) {
   };
   const tokenSource = normalizeTokenSource(value.tokenSource ?? value.token_source);
   const requestIds = value.requestIds ?? value.request_ids;
+  const unavailable = tokenSource === "unavailable";
+  const inputTokens = unavailable
+    ? null
+    : componentFromMetrics(value, "inputTokens", "input_tokens", "input");
+  const outputTokens = unavailable
+    ? null
+    : componentFromMetrics(value, "outputTokens", "output_tokens", "output");
+  const cacheReadTokens = unavailable
+    ? null
+    : componentFromMetrics(value, "cacheReadTokens", "cache_read_tokens", "cacheRead");
+  const cacheWriteTokens = unavailable
+    ? null
+    : componentFromMetrics(value, "cacheWriteTokens", "cache_write_tokens", "cacheWrite");
   const metrics = {
-    tokens: tokenSource === "unavailable" ? null : numberOrNull(value.tokens),
-    context: tokenSource === "unavailable" ? null : numberOrNull(value.context),
+    tokens: unavailable ? null : numberOrNull(value.tokens),
+    context: unavailable ? null : numberOrNull(value.context),
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
   };
   if (tokenSource) {
     metrics.tokenSource = tokenSource;

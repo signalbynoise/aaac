@@ -1,0 +1,26 @@
+{
+  "campaign_id": "campaign_EXAMPLE",
+  "iteration": 0,
+  "collected_at": "ISO8601",
+  "agents": [
+    {
+      "agent_id": "remediation-check-app-inventory",
+      "command_mirror": "check-app",
+      "answer": "partial",
+      "confidence": "high",
+      "false_positives": [
+        {
+          "path": "src/hooks/useCryptoPriceWorker.ts",
+          "export_name": null,
+          "reason": "worker_hook_runtime",
+          "evidence": "src/hooks/useCryptoPriceWorker.ts:1"
+        }
+      ],
+      "protected_paths": ["src/hooks/useCryptoPriceWorker.ts"],
+      "do_not_delete": [],
+      "safe_to_fix": [],
+      "findings": [],
+      "gaps": []
+    }
+  ]
+}

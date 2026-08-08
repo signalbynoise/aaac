@@ -1,0 +1,265 @@
+# Generic AAAC project overlay — copied into consumer repos by `aaac init`.
+# Add `resolvers:` and domain orchestrators when you create `.cursor/domains/<slug>/`.
+# Reference implementation (Lüdecker cms/ui/database): ludecker repo `.cursor/aaac/graph.project.yaml`
+
+orchestrators:
+  update-doc:
+    path: skills/shared/documentation/orchestrator
+    requires: [discovery, documentation, reporting]
+    readonly: true
+
+  review-incident:
+    path: skills/shared/investigation/orchestrator
+    requires: [discovery, investigation, reporting]
+    optional: [execution]
+
+  review-module:
+    path: skills/shared/architecture/orchestrator
+    requires: [discovery, architecture, reporting]
+    readonly: true
+
+  verb-check:
+    path: skills/shared/verbs/check/orchestrator
+    requires: [check, reporting]
+    readonly: true
+
+  test-function:
+    path: skills/shared/testing/orchestrator
+    requires: [discovery, testing, verification, reporting]
+
+  release-app:
+    path: skills/shared/platform-release/orchestrator
+    requires: [testing, verification, execution, reporting]
+
+  remediate-app:
+    path: skills/shared/remediation/orchestrator
+    requires: [remediation, discovery, check, execution, testing, verification, reporting]
+    check_swarm_skill: skills/shared/remediation/check-swarm
+    phases: [campaign_init, scan, check_swarm, plan_waves, execute, debt_sweep, satisfaction_gate, report]
+
+  verb-create:
+    path: skills/shared/verbs/create/orchestrator
+    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting, module-authoring]
+
+  verb-update:
+    path: skills/shared/verbs/update/orchestrator
+    requires: [discovery, investigation-lite, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
+
+  verb-fix:
+    path: skills/shared/verbs/fix/orchestrator
+    requires: [discovery, investigation, root-cause, planning, validation, impact-analysis, dependency-graph, fitness-functions, rollback, execution, testing, verification, reporting]
+    phases: [load_inventory, discover, investigate_swarm, root_cause, plan, validate, impact_analysis, dependency_graph, fitness_functions, rollback, execute, test_execute, verify, review_swarm, sync_inventory, report]
+
+  verb-review:
+    path: skills/shared/verbs/review/orchestrator
+    requires: [discovery, architecture, reporting]
+    readonly: true
+
+  verb-test:
+    path: skills/shared/verbs/test/orchestrator
+    requires: [discovery, planning, testing, verification, reporting]
+
+  verb-release:
+    path: skills/shared/verbs/release/orchestrator
+    requires: [testing, verification, execution, reporting]
+
+  verb-remove:
+    path: skills/shared/verbs/remove/orchestrator
+    requires: [discovery, remove, execution, testing, verification, reporting]
+
+{{INJECT_OBJECT_BLOCKS}}
+
+skills:
+  discovery:
+    path: skills/shared/discovery
+    agents: [discovery-inventory, discovery-boundaries, discovery-ssot]
+  planning:
+    path: skills/shared/planning
+    agents: [plan-layer-map, plan-state-machines]
+  execution:
+    path: skills/shared/execution
+    depends: [governance/implementation]
+    agents: [code-author]
+  test-authoring:
+    path: skills/shared/test-authoring
+    agents: [test-author]
+  testing:
+    path: skills/shared/testing
+    agents: [unit-test-run, fallow-check-changed, fix-repro-verify]
+  verification:
+    path: skills/shared/verification
+  implementation-review:
+    path: skills/shared/implementation-review
+    agents: [boundary-review, doc-conformance, implementation-review]
+  reporting:
+    path: skills/shared/reporting
+    agents: [report-completeness-review, report-factual-review]
+  architecture:
+    path: skills/shared/architecture
+    agents: [boundary-review, dependency-analysis, system-decomposition]
+  documentation:
+    path: skills/shared/documentation
+  investigation:
+    path: skills/shared/investigation
+    agents:
+      - fix-repro
+      - fix-code-path
+      - fix-recent-changes
+      - fix-test-failures
+      - fix-regression-scope
+      - fix-runtime-evidence
+      - fix-inventory-confirm
+  root-cause:
+    path: skills/shared/root-cause
+    agents: [root-cause-analyst, fix-hypothesis-validate]
+  investigation-lite:
+    path: skills/shared/investigation-lite
+    agents: [investigate-lite-exists, investigate-lite-dependencies, investigate-lite-constraints]
+  validation:
+    path: skills/shared/validation
+    agents: [gate-validate-confidence, gate-validate-complexity, gate-validate-requirements]
+  impact-analysis:
+    path: skills/shared/impact-analysis
+    agents: [impact-analysis, dependency-analysis]
+  dependency-graph:
+    path: skills/shared/dependency-graph
+    agents: [dependency-analysis, boundary-review]
+  fitness-functions:
+    path: skills/shared/fitness-functions
+    agents: [boundary-review, doc-conformance, fallow-check-changed]
+  rollback:
+    path: skills/shared/rollback
+    agents: [gate-rollback-feasibility, gate-rollback-verification]
+  run:
+    path: skills/shared/run
+  check:
+    path: skills/shared/check
+    agents: [discovery-inventory, discovery-ssot, check-capability-trace]
+  component:
+    path: skills/shared/component
+  model:
+    path: skills/shared/model
+  migration:
+    path: skills/shared/migration
+  domain:
+    path: skills/shared/domain
+  schema:
+    path: skills/shared/schema
+  workflow:
+    path: skills/shared/workflow
+  integration:
+    path: skills/shared/integration
+  remove:
+    path: skills/shared/remove
+  module-authoring:
+    path: skills/shared/module-authoring
+  platform-release:
+    path: skills/shared/platform-release
+  remediation:
+    path: skills/shared/remediation
+  remediation-check-swarm:
+    path: skills/shared/remediation/check-swarm
+    agents: [remediation-check-app-inventory, remediation-check-app-ssot, remediation-check-app-trace, remediation-check-architecture-boundaries, remediation-check-architecture-deps, remediation-check-architecture-decomposition, remediation-check-risk]
+  governance/implementation:
+    path: skills/shared/governance/implementation
+
+agents:
+  discovery-inventory:
+    path: agents/discovery-inventory.md
+  discovery-boundaries:
+    path: agents/discovery-boundaries.md
+  discovery-ssot:
+    path: agents/discovery-ssot.md
+  plan-layer-map:
+    path: agents/plan-layer-map.md
+  plan-state-machines:
+    path: agents/plan-state-machines.md
+  boundary-review:
+    path: agents/boundary-review.md
+  dependency-analysis:
+    path: agents/dependency-analysis.md
+  system-decomposition:
+    path: agents/system-decomposition.md
+  unit-test-run:
+    path: agents/unit-test-run.md
+  fallow-check-changed:
+    path: agents/fallow-check-changed.md
+  check-capability-trace:
+    path: agents/check-capability-trace.md
+  impact-analysis:
+    path: agents/impact-analysis.md
+  investigate-lite-exists:
+    path: agents/investigate-lite-exists.md
+  investigate-lite-dependencies:
+    path: agents/investigate-lite-dependencies.md
+  investigate-lite-constraints:
+    path: agents/investigate-lite-constraints.md
+  fix-repro:
+    path: agents/fix-repro.md
+  fix-code-path:
+    path: agents/fix-code-path.md
+  fix-recent-changes:
+    path: agents/fix-recent-changes.md
+  fix-test-failures:
+    path: agents/fix-test-failures.md
+  fix-regression-scope:
+    path: agents/fix-regression-scope.md
+  fix-runtime-evidence:
+    path: agents/fix-runtime-evidence.md
+  fix-inventory-confirm:
+    path: agents/fix-inventory-confirm.md
+  fix-repro-verify:
+    path: agents/fix-repro-verify.md
+  fix-hypothesis-validate:
+    path: agents/fix-hypothesis-validate.md
+  root-cause-analyst:
+    path: agents/root-cause-analyst.md
+  gate-validate-confidence:
+    path: agents/gate-validate-confidence.md
+  gate-validate-complexity:
+    path: agents/gate-validate-complexity.md
+  gate-validate-requirements:
+    path: agents/gate-validate-requirements.md
+  gate-rollback-feasibility:
+    path: agents/gate-rollback-feasibility.md
+  gate-rollback-verification:
+    path: agents/gate-rollback-verification.md
+  report-completeness-review:
+    path: agents/report-completeness-review.md
+  report-factual-review:
+    path: agents/report-factual-review.md
+  code-author:
+    path: agents/code-author.md
+  test-author:
+    path: agents/test-author.md
+  doc-conformance:
+    path: agents/doc-conformance.md
+  implementation-review:
+    path: agents/implementation-review.md
+  release-git:
+    path: agents/release-git.md
+    wave: 1
+    blocking: true
+  remediation-check-app-inventory:
+    path: agents/remediation-check-app-inventory.md
+  remediation-check-app-ssot:
+    path: agents/remediation-check-app-ssot.md
+  remediation-check-app-trace:
+    path: agents/remediation-check-app-trace.md
+  remediation-check-architecture-boundaries:
+    path: agents/remediation-check-architecture-boundaries.md
+  remediation-check-architecture-deps:
+    path: agents/remediation-check-architecture-deps.md
+  remediation-check-architecture-decomposition:
+    path: agents/remediation-check-architecture-decomposition.md
+  remediation-check-risk:
+    path: agents/remediation-check-risk.md
+  remediation-remediator:
+    path: agents/remediation-remediator.md
+  remediation-e2e-gate:
+    path: agents/remediation-e2e-gate.md
+
+policies:
+  - policies/master-rules.md
+  - policies/implementation.md
+  - policies/mcp-and-deploy.md

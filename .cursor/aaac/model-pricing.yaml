@@ -1,0 +1,420 @@
+# AAAC model pricing SSOT — Cursor API pool rates (USD per 1M tokens).
+# Refresh: node .cursor/aaac/scripts/run-engine/refresh-model-pricing.mjs
+# Source of truth for rates: Cursor Models & Pricing docs (not invented).
+# Do not hardcode prices in UI or estimators — load this file.
+version: 1
+currency: USD
+unit: per_million_tokens
+pricing_basis: api_pool
+source:
+  url: https://cursor.com/docs/models-and-pricing.md
+  fetched_at: "2026-07-19T10:57:07.019Z"
+  note: Official Cursor Models & Pricing (API pool). First-party Auto rates from Auto pricing table.
+
+# When only total tokens are known (no input/output split), apply this documented blend.
+# cost_method becomes blended_total; never silent.
+blend:
+  input_share: 0.75
+  output_share: 0.25
+
+# When phase/agent token meters are missing: null = fail-closed (no cost invent).
+# duration_share_of_conversation_tokens is retired — conversation_* is chrome only.
+allocation:
+  when_phase_tokens_missing: null
+
+# Teams/Enterprise surcharge on non-Auto third-party (off by default for individual).
+cursor_token_rate:
+  per_million: 0.25
+  default_enabled: false
+  exempt_pools: [first_party, auto]
+
+aliases:
+  auto: auto
+  claude-4.5-haiku: claude-4.5-haiku
+  claude-4.5-sonnet: claude-4.5-sonnet
+  claude-4.6-opus: claude-4.6-opus
+  claude-4.6-sonnet: claude-4.6-sonnet
+  claude-sonnet-5: claude-sonnet-5
+  claude-sonnet-5-thinking: claude-sonnet-5
+  claude-sonnet-5-thinking-high: claude-sonnet-5
+  composer-1: composer-1
+  composer-2: composer-2.5
+  composer-2.5: composer-2.5
+  composer-2.5-fast: composer-2.5
+  cursor-grok-4.5: grok-4.5
+  cursor-grok-4.5-high: grok-4.5
+  cursor-grok-4.5-high-fast: grok-4.5-fast
+  cursor-grok-4.5-medium: grok-4.5
+  cursor-grok-4.5-medium-fast: grok-4.5-fast
+  cursor-grok-4.5-low: grok-4.5
+  cursor-grok-4.5-low-fast: grok-4.5-fast
+  cursor-grok-4.5-fast: grok-4.5-fast
+  grok-4.5-high-fast: grok-4.5-fast
+  grok-4.5-medium-fast: grok-4.5-fast
+  grok-4.5-low-fast: grok-4.5-fast
+  grok-4.5-fast: grok-4.5-fast
+  gpt-5.3-codex: gpt-5.3-codex
+  gpt-5.3-codex-fast: gpt-5.3-codex
+  gpt-5.3-codex-high: gpt-5.3-codex
+  gpt-5.3-codex-high-fast: gpt-5.3-codex
+  gpt-5.6-luna: gpt-5.6-luna
+  gpt-5.6-sol: gpt-5.6-sol
+  gpt-5.6-sol-medium: gpt-5.6-sol
+  gpt-5.6-terra: gpt-5.6-terra
+  gpt-5.6-terra-medium: gpt-5.6-terra
+  grok-4.5: grok-4.5
+  inherit: auto
+
+models:
+  auto:
+    display_name: "Auto"
+    context_window: 200000
+    provider: Cursor
+    pool: first_party
+    input_per_million: 1.25
+    output_per_million: 6
+    cache_read_per_million: 0.25
+    cache_write_per_million: 1.25
+  claude-4-sonnet:
+    display_name: "Claude 4 Sonnet"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 3
+    output_per_million: 15
+    cache_read_per_million: 0.3
+    cache_write_per_million: 3.75
+  claude-4-sonnet-1m:
+    display_name: "Claude 4 Sonnet 1M"
+    context_window: 1000000
+    provider: Anthropic
+    pool: api
+    input_per_million: 6
+    output_per_million: 22.5
+    cache_read_per_million: 0.6
+    cache_write_per_million: 7.5
+  claude-4.5-haiku:
+    display_name: "Claude 4.5 Haiku"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 1
+    output_per_million: 5
+    cache_read_per_million: 0.1
+    cache_write_per_million: 1.25
+  claude-4.5-opus:
+    display_name: "Claude 4.5 Opus"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 5
+    output_per_million: 25
+    cache_read_per_million: 0.5
+    cache_write_per_million: 6.25
+  claude-4.5-sonnet:
+    display_name: "Claude 4.5 Sonnet"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 3
+    output_per_million: 15
+    cache_read_per_million: 0.3
+    cache_write_per_million: 3.75
+  claude-4.6-opus:
+    display_name: "Claude 4.6 Opus"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 5
+    output_per_million: 25
+    cache_read_per_million: 0.5
+    cache_write_per_million: 6.25
+  claude-4.6-sonnet:
+    display_name: "Claude 4.6 Sonnet"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 3
+    output_per_million: 15
+    cache_read_per_million: 0.3
+    cache_write_per_million: 3.75
+  claude-4.7-opus:
+    display_name: "Claude 4.7 Opus"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 5
+    output_per_million: 25
+    cache_read_per_million: 0.5
+    cache_write_per_million: 6.25
+  claude-fable-5:
+    display_name: "Claude Fable 5"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 10
+    output_per_million: 50
+    cache_read_per_million: 1
+    cache_write_per_million: 12.5
+  claude-opus-4.7-fast:
+    display_name: "Claude Opus 4.7 (fast mode)"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 30
+    output_per_million: 150
+    cache_read_per_million: 3
+    cache_write_per_million: 37.5
+  claude-opus-4.8:
+    display_name: "Claude Opus 4.8"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 5
+    output_per_million: 25
+    cache_read_per_million: 0.5
+    cache_write_per_million: 6.25
+  claude-sonnet-5:
+    display_name: "Claude Sonnet 5"
+    context_window: 200000
+    provider: Anthropic
+    pool: api
+    input_per_million: 3
+    output_per_million: 15
+    cache_read_per_million: 0.3
+    cache_write_per_million: 3.75
+  composer-1:
+    display_name: "Composer 1"
+    context_window: 200000
+    provider: Cursor
+    pool: api
+    input_per_million: 1.25
+    output_per_million: 10
+    cache_read_per_million: 0.125
+  composer-2.5:
+    display_name: "Composer 2.5"
+    context_window: 200000
+    provider: Cursor
+    pool: first_party
+    input_per_million: 0.5
+    output_per_million: 2.5
+    cache_read_per_million: 0.2
+  gemini-2.5-flash:
+    display_name: "Gemini 2.5 Flash"
+    context_window: 200000
+    provider: Google
+    pool: api
+    input_per_million: 0.3
+    output_per_million: 2.5
+    cache_read_per_million: 0.03
+  gemini-3-flash:
+    display_name: "Gemini 3 Flash"
+    context_window: 200000
+    provider: Google
+    pool: api
+    input_per_million: 0.5
+    output_per_million: 3
+    cache_read_per_million: 0.05
+  gemini-3-pro:
+    display_name: "Gemini 3 Pro"
+    context_window: 200000
+    provider: Google
+    pool: api
+    input_per_million: 2
+    output_per_million: 12
+    cache_read_per_million: 0.2
+  gemini-3-pro-image-preview:
+    display_name: "Gemini 3 Pro Image Preview"
+    context_window: 200000
+    provider: Google
+    pool: api
+    input_per_million: 2
+    output_per_million: 12
+    cache_read_per_million: 0.2
+  gemini-3.1-pro:
+    display_name: "Gemini 3.1 Pro"
+    context_window: 200000
+    provider: Google
+    pool: api
+    input_per_million: 2
+    output_per_million: 12
+    cache_read_per_million: 0.2
+  gemini-3.5-flash:
+    display_name: "Gemini 3.5 Flash"
+    context_window: 200000
+    provider: Google
+    pool: api
+    input_per_million: 1.5
+    output_per_million: 9
+    cache_read_per_million: 0.15
+  glm-5.2:
+    display_name: "GLM 5.2"
+    context_window: 200000
+    provider: Z.ai
+    pool: api
+    input_per_million: 1.4
+    output_per_million: 4.4
+    cache_read_per_million: 0.26
+  gpt-5:
+    display_name: "GPT-5"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.25
+    output_per_million: 10
+    cache_read_per_million: 0.125
+  gpt-5-fast:
+    display_name: "GPT-5 Fast"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 2.5
+    output_per_million: 20
+    cache_read_per_million: 0.25
+  gpt-5-mini:
+    display_name: "GPT-5 Mini"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 0.25
+    output_per_million: 2
+    cache_read_per_million: 0.025
+  gpt-5-codex:
+    display_name: "GPT-5-Codex"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.25
+    output_per_million: 10
+    cache_read_per_million: 0.125
+  gpt-5.1-codex:
+    display_name: "GPT-5.1 Codex"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.25
+    output_per_million: 10
+    cache_read_per_million: 0.125
+  gpt-5.1-codex-max:
+    display_name: "GPT-5.1 Codex Max"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.25
+    output_per_million: 10
+    cache_read_per_million: 0.125
+  gpt-5.1-codex-mini:
+    display_name: "GPT-5.1 Codex Mini"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 0.25
+    output_per_million: 2
+    cache_read_per_million: 0.025
+  gpt-5.2:
+    display_name: "GPT-5.2"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.75
+    output_per_million: 14
+    cache_read_per_million: 0.175
+  gpt-5.2-codex:
+    display_name: "GPT-5.2 Codex"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.75
+    output_per_million: 14
+    cache_read_per_million: 0.175
+  gpt-5.3-codex:
+    display_name: "GPT-5.3 Codex"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1.75
+    output_per_million: 14
+    cache_read_per_million: 0.175
+  gpt-5.4:
+    display_name: "GPT-5.4"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 2.5
+    output_per_million: 15
+    cache_read_per_million: 0.25
+  gpt-5.4-mini:
+    display_name: "GPT-5.4 Mini"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 0.75
+    output_per_million: 4.5
+    cache_read_per_million: 0.075
+  gpt-5.4-nano:
+    display_name: "GPT-5.4 Nano"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 0.2
+    output_per_million: 1.25
+    cache_read_per_million: 0.02
+  gpt-5.5:
+    display_name: "GPT-5.5"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 5
+    output_per_million: 30
+    cache_read_per_million: 0.5
+  gpt-5.6-luna:
+    display_name: "GPT-5.6 Luna"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 1
+    output_per_million: 6
+    cache_read_per_million: 0.1
+    cache_write_per_million: 1.25
+  gpt-5.6-sol:
+    display_name: "GPT-5.6 Sol"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 5
+    output_per_million: 30
+    cache_read_per_million: 0.5
+    cache_write_per_million: 6.25
+  gpt-5.6-terra:
+    display_name: "GPT-5.6 Terra"
+    context_window: 200000
+    provider: OpenAI
+    pool: api
+    input_per_million: 2.5
+    output_per_million: 15
+    cache_read_per_million: 0.25
+    cache_write_per_million: 3.125
+  grok-4.5:
+    display_name: "Grok 4.5"
+    context_window: 200000
+    provider: Cursor
+    pool: first_party
+    input_per_million: 2
+    output_per_million: 6
+    cache_read_per_million: 0.5
+  grok-4.5-fast:
+    display_name: "Grok 4.5 Fast"
+    context_window: 200000
+    provider: Cursor
+    pool: first_party
+    input_per_million: 4
+    output_per_million: 18
+    cache_read_per_million: 0.5
+  kimi-k2.7-code:
+    display_name: "Kimi K2.7 Code"
+    context_window: 200000
+    provider: Moonshot
+    pool: api
+    input_per_million: 0.95
+    output_per_million: 4
+    cache_read_per_million: 0.19

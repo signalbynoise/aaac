@@ -1,0 +1,42 @@
+{
+  "manual_commands": ["setup-app-web.md"],
+  "verify": {
+    "enabled": false
+  },
+  "remediation": {
+    "fallow_cwd": ".",
+    "scan_root": ".",
+    "verify": {
+      "layers": [
+        {
+          "id": "typecheck",
+          "command": "npm",
+          "args": ["run", "typecheck"],
+          "cwd": ".",
+          "optional": true
+        },
+        {
+          "id": "vitest",
+          "command": "npm",
+          "args": ["test"],
+          "cwd": ".",
+          "optional": true
+        },
+        {
+          "id": "build",
+          "command": "npm",
+          "args": ["run", "build"],
+          "cwd": ".",
+          "optional": true
+        }
+      ],
+      "playwright": {
+        "enabled": false
+      },
+      "dev_server": {
+        "url": "http://localhost:3000",
+        "launch_hint": "Start your dev server before debt sweep / Playwright gates."
+      }
+    }
+  }
+}

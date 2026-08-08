@@ -3,50 +3,69 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { installAaac } from '../../src/lib/install.mjs';
 
 const fixtureDir = path.dirname(fileURLToPath(import.meta.url));
-const sourceRoot = path.resolve(fixtureDir, '../../../..');
+const packageRoot = path.resolve(fixtureDir, '../..');
 const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aaac-vitest-workspace-'));
 
-function symlinkChildren(sourceDir, targetDir, excludedNames = new Set()) {
-  fs.mkdirSync(targetDir, { recursive: true });
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-    if (excludedNames.has(entry.name)) continue;
-    fs.symlinkSync(path.join(sourceDir, entry.name), path.join(targetDir, entry.name));
-  }
-}
-
-function copyWebsiteFixture() {
-  const sourceApps = path.join(sourceRoot, 'apps');
-  const targetApps = path.join(workspaceRoot, 'apps');
-  symlinkChildren(sourceApps, targetApps, new Set(['website']));
-  fs.cpSync(path.join(sourceApps, 'website'), path.join(targetApps, 'website'), {
-    recursive: true,
-    filter(source) {
-      return !source.endsWith(`${path.sep}dist`) && !source.endsWith(`${path.sep}node_modules`);
-    },
-  });
-  const sourceModules = path.join(sourceApps, 'website', 'node_modules');
-  if (fs.existsSync(sourceModules)) {
-    fs.symlinkSync(sourceModules, path.join(targetApps, 'website', 'node_modules'));
-  }
+function ensureStubWebsite() {
+  const target = path.join(workspaceRoot, 'apps/website');
+  fs.mkdirSync(path.join(target, 'public'), { recursive: true });
+  fs.mkdirSync(path.join(target, 'lib/nav'), { recursive: true });
+  fs.writeFileSync(
+    path.join(target, 'package.json'),
+    JSON.stringify(
+      {
+        name: '@ludecker/website',
+        private: true,
+        scripts: {
+          build: 'node -e "require(\'node:fs\').mkdirSync(\'dist\',{recursive:true}); require(\'node:fs\').writeFileSync(\'dist/.keep\',\'\')"',
+          start: 'node -e "setInterval(()=>{}, 1e9)"',
+        },
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  fs.writeFileSync(
+    path.join(target, 'index.html'),
+    '<!doctype html><html><head><link rel="icon" href="/favicon.ico" /></head><body></body></html>\n',
+  );
+  fs.writeFileSync(path.join(target, 'public/favicon.ico'), '');
 }
 
 function createIsolatedWorkspace() {
-  symlinkChildren(sourceRoot, workspaceRoot, new Set(['.cursor', 'apps']));
-  copyWebsiteFixture();
+  fs.mkdirSync(path.join(workspaceRoot, 'packages'), { recursive: true });
+  fs.symlinkSync(packageRoot, path.join(workspaceRoot, 'packages/aaac'));
+  fs.writeFileSync(
+    path.join(workspaceRoot, 'package.json'),
+    JSON.stringify({ name: 'aaac-test-workspace', private: true }, null, 2) + '\n',
+  );
+  fs.writeFileSync(
+    path.join(workspaceRoot, 'pnpm-workspace.yaml'),
+    'packages:\n  - "apps/*"\n  - "packages/*"\n',
+  );
+  ensureStubWebsite();
+  installAaac({
+    targetDir: workspaceRoot,
+    projectName: 'aaac-test-workspace',
+    docsRoot: 'docs',
+    packageRoot,
+  });
 
-  const sourceCursor = path.join(sourceRoot, '.cursor');
-  const targetCursor = path.join(workspaceRoot, '.cursor');
-  symlinkChildren(sourceCursor, targetCursor, new Set(['aaac']));
-
-  const sourceAaac = path.join(sourceCursor, 'aaac');
-  const targetAaac = path.join(targetCursor, 'aaac');
-  symlinkChildren(sourceAaac, targetAaac, new Set(['state']));
-
-  for (const relative of ['runs', 'active-runs', 'sessions']) {
-    fs.mkdirSync(path.join(targetAaac, 'state', relative), { recursive: true });
-  }
+  const projectConfigPath = path.join(workspaceRoot, '.cursor/aaac/project.config.json');
+  const projectConfig = JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'));
+  projectConfig.verify = {
+    enabled: true,
+    app_root: 'apps/website',
+    index_html: 'apps/website/index.html',
+    build: {
+      command: 'pnpm',
+      args: ['--filter', '@ludecker/website', 'build'],
+    },
+  };
+  fs.writeFileSync(projectConfigPath, `${JSON.stringify(projectConfig, null, 2)}\n`);
 }
 
 createIsolatedWorkspace();

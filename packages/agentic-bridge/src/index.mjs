@@ -72,3 +72,5 @@ export {
   persistSwarmExpectedSpecs,
 } from "./run-manifest.mjs";
 export { listAaocCommands, normalizeAaocPrompt } from "./commands.mjs";
+
+export { accumulateCursorUsage, parseStreamJsonLine } from "./cursor-usage.mjs";

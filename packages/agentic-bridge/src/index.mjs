@@ -73,5 +73,12 @@ export {
 } from "./run-manifest.mjs";
 export { listAaocCommands, normalizeAaocPrompt } from "./commands.mjs";
 
-export { accumulateCursorUsage } from "./cursor-usage.mjs";
+export {
+  accumulateCursorUsage,
+  createCursorUsageAccumulator,
+  cursorUsageMetrics,
+  parseCursorUsageEvent,
+  computeUsageContextPercent,
+  resolveModelContextWindow,
+} from "./cursor-usage.mjs";
 export { parseStreamJsonLine } from "./stream-json-tools.mjs";

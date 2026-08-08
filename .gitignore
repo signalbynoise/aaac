@@ -5,3 +5,6 @@ dist/
 .DS_Store
 packages/aaac/test-results/
 packages/aaac/playwright-report/
+.cursor/
+docs/
+packages/aaac/state/

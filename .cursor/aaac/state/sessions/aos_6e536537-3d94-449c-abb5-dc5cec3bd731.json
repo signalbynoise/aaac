@@ -1,9 +1,0 @@
-{
-  "run_id": "run_20260808_review-module-cms-aos_6e53",
-  "session_id": "aos_6e536537-3d94-449c-abb5-dc5cec3bd731",
-  "command": "review-module",
-  "phase": "discover",
-  "status": "running",
-  "origin": "agentic-os",
-  "started_at": "2026-08-08T07:41:40.666Z"
-}

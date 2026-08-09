@@ -52,15 +52,23 @@ export function loadPackagedGlobalLessons() {
   return readJson(GLOBAL_LESSONS_PATH, emptyLessonsStore());
 }
 
-/** Local lessons win on id collision. Active-only. */
+function isRetrievable(lesson) {
+  const status = lesson?.status;
+  if (!status) return true;
+  if (status === "deprecated") return false;
+  // active | validated | candidate all retrievable
+  return status === "active" || status === "validated" || status === "candidate";
+}
+
+/** Local lessons win on id collision. Active/validated only. */
 export function mergeLessonCorpora(packaged, local) {
   const merged = {};
   for (const [id, lesson] of Object.entries(packaged?.lessons ?? {})) {
-    if (lesson?.status && lesson.status !== "active") continue;
+    if (!isRetrievable(lesson)) continue;
     merged[id] = { ...lesson, source: "packaged" };
   }
   for (const [id, lesson] of Object.entries(local?.lessons ?? {})) {
-    if (lesson?.status && lesson.status !== "active") continue;
+    if (!isRetrievable(lesson)) continue;
     merged[id] = { ...lesson, source: "local" };
   }
   return merged;

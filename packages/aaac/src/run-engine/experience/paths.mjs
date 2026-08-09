@@ -10,6 +10,13 @@ export const EXPERIENCE_STATS_PATH = path.join(STATE_ROOT, "experience-stats.jso
 export const WORKSPACE_MEMORY_PATH = path.join(STATE_ROOT, "workspace-memory.json");
 export const GLOBAL_LESSONS_PATH = path.join(AAAC_ROOT, "experience", "global-lessons.json");
 export const KNOWLEDGE_ROOT = path.join(AAAC_ROOT, "knowledge");
+/** V4 — compressed strategies, repo knowledge, execution profiles */
+export const STRATEGIES_PATH = path.join(STATE_ROOT, "strategies.json");
+export const REPO_KNOWLEDGE_PATH = path.join(STATE_ROOT, "repo-knowledge.json");
+export const EXECUTION_PROFILES_PATH = path.join(STATE_ROOT, "execution-profiles.json");
+/** V5 — learned swarm targets + hash-gated artifact cache */
+export const GRAPH_POLICY_PATH = path.join(STATE_ROOT, "graph-policy.json");
+export const ARTIFACT_CACHE_ROOT = path.join(STATE_ROOT, "artifact-cache");
 export const RETRIEVAL_YAML_PATH = path.join(AAAC_ROOT, "experience", "retrieval.yaml");
 /** Shipped with npm — precomputed collective vectors (portable JSON). */
 export const PACKAGED_INDEX_DIR = path.join(AAAC_ROOT, "experience", "packaged-index");
@@ -70,6 +77,7 @@ const DEFAULT_RETRIEVAL = {
     bayes_alpha: 1,
     bayes_beta: 1,
     recency_half_life_days: 730,
+    contextual_utility: 0.22,
   },
 };
 
@@ -139,5 +147,30 @@ export function loadRetrievalConfig() {
   } catch {
     // keep defaults
   }
+
+  // Policy / bandit env overrides (Stage 5)
+  if (process.env.AAAC_FINAL_LESSONS) {
+    const n = Number(process.env.AAAC_FINAL_LESSONS);
+    if (Number.isFinite(n) && n > 0) cfg.final_lessons = n;
+  }
+  if (process.env.AAAC_MMR_LAMBDA) {
+    const n = Number(process.env.AAAC_MMR_LAMBDA);
+    if (Number.isFinite(n) && n > 0 && n <= 1) cfg.mmr_lambda = n;
+  }
   return cfg;
+}
+
+/** Soft artifact warning threshold (bytes), ratio of hard 16KB limit by default. */
+export function loadArtifactCharWarn(hardLimit = 16000) {
+  if (process.env.AAAC_ARTIFACT_CHAR_WARN) {
+    const n = Number(process.env.AAAC_ARTIFACT_CHAR_WARN);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  if (process.env.AAAC_ARTIFACT_WARN_RATIO) {
+    const r = Number(process.env.AAAC_ARTIFACT_WARN_RATIO);
+    if (Number.isFinite(r) && r > 0 && r <= 1) {
+      return Math.floor(hardLimit * r);
+    }
+  }
+  return hardLimit;
 }

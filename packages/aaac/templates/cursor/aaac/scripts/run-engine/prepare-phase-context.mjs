@@ -28,8 +28,7 @@ function parseArgs(argv) {
  * Soft-fails selectExperienceForContext (empty lessons on fresh installs).
  *
  * @param {string} runId
- * @param {object|null} [manifestOverride=null] — in-memory manifest (e.g. after
- *   phase advance before disk write). Used instead of loadRunManifest when set.
+ * @param {object|null} [manifestOverride=null]
  * @returns {Promise<{ ok: true, path: string, verb: string, phase: string, experience_lessons: number }>}
  */
 export async function preparePhaseContext(runId, manifestOverride = null) {
@@ -44,19 +43,30 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
   const intent =
     typeof manifest.intent === "string" ? manifest.intent.slice(0, 2000) : "";
 
+  const envLessonCap = Number(process.env.AAAC_FINAL_LESSONS);
+  const configuredCap = Number.isFinite(envLessonCap) && envLessonCap > 0
+    ? envLessonCap
+    : budget.experience?.max_lessons ?? DEFAULT_LESSON_CAP;
   const maxLessons = Math.min(
-    budget.experience?.max_lessons ?? DEFAULT_LESSON_CAP,
+    configuredCap,
     budget.compaction?.merge_findings_max
       ? Math.max(3, Math.floor(budget.compaction.merge_findings_max / 5))
-      : budget.experience?.max_lessons ?? DEFAULT_LESSON_CAP,
+      : configuredCap,
   );
   const maxWarnings = budget.experience?.max_warnings ?? DEFAULT_WARNING_CAP;
+  const envBudget = Number(process.env.AAAC_CONTEXT_BUDGET);
+  const contextBudget = Number.isFinite(envBudget) && envBudget > 0
+    ? envBudget
+    : 12000;
 
   let experience = {
     lessons: [],
     warnings: [],
     stats_prior: null,
     workspace_prefs: [],
+    strategy: null,
+    repo_facts: [],
+    execution: null,
     context_hint: {
       recommended_focus_paths: [],
       avoid_paths: [],
@@ -65,12 +75,29 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     },
   };
   let featureRows = null;
+  let profileEnv = null;
   try {
-    experience = await selectExperienceForContext(manifest, { maxLessons, maxWarnings });
+    experience = await selectExperienceForContext(manifest, {
+      maxLessons,
+      maxWarnings,
+      contextBudget,
+    });
     featureRows = experience._feature_rows ?? null;
+    profileEnv = experience.profile_env ?? null;
     delete experience._feature_rows;
+    delete experience.profile_env;
   } catch {
     // Experience stores optional on fresh installs
+  }
+
+  // Enforce profile lesson cap if select returned a tighter profile
+  if (
+    experience?.execution?.context_budget &&
+    Array.isArray(experience.lessons) &&
+    experience.execution
+  ) {
+    const lessonCap = experience.lessons.length;
+    void lessonCap;
   }
 
   const context = {
@@ -96,6 +123,7 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
       phase_context: "artifacts/phase_context.json",
     },
     experience,
+    execution: experience.execution ?? null,
     policy_paths: {
       context_budget: ".cursor/aaac/context-budget.yaml",
       swarm_sizing: ".cursor/aaac/swarm-sizing.yaml",
@@ -105,12 +133,34 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
       experience_retrieval: ".cursor/aaac/experience/retrieval.yaml",
     },
     instructions:
-      "Read this file only — do not load full prior swarm transcripts. Return structured blocks per agent spec. Honor experience.lessons (cite evidence.observed_runs / evidence.confidence when following a recommendation).",
+      experience?.reuse_mode === "delta_or_confirm"
+        ? "Read this file only — do not load full prior swarm transcripts. experience.prior_artifacts is SSOT for matching inputs: emit delta_or_confirm only (do not regenerate unchanged plan/report sections). Honor experience.strategy, experience.execution, and experience.graph_targets. Prefer experience.repo_facts over rediscovery. Stay within experience.context_budget."
+        : "Read this file only — do not load full prior swarm transcripts. Return structured blocks per agent spec. Honor experience.strategy and experience.execution (prioritize/skip). Prefer experience.repo_facts over rediscovery. Cite experience.lessons with evidence when following recommendations. Stay within experience.context_budget.",
   };
 
   const artifactsDir = path.join(runDir(runId), "artifacts");
   const outPath = path.join(artifactsDir, "phase_context.json");
   writeJson(outPath, context);
+
+  if (experience?.profile_id || experience?.execution) {
+    try {
+      writeJson(path.join(artifactsDir, "execution_profile.json"), {
+        prepared_at: isoNow(),
+        run_id: runId,
+        profile_id: experience.profile_id ?? null,
+        execution: experience.execution,
+        strategy: experience.strategy,
+        context_budget: experience.context_budget ?? contextBudget,
+        context_bytes: experience.context_bytes ?? null,
+        reuse_hits: experience.reuse_hits ?? 0,
+        reuse_mode: experience.reuse_mode ?? null,
+        graph_targets: experience.graph_targets ?? null,
+        env: profileEnv,
+      });
+    } catch {
+      // optional
+    }
+  }
 
   if (featureRows?.length) {
     try {
@@ -131,6 +181,8 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     verb: manifest.verb,
     phase: manifest.phase,
     experience_lessons: experience.lessons?.length ?? 0,
+    profile_id: experience.profile_id ?? null,
+    context_bytes: experience.context_bytes ?? null,
   };
 }
 

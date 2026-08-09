@@ -2,8 +2,7 @@
  * Lightweight: select experience priors for phase_context (read path).
  * Prefer importing this from prepare-phase-context — not the full process module.
  *
- * Always uses hybrid vector retrieval over packaged ∪ local lessons.
- * Packaged-index ships with npm so fresh installs retrieve out of the box.
+ * V4: lessons + strategy + repo facts under an execution profile budget.
  */
 import {
   loadLessonsStore,
@@ -17,6 +16,25 @@ import { DEFAULT_LESSON_CAP, DEFAULT_WARNING_CAP, loadRetrievalConfig } from "./
 import { retrieveExperience } from "./retrieve.mjs";
 import { getEmbeddingProvider } from "./embed/provider.mjs";
 import { seedLocalIndexFromPackaged } from "./index/seed.mjs";
+import {
+  loadStrategiesStore,
+  getStrategyForManifest,
+  compactStrategyCard,
+} from "./strategy.mjs";
+import {
+  loadRepoKnowledgeStore,
+  selectRepoFacts,
+  saveRepoKnowledgeStore,
+} from "./repo-knowledge.mjs";
+import {
+  loadProfilesStore,
+  resolveActiveProfile,
+  bindingExecutionPacket,
+  saveProfilesStore,
+  profileToEnv,
+} from "./execution-profile.mjs";
+import { selectPriorArtifacts } from "./artifact-reuse.mjs";
+import { selectGraphTargets } from "./graph-policy.mjs";
 
 export { mergeLessonCorpora };
 
@@ -64,20 +82,54 @@ function finishExperiencePacket(manifest, lessons, warnings, merged, stats, memo
           : null,
     },
     retrieval: null,
+    strategy: null,
+    repo_facts: [],
+    execution: null,
+    context_bytes: 0,
+    reuse_hits: 0,
   };
 }
 
+function estimateBytes(obj) {
+  try {
+    return Buffer.byteLength(JSON.stringify(obj), "utf8");
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * Select top lessons for phase context (hybrid retrieval + compact evidence).
- * Async — await from prepare-phase-context.
+ * Select top lessons + V4 strategy/repo/profile packet for phase context.
  *
  * @param {object} manifest
- * @param {{ maxLessons?: number, maxWarnings?: number, provider?: object, ensureIndex?: boolean }} [options]
+ * @param {{ maxLessons?: number, maxWarnings?: number, provider?: object, ensureIndex?: boolean, contextBudget?: number }} [options]
  */
 export async function selectExperienceForContext(manifest, options = {}) {
+  const profilesStore = loadProfilesStore();
+  const { profile, from: profileSource } = resolveActiveProfile(
+    profilesStore,
+    manifest,
+  );
+  // Persist selection so process can attribute the run
+  if (profileSource === "selected") {
+    saveProfilesStore(profilesStore);
+  }
+
   const cfg = loadRetrievalConfig();
-  const maxLessons = options.maxLessons ?? DEFAULT_LESSON_CAP;
+  const profileLessonCap = profile?.context?.lessons;
+  const maxLessons =
+    options.maxLessons ??
+    profileLessonCap ??
+    cfg.final_lessons ??
+    DEFAULT_LESSON_CAP;
   const maxWarnings = options.maxWarnings ?? cfg.max_warnings ?? DEFAULT_WARNING_CAP;
+  const envBudget = Number(process.env.AAAC_CONTEXT_BUDGET);
+  const contextBudget =
+    options.contextBudget ??
+    (Number.isFinite(envBudget) && envBudget > 0
+      ? envBudget
+      : profile?.context_budget ?? 12000);
+
   const packaged = loadPackagedGlobalLessons();
   const local = loadLessonsStore();
   const stats = loadExperienceStats();
@@ -108,5 +160,51 @@ export async function selectExperienceForContext(manifest, options = {}) {
   );
   packet.retrieval = retrieved.meta;
   packet._feature_rows = retrieved.feature_rows;
+
+  // Strategy card
+  const strategies = loadStrategiesStore();
+  const strategy = getStrategyForManifest(strategies, manifest);
+  const strategyCard =
+    profile?.context?.strategy !== false ? compactStrategyCard(strategy) : null;
+  packet.strategy = strategyCard;
+
+  // Repo facts under remaining budget
+  const strategyBytes = strategyCard ? estimateBytes(strategyCard) : 0;
+  const lessonsBytes = estimateBytes(packet.lessons);
+  const remaining = Math.max(500, contextBudget - strategyBytes - lessonsBytes);
+  const repoStore = loadRepoKnowledgeStore();
+  const { facts, bytes, reuse_hits } = selectRepoFacts(repoStore, {
+    budgetBytes: remaining,
+    reuse: profile?.reuse ?? {},
+    maxClaims: profile?.context?.repo_facts === "targeted" ? 6 : 3,
+  });
+  if (reuse_hits) saveRepoKnowledgeStore(repoStore);
+  packet.repo_facts = facts;
+  packet.reuse_hits = reuse_hits;
+
+  // V5 — hard artifact reuse + graph targets
+  const prior = selectPriorArtifacts(manifest);
+  packet.prior_artifacts = prior.prior_artifacts;
+  packet.reuse_mode = prior.reuse_mode;
+  packet.reuse_hits = (reuse_hits ?? 0) + (prior.reuse_hits ?? 0);
+  packet.graph_targets = selectGraphTargets(manifest);
+
+  // Binding execution profile
+  packet.execution = bindingExecutionPacket(profile, strategyCard);
+  packet.profile_id = profile?.id ?? null;
+  packet.profile_env = profileToEnv(profile);
+  packet.context_budget = contextBudget;
+  packet.context_bytes = strategyBytes + lessonsBytes + bytes;
+
+  // Merge strategy skips into context_hint
+  if (strategyCard?.usually_not_needed?.length) {
+    const pathSkips = strategyCard.usually_not_needed
+      .filter((s) => String(s).startsWith("path:"))
+      .map((s) => String(s).slice(5));
+    packet.context_hint.avoid_paths = [
+      ...new Set([...(packet.context_hint.avoid_paths ?? []), ...pathSkips]),
+    ].slice(0, 20);
+  }
+
   return packet;
 }

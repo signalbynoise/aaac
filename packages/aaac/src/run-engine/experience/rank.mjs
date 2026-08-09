@@ -1,7 +1,8 @@
 /**
- * Outcome-aware weighted feature ranking (fixed weights this cut).
+ * Outcome-aware weighted feature ranking (+ contextual utility, Stage 4).
  */
 import { loadRetrievalConfig } from "./paths.mjs";
+import { contextualUtilityScore } from "./utility.mjs";
 
 export function bayesianUtility(evidence, alpha = 1, beta = 1) {
   const successes = evidence?.successful_runs ?? 0;
@@ -66,6 +67,7 @@ export function failurePenalty(lesson) {
  */
 export function scoreCandidate(features, weights) {
   const w = weights ?? loadRetrievalConfig().ranking;
+  const contextualW = w.contextual_utility ?? 0.22;
   return (
     w.semantic_similarity * (features.semantic_similarity ?? 0) +
     w.trigger_similarity * (features.trigger_similarity ?? 0) +
@@ -73,7 +75,8 @@ export function scoreCandidate(features, weights) {
     w.outcome_value * (features.outcome_value ?? 0) +
     w.repository_affinity * (features.repository_affinity ?? 0) +
     w.recency * (features.recency ?? 0) +
-    w.graph_support * (features.graph_support ?? 0) -
+    w.graph_support * (features.graph_support ?? 0) +
+    contextualW * (features.contextual_utility ?? 0) -
     w.contradiction_penalty * (features.contradiction_penalty ?? 0) -
     w.failure_penalty * (features.failure_penalty ?? 0) -
     w.redundancy_penalty * (features.redundancy_penalty ?? 0)
@@ -105,6 +108,7 @@ export function buildFeatures({
     repository_affinity: repositoryAffinity(lesson, manifest),
     recency: recencyScore(lesson, cfg.ranking.recency_half_life_days),
     graph_support: Math.min(1, graphSupport),
+    contextual_utility: contextualUtilityScore(lesson, manifest),
     contradiction_penalty: contradictionPenalty,
     failure_penalty: failurePenalty(lesson),
     redundancy_penalty: redundancyPenalty,

@@ -10,6 +10,12 @@ import {
   tierLookup,
 } from "./load-swarm-sizing.mjs";
 import { resolveSwarmWaves } from "./resolve-swarm-waves.mjs";
+import {
+  applyLearnedTargetToDetail,
+  isGraphLearningEnabled,
+  isReadonlyVerb,
+  selectGraphTargets,
+} from "./experience/graph-policy.mjs";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -38,6 +44,32 @@ function isMutating(manifest, enforcement) {
 function tierPhase(phase, manifest) {
   if (phase === "discover" && manifest.verb === "check") return "check_swarm";
   return phase;
+}
+
+function withGraphLearning(detail, phase, manifest) {
+  if (!(detail?.target > 0)) return detail;
+  if (!isGraphLearningEnabled() || !isReadonlyVerb(manifest)) {
+    return { ...detail, graph_applied: false, learned_target: null };
+  }
+  try {
+    const learned = selectGraphTargets(manifest);
+    const applied = applyLearnedTargetToDetail(detail, phase, learned);
+    if (applied.learned == null) {
+      return { ...detail, graph_applied: false, learned_target: null };
+    }
+    const target = applied.target;
+    const waveResult = resolveSwarmWaves(target, { phase, manifest });
+    return {
+      ...detail,
+      target,
+      waves: waveResult.waves,
+      wave_reason: waveResult.reason,
+      graph_applied: applied.applied,
+      learned_target: applied.learned,
+    };
+  } catch {
+    return { ...detail, graph_applied: false, learned_target: null };
+  }
 }
 
 /**
@@ -90,14 +122,18 @@ export function resolveSwarmTargetDetail(phase, manifest, enforcement = null) {
 
   if (phaseClass === "fixed") {
     const fixed = sizing.floors[phase] ?? floor ?? 1;
-    return {
-      target: fixed,
-      floor: fixed,
-      ceiling: fixed,
-      score: null,
-      phase_class: phaseClass,
-      tier: fixed,
-    };
+    return withGraphLearning(
+      {
+        target: fixed,
+        floor: fixed,
+        ceiling: fixed,
+        score: null,
+        phase_class: phaseClass,
+        tier: fixed,
+      },
+      phase,
+      manifest,
+    );
   }
 
   const complexity = manifest.complexity ?? {};
@@ -121,16 +157,20 @@ export function resolveSwarmTargetDetail(phase, manifest, enforcement = null) {
   }
 
   const waveResult = resolveSwarmWaves(target, { phase, manifest });
-  return {
-    target,
-    floor,
-    ceiling,
-    score,
-    phase_class: phaseClass,
-    tier: tier ?? target,
-    waves: waveResult.waves,
-    wave_reason: waveResult.reason,
-  };
+  return withGraphLearning(
+    {
+      target,
+      floor,
+      ceiling,
+      score,
+      phase_class: phaseClass,
+      tier: tier ?? target,
+      waves: waveResult.waves,
+      wave_reason: waveResult.reason,
+    },
+    phase,
+    manifest,
+  );
 }
 
 /** Numeric target for enforcement (launch minimum). */
@@ -152,6 +192,7 @@ export function applySwarmTargetsToManifest(manifest, phases, enforcement = null
   manifest.swarm = manifest.swarm ?? {};
   manifest.swarm.target_agents = manifest.swarm.target_agents ?? {};
   manifest.swarm.wave_plan = manifest.swarm.wave_plan ?? {};
+  const overrides = {};
 
   for (const phase of phases) {
     const detail = resolveSwarmTargetDetail(phase, manifest, enforcement);
@@ -164,6 +205,20 @@ export function applySwarmTargetsToManifest(manifest, phases, enforcement = null
         reason: detail.wave_reason ?? "context_budget",
       };
     }
+    if (detail.graph_applied || detail.learned_target != null) {
+      overrides[phase] = {
+        target: detail.target,
+        yaml_floor: detail.floor,
+        learned: detail.learned_target,
+        applied: Boolean(detail.graph_applied),
+      };
+    }
+  }
+  if (Object.keys(overrides).length) {
+    manifest.swarm.graph_policy = {
+      applied: true,
+      overrides,
+    };
   }
   return manifest;
 }

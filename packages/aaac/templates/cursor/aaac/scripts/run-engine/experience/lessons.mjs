@@ -142,6 +142,13 @@ export function upsertLessonWithEvidence(
     avoid_paths: candidate.avoid_paths ?? [],
   };
 
+  // Revive if previously deprecated but seen again with structure.
+  if (existing.status === "deprecated" && candidate.kind === "structured") {
+    existing.status = "active";
+    delete existing.deprecated_reason;
+    delete existing.deprecated_at;
+  }
+
   existing.lesson = candidate.lesson ?? existing.lesson;
   existing.problem = candidate.problem ?? existing.problem;
   existing.solution = candidate.solution ?? existing.solution;
@@ -151,6 +158,25 @@ export function upsertLessonWithEvidence(
     existing.avoid_paths = [
       ...new Set([...(existing.avoid_paths ?? []), ...candidate.avoid_paths]),
     ];
+  }
+  // Structured lesson fields (condition → action → expected_effect).
+  for (const field of [
+    "kind",
+    "failure_class",
+    "context",
+    "condition",
+    "action",
+    "expected_effect",
+    "appliesWhen",
+    "promotion_stage",
+  ]) {
+    if (candidate[field] != null) existing[field] = candidate[field];
+  }
+  if (existing.condition && existing.action && existing.expected_effect) {
+    existing.kind = existing.kind ?? "structured";
+    existing.lesson =
+      existing.lesson ||
+      `${existing.action} (${existing.expected_effect})`;
   }
 
   const evidence = { ...emptyEvidence(), ...(existing.evidence ?? {}) };

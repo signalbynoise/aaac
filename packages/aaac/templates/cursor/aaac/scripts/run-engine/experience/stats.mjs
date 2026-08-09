@@ -16,6 +16,16 @@ export function updateExperienceStats(store, manifest, outcome) {
   const metrics = manifest.metrics ?? {};
   const duration = metrics.duration_ms ?? null;
   const tokens = metrics.total_tokens ?? metrics.conversation_tokens ?? null;
+  const agents = [
+    ...(Array.isArray(manifest?.swarm?.agents) ? manifest.swarm.agents : []),
+    ...Object.values(manifest?.swarm_history ?? {}).flatMap((p) =>
+      Array.isArray(p?.agents) ? p.agents : [],
+    ),
+  ];
+  const filesRead = agents.reduce(
+    (s, a) => s + (Number(a?.files_read) || 0),
+    0,
+  );
   const utilization =
     manifest.swarm?.estimated_utilization ??
     avg(
@@ -34,6 +44,7 @@ export function updateExperienceStats(store, manifest, outcome) {
     partials: 0,
     avg_duration_ms: null,
     avg_tokens: null,
+    avg_files_read: null,
     avg_context_utilization: null,
     total_gate_retries: 0,
     last_run_id: null,
@@ -49,6 +60,11 @@ export function updateExperienceStats(store, manifest, outcome) {
   const n = entry.runs - 1;
   entry.avg_duration_ms = rollingAvg(entry.avg_duration_ms, duration, n);
   entry.avg_tokens = rollingAvg(entry.avg_tokens, tokens, n);
+  entry.avg_files_read = rollingAvg(
+    entry.avg_files_read,
+    filesRead > 0 ? filesRead : null,
+    n,
+  );
   entry.avg_context_utilization = rollingAvg(
     entry.avg_context_utilization,
     utilization,

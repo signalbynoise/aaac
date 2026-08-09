@@ -4,7 +4,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { loadRunManifest, runDir, writeJson, isoNow } from "../lib.mjs";
+import { loadRunManifest, runDir, writeJson, isoNow, readJson } from "../lib.mjs";
 import { pctImprovement } from "./math.mjs";
 import { deriveOutcome } from "./outcome.mjs";
 import { buildReflection } from "./reflection.mjs";
@@ -22,6 +22,40 @@ import {
 import { candidateLessonsFromRun, upsertLessonWithEvidence } from "./lessons.mjs";
 import { promoteKnowledgeArtifacts, maybeUpdateWorkspaceMemory } from "./promote.mjs";
 import { upsertLessonsIntoIndex } from "./index/build.mjs";
+import { extractFailures } from "./failures.mjs";
+import { compileLessonsFromRun } from "./lesson-compiler.mjs";
+import { consolidateLessonsStore } from "./consolidate.mjs";
+import { loadArtifactCharWarn } from "./paths.mjs";
+import {
+  computeRunReward,
+  updateLessonUtilities,
+} from "./utility.mjs";
+import { buildTrajectory } from "./trajectory.mjs";
+import {
+  loadStrategiesStore,
+  saveStrategiesStore,
+  upsertStrategyFromTrajectory,
+} from "./strategy.mjs";
+import { compressExperience } from "./compress.mjs";
+import {
+  loadRepoKnowledgeStore,
+  saveRepoKnowledgeStore,
+  learnRepoKnowledgeFromRun,
+  writeRepoMapMarkdown,
+} from "./repo-knowledge.mjs";
+import {
+  loadProfilesStore,
+  saveProfilesStore,
+  updateExecutionProfile,
+} from "./execution-profile.mjs";
+import {
+  emptyGraphPolicyStore,
+  loadGraphPolicyStore,
+  saveGraphPolicyStore,
+  updateGraphPolicyFromTrajectory,
+  DEFAULT_YAML_FLOORS,
+} from "./graph-policy.mjs";
+import { cacheArtifactsFromRun } from "./artifact-reuse.mjs";
 
 export async function processRunExperience(runId, options = {}) {
   const manifest = options.manifest ?? loadRunManifest(runId);
@@ -75,20 +109,198 @@ export async function processRunExperience(runId, options = {}) {
   );
 
   const lessonsStore = loadLessonsStore();
-  const candidates = candidateLessonsFromRun(manifest, reflection, outcome);
+  const artifactCharWarn = loadArtifactCharWarn();
+  const failures = extractFailures(manifest, {
+    artifactsDir,
+    artifactCharWarn,
+  });
+  writeJson(path.join(artifactsDir, "failures.json"), {
+    run_id: runId,
+    prepared_at: isoNow(),
+    artifact_char_warn: artifactCharWarn,
+    failures,
+  });
+
+  const structured = compileLessonsFromRun(
+    manifest,
+    reflection,
+    outcome,
+    failures,
+  );
+  // Keep path/avoid hints from legacy extractor; skip generic rec-* prose when
+  // a structured lesson already covers the same signal.
+  const legacy = candidateLessonsFromRun(manifest, reflection, outcome).filter(
+    (c) => {
+      if (c.id?.startsWith("ignore-")) return true;
+      if (structured.some((s) => s.id === c.id)) return false;
+      if (c.id?.startsWith("rec-optimize-") && structured.length) return false;
+      return !structured.some(
+        (s) =>
+          s.failure_class &&
+          c.tags?.includes("runtime") &&
+          s.context?.phase &&
+          c.id?.includes(s.context.phase),
+      );
+    },
+  );
+  const candidates = [...structured, ...legacy];
+  const byId = new Map();
+  for (const c of candidates) {
+    if (!byId.has(c.id)) byId.set(c.id, c);
+  }
+
   const upserted = [];
-  for (const candidate of candidates) {
+  for (const candidate of byId.values()) {
     upserted.push(
       upsertLessonWithEvidence(lessonsStore, candidate, {
         runId,
         outcome,
         tokenSavingsPct,
         runtimeImprovementPct,
-        contradicted: outcome.status === "failure" && candidate.scope === "global",
+        contradicted:
+          outcome.status === "failure" &&
+          candidate.scope === "global" &&
+          candidate.kind !== "structured",
       }),
     );
   }
+
+  const consolidation = consolidateLessonsStore(lessonsStore);
+
+  // V4 — trajectory capture
+  const profileId =
+    process.env.AAAC_EXECUTION_PROFILE ??
+    readJson(path.join(artifactsDir, "execution_profile.json"), null)?.profile_id ??
+    null;
+  const trajectory = buildTrajectory(manifest, {
+    artifactsDir,
+    failures,
+    profileId,
+  });
+  writeJson(path.join(artifactsDir, "trajectory.json"), trajectory);
+
+  // Stage 4 — credit assignment / contextual utility
+  // Prefer an existing learning-funnel.json (written by harness after agents).
+  // If absent, compute reward now but defer utility updates so harnesses
+  // don't double-count exposures when they write the funnel later.
+  const funnelPath = path.join(artifactsDir, "learning-funnel.json");
+  const funnel = readJson(funnelPath, null);
+  const reward = computeRunReward({
+    success: outcome.status === "success",
+    tokens:
+      manifest.metrics?.total_tokens ??
+      manifest.metrics?.conversation_tokens ??
+      null,
+    baselineTokens: prior?.avg_tokens ?? statsPrior?.avg_tokens ?? null,
+    durationMs: manifest.metrics?.duration_ms ?? null,
+    baselineDurationMs:
+      prior?.avg_duration_ms ?? statsPrior?.avg_duration_ms ?? null,
+    gateFails: failures.length,
+    filesRead: trajectory.files_read_total,
+    baselineFilesRead: statsPrior?.avg_files_read ?? null,
+    qualityOk: trajectory.quality?.ok ?? null,
+  });
+  const utilityUpdated = funnel
+    ? updateLessonUtilities(lessonsStore, {
+        manifest,
+        funnel,
+        reward,
+      })
+    : [];
+  writeJson(path.join(artifactsDir, "run-reward.json"), {
+    run_id: runId,
+    reward,
+    quality: trajectory.quality,
+    files_read_total: trajectory.files_read_total,
+    utility_updated: utilityUpdated,
+    utility_deferred: !funnel,
+    prepared_at: isoNow(),
+  });
+
+  // V4 — strategy upsert + compression + repo knowledge + profile update
+  const strategiesStore = loadStrategiesStore();
+  const strategyResult = upsertStrategyFromTrajectory(
+    strategiesStore,
+    trajectory,
+    { lessons: upserted, profileId },
+  );
+  const compression = compressExperience({
+    lessonsStore,
+    strategiesStore,
+    signature: key,
+    strategyId: strategyResult.strategy?.id,
+  });
+  saveStrategiesStore(strategiesStore);
+  writeJson(path.join(artifactsDir, "strategy-update.json"), {
+    run_id: runId,
+    prepared_at: isoNow(),
+    ...strategyResult,
+    compression,
+  });
+
+  const repoStore = loadRepoKnowledgeStore();
+  const repoLearn = learnRepoKnowledgeFromRun(repoStore, {
+    trajectory,
+    lessons: upserted,
+    manifest,
+  });
+  if (repoLearn.added.length) {
+    writeRepoMapMarkdown(repoStore);
+    saveRepoKnowledgeStore(repoStore);
+  }
+
+  let profileUpdate = null;
+  if (profileId) {
+    const profilesStore = loadProfilesStore();
+    updateExecutionProfile(profilesStore, profileId, {
+      reward,
+      trajectory,
+    });
+    saveProfilesStore(profilesStore);
+    profileUpdate = { profile_id: profileId, reward };
+  }
+
+  // V5 — graph policy + artifact cache
+  let graphUpdate = null;
+  try {
+    const graphStore = loadGraphPolicyStore() ?? emptyGraphPolicyStore();
+    graphUpdate = updateGraphPolicyFromTrajectory(
+      graphStore,
+      trajectory,
+      manifest,
+      { yamlFloors: DEFAULT_YAML_FLOORS },
+    );
+    saveGraphPolicyStore(graphStore);
+    writeJson(path.join(artifactsDir, "graph-policy-update.json"), {
+      run_id: runId,
+      prepared_at: isoNow(),
+      ...graphUpdate,
+    });
+  } catch (err) {
+    graphUpdate = { error: String(err?.message ?? err).slice(0, 200) };
+  }
+
+  let artifactCache = null;
+  try {
+    artifactCache = cacheArtifactsFromRun(manifest, artifactsDir, {
+      qualityOk: Boolean(trajectory.quality?.ok),
+    });
+    writeJson(path.join(artifactsDir, "artifact-cache-update.json"), {
+      run_id: runId,
+      prepared_at: isoNow(),
+      ...artifactCache,
+    });
+  } catch (err) {
+    artifactCache = { cached: false, error: String(err?.message ?? err).slice(0, 200) };
+  }
+
   saveLessonsStore(lessonsStore);
+  writeJson(path.join(artifactsDir, "lesson-consolidation.json"), {
+    run_id: runId,
+    prepared_at: isoNow(),
+    ...consolidation,
+    compression,
+  });
 
   let indexResult = null;
   try {
@@ -108,10 +320,77 @@ export async function processRunExperience(runId, options = {}) {
   const memoryAdded = maybeUpdateWorkspaceMemory(memoryStore, upserted, outcome);
   if (memoryAdded.length) saveWorkspaceMemory(memoryStore);
 
-  const promoted = promoteKnowledgeArtifacts(reflection, upserted);
+  // Stage 3 — promotion ladder (may write knowledge/procedures.md)
+  const promoted = promoteKnowledgeArtifacts(
+    reflection,
+    Object.values(lessonsStore.lessons ?? {}),
+    lessonsStore,
+  );
+  saveLessonsStore(lessonsStore);
+
+  // Stage 5 — update bandit arm when selected via env
+  let banditUpdate = null;
+  const armId = process.env.AAAC_BANDIT_ARM;
+  if (armId) {
+    try {
+      const { loadBanditStore, saveBanditStore, updateBanditArm, armToEnv } =
+        await import("./bandit.mjs");
+      const store = loadBanditStore();
+      updateBanditArm(store, armId, reward);
+      saveBanditStore(store);
+      const arm = store.arms[armId];
+      banditUpdate = {
+        arm_id: armId,
+        reward,
+        pulls: arm?.pulls ?? null,
+        mean_reward:
+          arm?.pulls > 0
+            ? Math.round((arm.reward_sum / arm.pulls) * 1000) / 1000
+            : null,
+      };
+      writeJson(path.join(artifactsDir, "learning-policy.json"), {
+        run_id: runId,
+        prepared_at: isoNow(),
+        arm_id: armId,
+        env: arm ? armToEnv(arm) : {},
+        reward,
+        bandit: banditUpdate,
+      });
+    } catch (err) {
+      banditUpdate = {
+        error: String(err?.message ?? err).slice(0, 300),
+      };
+    }
+  } else {
+    writeJson(path.join(artifactsDir, "learning-policy.json"), {
+      run_id: runId,
+      prepared_at: isoNow(),
+      arm_id: null,
+      env: {
+        AAAC_FINAL_LESSONS: process.env.AAAC_FINAL_LESSONS ?? null,
+        AAAC_MMR_LAMBDA: process.env.AAAC_MMR_LAMBDA ?? null,
+        AAAC_ARTIFACT_WARN_RATIO: process.env.AAAC_ARTIFACT_WARN_RATIO ?? null,
+        AAAC_ARTIFACT_CHAR_WARN: process.env.AAAC_ARTIFACT_CHAR_WARN ?? null,
+      },
+      reward,
+    });
+  }
 
   const experienceOutcomes = [
     { type: "reflection", path: "artifacts/reflection.json" },
+    { type: "failures", path: "artifacts/failures.json", count: failures.length },
+    {
+      type: "trajectory",
+      path: "artifacts/trajectory.json",
+      quality_ok: trajectory.quality?.ok ?? false,
+      files_read_total: trajectory.files_read_total,
+      tokens: trajectory.tokens,
+    },
+    {
+      type: "lesson_consolidation",
+      path: "artifacts/lesson-consolidation.json",
+      ...consolidation,
+    },
     {
       type: "stats",
       signature: key,
@@ -124,6 +403,9 @@ export async function processRunExperience(runId, options = {}) {
     ...upserted.map((l) => ({
       type: "lesson_upserted",
       lesson_id: l.id,
+      kind: l.kind ?? null,
+      failure_class: l.failure_class ?? null,
+      promotion_stage: l.promotion_stage ?? null,
       evidence: l.evidence,
     })),
     ...(indexResult?.ok
@@ -133,6 +415,38 @@ export async function processRunExperience(runId, options = {}) {
         : []),
     ...memoryAdded.map((id) => ({ type: "workspace_pref", id })),
     ...promoted.map((p) => ({ type: "knowledge_promoted", path: p.path })),
+    ...(utilityUpdated.length
+      ? [{ type: "utility_updated", lesson_ids: utilityUpdated, reward }]
+      : []),
+    ...(banditUpdate
+      ? [{ type: "bandit_updated", ...banditUpdate }]
+      : []),
+    ...(strategyResult.updated
+      ? [{
+          type: "strategy_updated",
+          strategy_id: strategyResult.strategy?.id,
+          winner: strategyResult.winner,
+        }]
+      : []),
+    ...(repoLearn.added.length
+      ? [{ type: "repo_knowledge_updated", claim_ids: repoLearn.added }]
+      : []),
+    ...(profileUpdate
+      ? [{ type: "execution_profile_updated", ...profileUpdate }]
+      : []),
+    ...(compression.deprecated_lesson_ids?.length
+      ? [{
+          type: "experience_compressed",
+          deprecated: compression.deprecated_lesson_ids.length,
+          active_after: compression.active_lesson_count_after,
+        }]
+      : []),
+    ...(graphUpdate && !graphUpdate.error
+      ? [{ type: "graph_policy_updated", ...graphUpdate }]
+      : []),
+    ...(artifactCache?.cached
+      ? [{ type: "artifact_cache_updated", ...artifactCache }]
+      : []),
   ];
 
   const result = {
@@ -172,6 +486,14 @@ export async function processRunExperience(runId, options = {}) {
     manifest.artifacts = {
       ...(manifest.artifacts ?? {}),
       reflection: "artifacts/reflection.json",
+      trajectory: "artifacts/trajectory.json",
+    };
+    manifest.trajectory = {
+      path: "artifacts/trajectory.json",
+      quality_ok: trajectory.quality?.ok ?? false,
+      files_read_total: trajectory.files_read_total,
+      tokens: trajectory.tokens,
+      profile_id: profileId,
     };
     manifest.updated_at = isoNow();
     writeJson(path.join(runDir(runId), "run.json"), manifest);

@@ -404,6 +404,9 @@ if (nextPhase === "execute" && !force) {
 }
 
 if (!nextPhase) {
+  // Terminal phase must be archived like every prior phase — UI/history SSOT
+  // reads swarm_history[phase].agents for completed phases only.
+  archivePhaseSwarm(manifest, completedPhase);
   manifest.status = "completed";
   manifest.phase = "report";
   manifest.completed_at = isoNow();

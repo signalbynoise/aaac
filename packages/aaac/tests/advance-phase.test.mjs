@@ -425,6 +425,109 @@ describe('advance-phase', () => {
     expect(result.stderr).toMatch(/files_written|defer/i);
   });
 
+  it('archives terminal report swarm into swarm_history on run complete', async () => {
+    const conversationId = uniqueConversationId('advance-report-archive');
+    const runId = nextRunId('advance-report-archive');
+    const manifest = checkModuleManifest('report', runId, conversationId);
+    manifest.completed = [
+      'discover',
+      'validate',
+      'impact_analysis',
+      'dependency_graph',
+      'fitness_functions',
+    ];
+    manifest.pending = [];
+    manifest.swarm = {
+      task_launches_this_phase: 2,
+      phase: 'report',
+      expected_specs_phase: 'report',
+      expected_agent_specs: [
+        {
+          id: 'report-completeness-review',
+          path: '.cursor/agents/report-completeness-review.md',
+          initial_summary:
+            'Verify that the report covers the request, how to undo the change, any follow up work, and a clear plain language conclusion.',
+        },
+        {
+          id: 'report-factual-review',
+          path: '.cursor/agents/report-factual-review.md',
+          initial_summary:
+            'Verify that every claim in the draft report agrees with the recorded evidence, actual changes, and completed checks.',
+        },
+      ],
+      agents: [
+        {
+          index: 1,
+          phase: 'report',
+          description: 'report-completeness-review',
+          agent_spec_id: 'report-completeness-review',
+          model: 'cursor-grok-4.5-medium-fast',
+          tokens: 322411,
+          input_tokens: 56314,
+          output_tokens: 4401,
+          cache_read_tokens: 261696,
+          cache_write_tokens: 0,
+          token_source: 'cursor_cli_usage',
+          context: 30.36,
+          files_read: 18,
+          files_written: 0,
+          files_edited: 1,
+          completed_at: '2026-08-09T18:24:26.373Z',
+          duration_ms: 50743,
+          initial_summary:
+            'Verify that the report covers the request, how to undo the change, any follow up work, and a clear plain language conclusion.',
+          summary:
+            'Verify that the report covers the request, how to undo the change, any follow up work, and a clear plain language conclusion.',
+        },
+        {
+          index: 2,
+          phase: 'report',
+          description: 'report-factual-review',
+          agent_spec_id: 'report-factual-review',
+          model: 'cursor-grok-4.5-medium-fast',
+          tokens: 451831,
+          input_tokens: 63483,
+          output_tokens: 6332,
+          cache_read_tokens: 382016,
+          cache_write_tokens: 0,
+          token_source: 'cursor_cli_usage',
+          context: 34.91,
+          files_read: 36,
+          files_written: 0,
+          files_edited: 1,
+          completed_at: '2026-08-09T18:24:52.180Z',
+          duration_ms: 76549,
+          initial_summary:
+            'Verify that every claim in the draft report agrees with the recorded evidence, actual changes, and completed checks.',
+          summary:
+            'Verify that every claim in the draft report agrees with the recorded evidence, actual changes, and completed checks.',
+        },
+      ],
+      target_agents: { report: 2 },
+    };
+    writeArtifact(runId, 'artifacts/report.md', '# Report\n\nDone.\n');
+    seedRun(manifest, conversationId);
+    runs.push({ runId, conversationId });
+
+    const result = await advancePhase(runId, 'report');
+    expect(result.code).toBe(0);
+    expect(result.json?.status).toBe('completed');
+
+    const updated = JSON.parse(fs.readFileSync(runManifestPath(runId), 'utf8'));
+    expect(updated.status).toBe('completed');
+    expect(updated.swarm_history?.report?.agents).toHaveLength(2);
+    expect(updated.swarm_history.report.agents.map((a) => a.agent_spec_id)).toEqual([
+      'report-completeness-review',
+      'report-factual-review',
+    ]);
+    expect(updated.swarm_history.report.agents[0].input_tokens).toBe(56314);
+    expect(updated.swarm_history.report.agents[0].files_read).toBe(18);
+    expect(updated.swarm_history.report.agents[0].model).toBe(
+      'cursor-grok-4.5-medium-fast',
+    );
+    expect(updated.swarm_history.report.expected_agent_specs).toHaveLength(2);
+  });
+
   it('rejects execute advance without code-author agent_spec_id', async () => {
     const conversationId = uniqueConversationId('advance-execute-spec');
     const runId = nextRunId('advance-execute-spec');

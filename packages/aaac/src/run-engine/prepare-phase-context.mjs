@@ -134,13 +134,25 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     },
     instructions:
       experience?.reuse_mode === "delta_or_confirm"
-        ? "Read this file only — do not load full prior swarm transcripts. experience.prior_artifacts is SSOT for matching inputs: emit delta_or_confirm only (do not regenerate unchanged plan/report sections). Honor experience.strategy, experience.execution, and experience.graph_targets. Prefer experience.repo_facts over rediscovery. Stay within experience.context_budget."
-        : "Read this file only — do not load full prior swarm transcripts. Return structured blocks per agent spec. Honor experience.strategy and experience.execution (prioritize/skip). Prefer experience.repo_facts over rediscovery. Cite experience.lessons with evidence when following recommendations. Stay within experience.context_budget.",
+        ? "Read this file only — do not load full prior swarm transcripts. experience.prior_artifacts is SSOT for matching inputs: emit delta_or_confirm only (do not regenerate unchanged plan/report sections). Honor experience.strategy, experience.execution, and experience.graph_targets. Prefer experience.repo_memory (retrieve-then-verify) and experience.repo_facts over cold rediscovery. Stay within experience.context_budget."
+        : "Read this file only — do not load full prior swarm transcripts. Return structured blocks per agent spec. Honor experience.strategy and experience.execution (prioritize/skip). Prefer experience.repo_memory: verify listed focus_paths and invariants first, then expand only for gaps. Prefer experience.repo_facts over rediscovery. Cite experience.lessons with evidence when following recommendations. Stay within experience.context_budget.",
   };
 
   const artifactsDir = path.join(runDir(runId), "artifacts");
   const outPath = path.join(artifactsDir, "phase_context.json");
   writeJson(outPath, context);
+
+  if (experience?.repo_memory) {
+    try {
+      writeJson(path.join(artifactsDir, "repo_memory.json"), {
+        prepared_at: isoNow(),
+        run_id: runId,
+        ...experience.repo_memory,
+      });
+    } catch {
+      // optional
+    }
+  }
 
   if (experience?.profile_id || experience?.execution) {
     try {

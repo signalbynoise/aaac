@@ -5,6 +5,8 @@ import fs from "fs";
 import path from "path";
 import { AAAC_ROOT, STATE_ROOT } from "../lib.mjs";
 
+export { AAAC_ROOT, STATE_ROOT };
+
 export const LESSONS_PATH = path.join(STATE_ROOT, "lessons.json");
 export const EXPERIENCE_STATS_PATH = path.join(STATE_ROOT, "experience-stats.json");
 export const WORKSPACE_MEMORY_PATH = path.join(STATE_ROOT, "workspace-memory.json");
@@ -17,7 +19,15 @@ export const EXECUTION_PROFILES_PATH = path.join(STATE_ROOT, "execution-profiles
 /** V5 — learned swarm targets + hash-gated artifact cache */
 export const GRAPH_POLICY_PATH = path.join(STATE_ROOT, "graph-policy.json");
 export const ARTIFACT_CACHE_ROOT = path.join(STATE_ROOT, "artifact-cache");
+/** V6 — repository vector graph + embeddings + invariants */
+export const REPO_GRAPH_PATH = path.join(STATE_ROOT, "repo-graph.json");
+export const REPO_SCRATCHPAD_PATH = path.join(STATE_ROOT, "repo-scratchpad.json");
+export const REPO_INDEX_DIR = path.join(STATE_ROOT, "repo-index");
+export const REPO_INDEX_META_PATH = path.join(REPO_INDEX_DIR, "meta.json");
+export const REPO_INDEX_VECTORS_PATH = path.join(REPO_INDEX_DIR, "vectors.json");
+export const REPO_EVENTS_PATH = path.join(STATE_ROOT, "repo-memory-events.jsonl");
 export const RETRIEVAL_YAML_PATH = path.join(AAAC_ROOT, "experience", "retrieval.yaml");
+export const REPO_VECTOR_SLOTS = ["summary", "api", "invariant", "trigger"];
 /** Shipped with npm — precomputed collective vectors (portable JSON). */
 export const PACKAGED_INDEX_DIR = path.join(AAAC_ROOT, "experience", "packaged-index");
 export const PACKAGED_INDEX_META_PATH = path.join(PACKAGED_INDEX_DIR, "meta.json");
@@ -48,6 +58,15 @@ const DEFAULT_RETRIEVAL = {
   max_warnings: 3,
   rrf_k: 60,
   mmr_lambda: 0.7,
+  repo_memory: {
+    final_nodes: 12,
+    max_invariants: 8,
+    graph_hops: 1,
+    semantic_candidates: 32,
+    lexical_candidates: 16,
+    scratchpad_max_chars: 4000,
+    index_max_files: 400,
+  },
   hnsw: {
     metric: "cos",
     connectivity: 16,
@@ -144,6 +163,32 @@ export function loadRetrievalConfig() {
     for (const key of Object.keys(cfg.ranking)) {
       cfg.ranking[key] = readYamlInt(content, key, cfg.ranking[key]);
     }
+    // repo_memory nested block (flat keys also accepted)
+    cfg.repo_memory.final_nodes = readYamlInt(
+      content,
+      "final_nodes",
+      cfg.repo_memory.final_nodes,
+    );
+    cfg.repo_memory.max_invariants = readYamlInt(
+      content,
+      "max_invariants",
+      cfg.repo_memory.max_invariants,
+    );
+    cfg.repo_memory.graph_hops = readYamlInt(
+      content,
+      "graph_hops",
+      cfg.repo_memory.graph_hops,
+    );
+    cfg.repo_memory.index_max_files = readYamlInt(
+      content,
+      "index_max_files",
+      cfg.repo_memory.index_max_files,
+    );
+    cfg.repo_memory.scratchpad_max_chars = readYamlInt(
+      content,
+      "scratchpad_max_chars",
+      cfg.repo_memory.scratchpad_max_chars,
+    );
   } catch {
     // keep defaults
   }

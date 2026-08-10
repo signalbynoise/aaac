@@ -43,6 +43,7 @@ import {
   learnRepoKnowledgeFromRun,
   writeRepoMapMarkdown,
 } from "./repo-knowledge.mjs";
+import { processRepoMemoryFromRun } from "./repo-learn.mjs";
 import {
   loadProfilesStore,
   saveProfilesStore,
@@ -249,6 +250,28 @@ export async function processRunExperience(runId, options = {}) {
     saveRepoKnowledgeStore(repoStore);
   }
 
+  // V6 — repo vector graph learn
+  let repoMemoryUpdate = null;
+  try {
+    repoMemoryUpdate = await processRepoMemoryFromRun({
+      trajectory,
+      manifest,
+      artifactsDir,
+      lessons: upserted,
+      emit: true,
+    });
+    writeJson(path.join(artifactsDir, "repo-memory-update.json"), {
+      run_id: runId,
+      prepared_at: isoNow(),
+      ...repoMemoryUpdate,
+    });
+  } catch (err) {
+    repoMemoryUpdate = {
+      ok: false,
+      error: String(err?.message ?? err).slice(0, 200),
+    };
+  }
+
   let profileUpdate = null;
   if (profileId) {
     const profilesStore = loadProfilesStore();
@@ -431,6 +454,11 @@ export async function processRunExperience(runId, options = {}) {
     ...(repoLearn.added.length
       ? [{ type: "repo_knowledge_updated", claim_ids: repoLearn.added }]
       : []),
+    ...(repoMemoryUpdate?.ok
+      ? [{ type: "repo_memory_updated", ...repoMemoryUpdate }]
+      : repoMemoryUpdate?.error
+        ? [{ type: "repo_memory_update_failed", error: repoMemoryUpdate.error }]
+        : []),
     ...(profileUpdate
       ? [{ type: "execution_profile_updated", ...profileUpdate }]
       : []),

@@ -36,6 +36,16 @@ slots:
   - failure
   - remedy
 
+# V6 — repository memory retrieval (discover retrieve-then-verify)
+repo_memory:
+  final_nodes: 12
+  max_invariants: 8
+  graph_hops: 1
+  semantic_candidates: 32
+  lexical_candidates: 16
+  scratchpad_max_chars: 4000
+  index_max_files: 400
+
 ranking:
   semantic_similarity: 0.38
   trigger_similarity: 0.16

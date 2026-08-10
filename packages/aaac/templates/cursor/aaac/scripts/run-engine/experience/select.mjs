@@ -35,6 +35,7 @@ import {
 } from "./execution-profile.mjs";
 import { selectPriorArtifacts } from "./artifact-reuse.mjs";
 import { selectGraphTargets } from "./graph-policy.mjs";
+import { retrieveRepoMemory } from "./retrieve-repo.mjs";
 
 export { mergeLessonCorpora };
 
@@ -84,6 +85,7 @@ function finishExperiencePacket(manifest, lessons, warnings, merged, stats, memo
     retrieval: null,
     strategy: null,
     repo_facts: [],
+    repo_memory: null,
     execution: null,
     context_bytes: 0,
     reuse_hits: 0,
@@ -181,6 +183,38 @@ export async function selectExperienceForContext(manifest, options = {}) {
   if (reuse_hits) saveRepoKnowledgeStore(repoStore);
   packet.repo_facts = facts;
   packet.reuse_hits = reuse_hits;
+
+  // V6 — repository vector graph memory
+  let repoMemory = null;
+  try {
+    repoMemory = await retrieveRepoMemory(manifest, {
+      provider,
+      emit: options.emitRepoEvents !== false,
+    });
+    packet.repo_memory = repoMemory;
+    packet.context_hint.recommended_focus_paths = [
+      ...(repoMemory.focus_paths ?? []),
+    ].slice(0, 20);
+    if (repoMemory.avoid_paths?.length) {
+      packet.context_hint.avoid_paths = [
+        ...new Set([
+          ...(packet.context_hint.avoid_paths ?? []),
+          ...repoMemory.avoid_paths,
+        ]),
+      ].slice(0, 20);
+    }
+    packet.context_bytes += estimateBytes(repoMemory);
+  } catch {
+    packet.repo_memory = {
+      focus_paths: [],
+      avoid_paths: [],
+      nodes: [],
+      invariants: [],
+      edges: [],
+      scratchpad_excerpt: "",
+      meta: { empty: true, error: true },
+    };
+  }
 
   // V5 — hard artifact reuse + graph targets
   const prior = selectPriorArtifacts(manifest);

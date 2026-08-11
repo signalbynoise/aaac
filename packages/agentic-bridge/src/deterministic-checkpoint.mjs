@@ -11,6 +11,10 @@ const log = createLogger("agentic-bridge:deterministic-checkpoint");
 
 const MAX_EVIDENCE = 10;
 const MAX_ANSWER_CHARS = 1800;
+/** Hard AAAC artifact budget is 16KB; stay under warn/fail threshold. */
+const MAX_ARTIFACT_BYTES = 14000;
+const MAX_AGENT_EXCERPT_CHARS = 900;
+const MAX_AGENTS_IN_MD = 4;
 
 function runsRootFor(workspaceRoot) {
   return path.join(workspaceRoot, ".cursor", "aaac", "state", "runs");
@@ -156,7 +160,30 @@ function buildDiscoverBrief(bodies, manifest) {
   ].join("\n");
 }
 
+function truncateUtf8(text, maxBytes) {
+  const buf = Buffer.from(String(text ?? ""), "utf8");
+  if (buf.length <= maxBytes) return String(text ?? "");
+  return buf.subarray(0, maxBytes).toString("utf8").replace(/\uFFFD$/, "") +
+    "\n\n<!-- truncated for context_budget -->\n";
+}
+
+function compactAgentExcerpt(text, maxChars = MAX_AGENT_EXCERPT_CHARS) {
+  const findings = extractSection(text, "Findings|Summary|Inventory|Answer");
+  const evidence = extractSection(text, "Evidence");
+  const confirmed = extractSection(text, "Confirmed.*");
+  const gaps = extractSection(text, "New findings.*|Gaps");
+  const parts = [];
+  if (findings) parts.push(`Findings:\n${findings}`);
+  if (evidence) parts.push(`Evidence:\n${evidence}`);
+  if (confirmed) parts.push(`Confirmed:\n${confirmed}`);
+  if (gaps) parts.push(`Gaps:\n${gaps}`);
+  const body = (parts.length ? parts.join("\n\n") : text).replace(/\s+\n/g, "\n").trim();
+  return body.slice(0, maxChars);
+}
+
 function buildDiscoveryBriefMd(bodies, manifest) {
+  const answer = extractAnswer(bodies, manifest);
+  const evidence = extractEvidenceLines(bodies);
   const lines = [
     `# Discovery brief (deterministic merge)`,
     ``,
@@ -164,14 +191,30 @@ function buildDiscoveryBriefMd(bodies, manifest) {
     `Domain: ${manifest?.domain ?? manifest?.object ?? ""}`,
     `Intent: ${manifest?.intent ?? ""}`,
     ``,
+    `## Summary`,
+    ``,
+    answer,
+    ``,
+    `## Evidence`,
+    ``,
+    ...(evidence.length ? evidence.map((e) => `- ${e.replace(/^"|"$/g, "")}`) : ["- see swarm agent artifacts"]),
+    ``,
+    `## Agent excerpts`,
+    ``,
   ];
-  for (const b of bodies) {
-    lines.push(`## Agent ${b.index}`);
+  for (const b of bodies.slice(0, MAX_AGENTS_IN_MD)) {
+    lines.push(`### Agent ${b.index} (\`${b.rel}\`)`);
     lines.push(``);
-    lines.push(b.text.slice(0, 6000));
+    lines.push(compactAgentExcerpt(b.text));
     lines.push(``);
   }
-  return lines.join("\n");
+  if (bodies.length > MAX_AGENTS_IN_MD) {
+    lines.push(`_Additional agents omitted for context budget; see \`*_agent_*.md\` artifacts._`);
+    lines.push(``);
+  }
+  lines.push(`source: deterministic_checkpoint`);
+  lines.push(``);
+  return truncateUtf8(lines.join("\n"), MAX_ARTIFACT_BYTES);
 }
 
 function buildPlanYaml(bodies, manifest) {
@@ -205,15 +248,15 @@ function buildPlanYaml(bodies, manifest) {
   lines.push(`tests_to_add: []`);
   lines.push(`source: deterministic_checkpoint`);
   lines.push(``);
-  lines.push(`# Agent excerpts`);
-  for (const b of bodies) {
+  lines.push(`# Agent excerpts (compact)`);
+  for (const b of bodies.slice(0, MAX_AGENTS_IN_MD)) {
     lines.push(`# --- ${b.rel} ---`);
-    for (const line of b.text.split("\n").slice(0, 80)) {
+    for (const line of compactAgentExcerpt(b.text, 500).split("\n")) {
       lines.push(`# ${line}`);
     }
   }
   lines.push(``);
-  return lines.join("\n");
+  return truncateUtf8(lines.join("\n"), MAX_ARTIFACT_BYTES);
 }
 
 function buildReportMd(bodies, manifest) {
@@ -222,18 +265,24 @@ function buildReportMd(bodies, manifest) {
     ``,
     `Run command: ${manifest?.command ?? ""}`,
     ``,
+    `## Summary`,
+    ``,
+    extractAnswer(bodies, { ...manifest, phase: "report" }),
+    ``,
   ];
-  for (const b of bodies) {
+  for (const b of bodies.slice(0, MAX_AGENTS_IN_MD)) {
     lines.push(`## Report agent ${b.index}`);
     lines.push(``);
-    lines.push(b.text.slice(0, 8000));
+    lines.push(compactAgentExcerpt(b.text, 1200));
     lines.push(``);
   }
   if (!bodies.length) {
     lines.push(`No report agent artifacts were available for merge.`);
     lines.push(``);
   }
-  return lines.join("\n");
+  lines.push(`source: deterministic_checkpoint`);
+  lines.push(``);
+  return truncateUtf8(lines.join("\n"), MAX_ARTIFACT_BYTES);
 }
 
 function writeArtifact(runArtifactsDir, rel, content) {

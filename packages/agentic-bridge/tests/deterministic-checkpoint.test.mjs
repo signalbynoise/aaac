@@ -53,5 +53,28 @@ describe("deterministic checkpoint", () => {
       "utf8",
     );
     expect(md).toMatch(/Discovery brief/);
+    expect(Buffer.byteLength(md, "utf8")).toBeLessThan(16000);
+  });
+
+  it("keeps discovery-brief.md under artifact budget with large agent bodies", () => {
+    const art = path.join(root, ".cursor", "aaac", "state", "runs", runId, "artifacts");
+    const bloated = `${"# bloated\n\n## Findings\n\n"}${"- path/file.ts detail ".repeat(400)}\n`;
+    for (let i = 1; i <= 4; i += 1) {
+      fs.writeFileSync(path.join(art, `discover_agent_${i}.md`), bloated);
+    }
+    const result = synthesizePhaseCheckpointDeterministic({
+      workspaceRoot: root,
+      runId,
+      phase: "discover",
+      manifest: { command: "review-domain", domain: "vector", intent: "graph UI" },
+      swarmAgentCount: 4,
+      missing: ["artifacts/discover_brief.yaml", "artifacts/discovery-brief.md"],
+    });
+    expect(result.ok).toBe(true);
+    const md = fs.readFileSync(
+      path.join(root, ".cursor/aaac/state/runs", runId, "artifacts/discovery-brief.md"),
+      "utf8",
+    );
+    expect(Buffer.byteLength(md, "utf8")).toBeLessThanOrEqual(14000);
   });
 });

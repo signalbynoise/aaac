@@ -379,9 +379,9 @@ describe("swarm-telemetry", () => {
 
     it("classifyToolFileMutation maps Read/Grep/Glob/SemanticSearch/Write/StrReplace/Delete", () => {
       expect(classifyToolFileMutation("Read")).toBe("read");
-      expect(classifyToolFileMutation("Grep")).toBe("read");
-      expect(classifyToolFileMutation("Glob")).toBe("read");
-      expect(classifyToolFileMutation("SemanticSearch")).toBe("read");
+      expect(classifyToolFileMutation("Grep")).toBe("search");
+      expect(classifyToolFileMutation("Glob")).toBe("search");
+      expect(classifyToolFileMutation("SemanticSearch")).toBe("search");
       expect(classifyToolFileMutation("Write")).toBe("written");
       expect(classifyToolFileMutation("StrReplace")).toBe("edited");
       expect(classifyToolFileMutation("Delete")).toBe("edited");

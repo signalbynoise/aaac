@@ -47,6 +47,26 @@ function contentHash(text) {
   return createHash("sha256").update(String(text ?? "")).digest("hex").slice(0, 16);
 }
 
+/** Resolve a dep path via package require, then host @ludecker/aaac tree. */
+function resolveDepPath(specifier) {
+  try {
+    const resolved = REQUIRE.resolve(specifier);
+    if (fs.existsSync(resolved)) return resolved;
+  } catch {
+    // fall through
+  }
+  const hostEntry = process.env.AAAC_HOST_AAAC_ENTRY;
+  if (hostEntry) {
+    try {
+      const resolved = createRequire(hostEntry).resolve(specifier);
+      if (fs.existsSync(resolved)) return resolved;
+    } catch {
+      // fall through
+    }
+  }
+  return null;
+}
+
 function resolveGrammarPath(filename) {
   const candidates = [
     path.join(HERE, "grammars", filename),
@@ -55,16 +75,16 @@ function resolveGrammarPath(filename) {
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return candidate;
   }
+  const fromWasms = resolveDepPath(`tree-sitter-wasms/out/${filename}`);
+  if (fromWasms) return fromWasms;
   try {
-    return REQUIRE.resolve(`tree-sitter-wasms/out/${filename}`);
-  } catch {
-    // fall through
-  }
-  try {
-    const fromDep = createRequire(
-      REQUIRE.resolve("web-tree-sitter"),
-    ).resolve(`tree-sitter-wasms/out/${filename}`);
-    if (fs.existsSync(fromDep)) return fromDep;
+    const wts = resolveDepPath("web-tree-sitter");
+    if (wts) {
+      const fromDep = createRequire(wts).resolve(
+        `tree-sitter-wasms/out/${filename}`,
+      );
+      if (fs.existsSync(fromDep)) return fromDep;
+    }
   } catch {
     // fall through
   }
@@ -72,15 +92,13 @@ function resolveGrammarPath(filename) {
 }
 
 function resolveWebTreeSitterWasm() {
-  try {
-    const entry = REQUIRE.resolve("web-tree-sitter");
+  const entry = resolveDepPath("web-tree-sitter");
+  if (entry) {
     const dir = path.dirname(entry);
     for (const name of ["tree-sitter.wasm", "web-tree-sitter.wasm"]) {
       const sibling = path.join(dir, name);
       if (fs.existsSync(sibling)) return sibling;
     }
-  } catch {
-    // fall through
   }
   for (const name of ["tree-sitter.wasm", "web-tree-sitter.wasm"]) {
     const vendored = path.join(HERE, "grammars", name);

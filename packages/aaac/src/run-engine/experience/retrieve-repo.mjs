@@ -16,6 +16,7 @@ import { relationsForPacket } from "./repo-index/relations.mjs";
 import {
   expandCandidatePaths,
   rankFocusSpans,
+  buildReadPack,
 } from "./repo-index/span-retrieve.mjs";
 import { emitRepoMemoryEvent } from "./repo-events.mjs";
 import { cosine } from "./index/hnsw.mjs";
@@ -33,8 +34,31 @@ function emptyRepoMemoryPacket(extra = {}) {
     clusters: [],
     call_neighbors: [],
     focus_spans: [],
+    read_pack: { spans: [], impact: [], call_neighbors: [], entry_flows: [] },
     ...extra,
   };
+}
+
+function basenameTokens(filePath) {
+  const base = String(filePath ?? "")
+    .split("/")
+    .pop()
+    ?.replace(/\.[^.]+$/, "") ?? "";
+  return tokenize(base.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " "));
+}
+
+function pathFamilyKey(filePath) {
+  const parts = String(filePath ?? "").split("/");
+  const base = parts.pop() ?? "";
+  const dir = parts.slice(-2).join("/");
+  const stem = base.replace(/\.[^.]+$/, "").replace(/([a-z])([A-Z])/g, "$1_$2");
+  const family = stem.split(/[_-]/)[0] ?? stem;
+  return `${dir}/${family}`.toLowerCase();
+}
+
+function isBarrelPath(filePath) {
+  const base = String(filePath ?? "").split("/").pop() ?? "";
+  return /^(index|main)\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(base);
 }
 
 function tokenize(text) {
@@ -122,6 +146,14 @@ function selectMmrNodes(ranked, k, lambda = 0.7) {
         if (cand.vector && s.vector) {
           maxSim = Math.max(maxSim, cosine(cand.vector, s.vector));
         }
+        // Diversify by path family so MemoryGraph* siblings aren't all dropped
+        if (
+          cand.node?.path &&
+          s.node?.path &&
+          pathFamilyKey(cand.node.path) === pathFamilyKey(s.node.path)
+        ) {
+          maxSim = Math.max(maxSim, 0.55);
+        }
       }
       const mmr = lambda * cand.score - (1 - lambda) * maxSim;
       if (mmr > bestMmr) {
@@ -133,6 +165,40 @@ function selectMmrNodes(ranked, k, lambda = 0.7) {
     remaining.splice(bestIdx, 1);
   }
   return selected;
+}
+
+function mergeStage1Neighbors(graph, active, focusPaths, picked, neighborCap) {
+  if (!neighborCap || !focusPaths.length) return { focusPaths, picked };
+  const pathToNode = new Map(
+    Object.values(active)
+      .filter((n) => n.path)
+      .map((n) => [n.path, n]),
+  );
+  const pathSet = new Set(focusPaths);
+  const expanded = expandCandidatePaths(graph, focusPaths, {
+    neighborCap,
+  }).filter((p) => !isBarrelPath(p) || focusPaths.includes(p));
+  const added = [];
+  for (const p of expanded) {
+    if (pathSet.has(p)) continue;
+    if (isBarrelPath(p)) continue;
+    pathSet.add(p);
+    added.push(p);
+    if (added.length >= neighborCap) break;
+  }
+  const nextPaths = [...focusPaths, ...added];
+  const nextPicked = [...picked];
+  for (const p of added) {
+    const node = pathToNode.get(p);
+    if (!node) continue;
+    nextPicked.push({
+      nodeId: node.id,
+      node,
+      score: 0.05,
+      vector: getRepoVector(node.id, "summary"),
+    });
+  }
+  return { focusPaths: nextPaths, picked: nextPicked };
 }
 
 /**
@@ -180,29 +246,72 @@ export async function retrieveRepoMemory(manifest, options = {}) {
 
   const denseStarted = Date.now();
   const vectorIndex = getRepoVectorIndex();
-  const denseHits = searchRepoVectors(queryVec, {
-    k: rm.semantic_candidates ?? cfg.semantic_candidates ?? 32,
+  const denseK = rm.semantic_candidates ?? cfg.semantic_candidates ?? 32;
+  const denseSummary = searchRepoVectors(queryVec, {
+    k: denseK,
     slot: "summary",
   });
+  const denseApi = searchRepoVectors(queryVec, {
+    k: denseK,
+    slot: "api",
+  });
   const denseLatencyMs = Date.now() - denseStarted;
-  const denseRank = denseHits.map((h) => h.nodeId);
-  const denseScore = new Map(denseHits.map((h) => [h.nodeId, h.score]));
+  const denseScore = new Map();
+  for (const h of denseSummary) {
+    denseScore.set(h.nodeId, Math.max(denseScore.get(h.nodeId) ?? 0, h.score));
+  }
+  for (const h of denseApi) {
+    denseScore.set(h.nodeId, Math.max(denseScore.get(h.nodeId) ?? 0, h.score * 0.95));
+  }
+  const denseRank = [...denseScore.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id);
 
   const sparse = buildSparseRepoIndex(active);
   const sparseHits = sparse.search(taskText, rm.lexical_candidates ?? 16);
   const sparseRank = sparseHits.map((h) => h.nodeId);
 
-  let fused = rrfFuse([denseRank, sparseRank], cfg.rrf_k);
+  let fused = rrfFuse(
+    [denseRank, denseSummary.map((h) => h.nodeId), denseApi.map((h) => h.nodeId), sparseRank],
+    cfg.rrf_k,
+  );
 
-  // Graph expansion
+  // Basename / camelCase boost when query tokens match path stem
+  const qTokens = new Set(tokenize(taskText));
+  const basenameBoost = Number(rm.basename_boost ?? 0.25);
+  if (basenameBoost > 0) {
+    fused = fused.map((f) => {
+      const node = active[f.nodeId];
+      if (!node?.path) return f;
+      const bTokens = basenameTokens(node.path);
+      let hits = 0;
+      for (const t of bTokens) {
+        if (qTokens.has(t)) hits += 1;
+      }
+      if (!hits) return f;
+      return {
+        nodeId: f.nodeId,
+        score: f.score + basenameBoost * (hits / Math.max(1, bTokens.length)),
+      };
+    }).sort((a, b) => b.score - a.score);
+  }
+
+  // Graph expansion — prefer structural kinds over related
   const expanded = new Map(fused.map((f) => [f.nodeId, f.score]));
+  const expandKinds = ["imports", "imported_by", "calls", "called_by", "tests", "tested_by"];
   for (let hop = 0; hop < hops; hop += 1) {
     const seeds = [...expanded.keys()].slice(0, cfg.semantic_candidates ?? 32);
     for (const seed of seeds) {
       for (const n of neighborsOf(graph, seed, {
+        kinds: expandKinds,
         limit: cfg.max_neighbours_per_seed ?? 8,
       })) {
         if (!active[n.id]) continue;
+        // Demote barrel hubs during expansion
+        if (isBarrelPath(active[n.id].path)) {
+          expanded.set(n.id, (expanded.get(n.id) ?? 0) + 0.04 * (n.edge.weight ?? 1));
+          continue;
+        }
         expanded.set(n.id, (expanded.get(n.id) ?? 0) + 0.12 * (n.edge.weight ?? 1));
       }
     }
@@ -216,7 +325,7 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   for (const { nodeId, score } of fused) {
     const node = active[nodeId];
     if (!node) continue;
-    const vector = getRepoVector(nodeId, "summary");
+    const vector = getRepoVector(nodeId, "summary") ?? getRepoVector(nodeId, "api");
     const semantic = denseScore.get(nodeId) ?? 0;
     candidates.push({
       nodeId,
@@ -227,10 +336,17 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   }
   candidates.sort((a, b) => b.score - a.score);
 
-  const picked = selectMmrNodes(candidates, maxNodes, cfg.mmr_lambda ?? 0.7);
-  const focusPaths = [
+  let picked = selectMmrNodes(candidates, maxNodes, cfg.mmr_lambda ?? 0.7);
+  let focusPaths = [
     ...new Set(picked.map((c) => c.node.path).filter(Boolean)),
   ];
+  ({ focusPaths, picked } = mergeStage1Neighbors(
+    graph,
+    active,
+    focusPaths,
+    picked,
+    rm.stage1_neighbor_files ?? 6,
+  ));
   const avoidPaths = [
     ...new Set(
       Object.values(active)
@@ -296,6 +412,13 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     rm,
     rrfK: cfg.rrf_k,
   });
+  const read_pack = buildReadPack({
+    focusSpans,
+    impact: relational.impact,
+    call_neighbors: relational.call_neighbors,
+    entry_flows: relational.entry_flows,
+    maxSpans: rm.final_spans ?? 8,
+  });
 
   const packet = {
     focus_paths: focusPaths,
@@ -316,7 +439,13 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     clusters: relational.clusters,
     call_neighbors: relational.call_neighbors,
     focus_spans: focusSpans,
+    read_pack,
     meta: {
+      read_budgets: {
+        max_agent_files_read: rm.max_agent_files_read ?? 16,
+        max_full_file_opens: rm.max_full_file_opens ?? 4,
+        max_gap_search_globs: rm.max_gap_search_globs ?? 8,
+      },
       candidates: fused.length,
       latency_ms: Date.now() - started,
       dense_latency_ms: denseLatencyMs,

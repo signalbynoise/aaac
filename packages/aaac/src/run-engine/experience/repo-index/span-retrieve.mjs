@@ -1,11 +1,68 @@
 /**
  * Stage-2 symbol intelligence: rank AST spans inside Stage-1 candidate files.
  */
+import fs from "fs";
+import path from "path";
 import {
   loadSymbolsStore,
   searchSymbolVectors,
 } from "./build.mjs";
 import { envelopeForSpan } from "./symbols.mjs";
+import { resolveWorkspaceRoot } from "../repo-graph.mjs";
+
+const STRUCTURAL_EXPAND_KINDS = new Set([
+  "imports",
+  "imported_by",
+  "calls",
+  "called_by",
+  "tests",
+  "tested_by",
+]);
+
+function readEnvelopeText(relativePath, envelopeStart, envelopeEnd, maxChars) {
+  try {
+    const root = resolveWorkspaceRoot();
+    const abs = path.isAbsolute(relativePath)
+      ? relativePath
+      : path.join(root, relativePath);
+    if (!fs.existsSync(abs)) return "";
+    const lines = fs.readFileSync(abs, "utf8").split("\n");
+    const start = Math.max(1, Number(envelopeStart) || 1);
+    const end = Math.max(start, Number(envelopeEnd) || start);
+    const slice = lines.slice(start - 1, end).join("\n");
+    const cap = Math.max(200, Number(maxChars) || 2400);
+    if (slice.length <= cap) return slice;
+    return `${slice.slice(0, cap)}\n…`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Compact first-read pack for agents (inlined envelopes + structure pointers).
+ */
+export function buildReadPack({
+  focusSpans = [],
+  impact = [],
+  call_neighbors = [],
+  entry_flows = [],
+  maxSpans = 8,
+} = {}) {
+  return {
+    spans: focusSpans.slice(0, maxSpans).map((s) => ({
+      path: s.path,
+      symbol: s.symbol,
+      kind: s.kind,
+      envelope_start: s.envelope_start,
+      envelope_end: s.envelope_end,
+      envelope_text: s.envelope_text ?? "",
+      why: s.why,
+    })),
+    impact: (impact ?? []).slice(0, 8),
+    call_neighbors: (call_neighbors ?? []).slice(0, 8),
+    entry_flows: (entry_flows ?? []).slice(0, 6),
+  };
+}
 
 function tokenize(text) {
   return String(text ?? "")
@@ -75,7 +132,7 @@ export function expandCandidatePaths(graph, focusPaths, { neighborCap = 8 } = {}
   let added = 0;
   for (const edge of graph.edges ?? []) {
     if (added >= neighborCap) break;
-    if (!["imports", "imported_by", "calls", "called_by", "tests", "tested_by"].includes(edge.kind)) {
+    if (!STRUCTURAL_EXPAND_KINDS.has(edge.kind)) {
       continue;
     }
     const fromSeed = seedIds.includes(edge.from);
@@ -105,6 +162,7 @@ export function rankFocusSpans({
   const finalSpans = Number(rm.final_spans ?? 8);
   const spansPerFile = Number(rm.spans_per_file ?? 2);
   const envelopeLines = Number(rm.span_envelope_lines ?? 4);
+  const envelopeMaxChars = Number(rm.envelope_max_chars ?? 2400);
   const pathSet = new Set(candidatePaths ?? []);
   if (!pathSet.size || finalSpans <= 0) return [];
 
@@ -151,6 +209,12 @@ export function rankFocusSpans({
     if (denseScore.has(id)) whyParts.push(`dense:${denseScore.get(id).toFixed(3)}`);
     if (sparseScore.has(id)) whyParts.push(`sparse:${sparseScore.get(id).toFixed(3)}`);
     whyParts.push(`stage1:${symbol.path}`);
+    const envelope_text = readEnvelopeText(
+      symbol.path,
+      envelope_start,
+      envelope_end,
+      envelopeMaxChars,
+    );
     out.push({
       path: symbol.path,
       symbol: symbol.name,
@@ -160,6 +224,7 @@ export function rankFocusSpans({
       end: symbol.end_line,
       envelope_start,
       envelope_end,
+      envelope_text,
       signature: symbol.signature,
       snippet: symbol.snippet,
       why: whyParts.join(" "),

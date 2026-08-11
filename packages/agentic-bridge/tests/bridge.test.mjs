@@ -362,13 +362,15 @@ describe("cursor-adapter activity formatting", () => {
     expect(formatAgentMetricsDetail({ tokens: null, context: null })).toBe("");
   });
 
-  it("phase-runner logs visible synthesizing progress before checkpoint LLM", () => {
+  it("phase-runner prefers deterministic checkpoint before LLM fallback", () => {
     const phaseRunnerSource = readBridgeSource("../src/phase-runner.mjs");
     expectSourceContract(phaseRunnerSource, {
       required: [
-        /Synthesizing phase artifacts/,
+        /synthesizePhaseCheckpointDeterministic/,
+        /Merging phase artifacts|Synthesizing phase artifacts/,
         /checkpoint: true/,
         /appendPhaseOutput\([\s\S]*synthesizingDetail/,
+        /LLM fallback/,
       ],
     });
   });

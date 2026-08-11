@@ -1,6 +1,6 @@
 {
   "name": "@ludecker/agentic-bridge",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Agentic OS local bridge — run dispatch, phase runner, Cursor adapter",
   "type": "module",
   "license": "MIT",

@@ -79,10 +79,16 @@ const DEFAULT_RETRIEVAL = {
     relations_max_flows: 8,
     relations_max_clusters: 8,
     span_envelope_lines: 4,
+    envelope_max_chars: 2400,
     final_spans: 8,
     spans_per_file: 2,
     max_symbols_per_file: 80,
     symbol_neighbor_files: 8,
+    stage1_neighbor_files: 6,
+    basename_boost: 0.25,
+    max_agent_files_read: 16,
+    max_full_file_opens: 4,
+    max_gap_search_globs: 8,
   },
   hnsw: {
     metric: "cos",
@@ -214,12 +220,29 @@ export function loadRetrievalConfig() {
       "relations_max_flows",
       "relations_max_clusters",
       "span_envelope_lines",
+      "envelope_max_chars",
       "final_spans",
       "spans_per_file",
       "max_symbols_per_file",
       "symbol_neighbor_files",
+      "stage1_neighbor_files",
+      "max_agent_files_read",
+      "max_full_file_opens",
+      "max_gap_search_globs",
     ]) {
       cfg.repo_memory[key] = readYamlInt(content, key, cfg.repo_memory[key]);
+    }
+    cfg.repo_memory.basename_boost = readYamlInt(
+      content,
+      "basename_boost",
+      cfg.repo_memory.basename_boost,
+    );
+    // basename_boost is fractional — re-read as float if present
+    {
+      const m = content.match(/^\s*basename_boost:\s*([\d.]+)/m);
+      if (m && Number.isFinite(Number(m[1]))) {
+        cfg.repo_memory.basename_boost = Number(m[1]);
+      }
     }
   } catch {
     // keep defaults

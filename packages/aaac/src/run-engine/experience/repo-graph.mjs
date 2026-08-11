@@ -176,16 +176,35 @@ export function verifyRepoGraph(graph) {
   return { verified, invalidated };
 }
 
+const STRUCTURAL_NEIGHBOR_KINDS = new Set([
+  "imports",
+  "imported_by",
+  "calls",
+  "called_by",
+  "tests",
+  "tested_by",
+]);
+
 export function neighborsOf(graph, nodeId, { kinds = null, limit = 8 } = {}) {
-  const edges = (graph.edges ?? []).filter(
-    (e) =>
-      (e.from === nodeId || e.to === nodeId) &&
-      (!kinds || kinds.includes(e.kind)),
-  );
+  const kindRank = (kind) => (STRUCTURAL_NEIGHBOR_KINDS.has(kind) ? 0 : 1);
+  const edges = (graph.edges ?? [])
+    .filter(
+      (e) =>
+        (e.from === nodeId || e.to === nodeId) &&
+        (!kinds || kinds.includes(e.kind)),
+    )
+    .sort((a, b) => {
+      const kr = kindRank(a.kind) - kindRank(b.kind);
+      if (kr !== 0) return kr;
+      return (b.weight ?? 0) - (a.weight ?? 0);
+    });
   const out = [];
-  for (const e of edges.slice(0, limit * 2)) {
+  const seen = new Set();
+  for (const e of edges) {
     const other = e.from === nodeId ? e.to : e.from;
-    if (graph.nodes[other]) out.push({ id: other, edge: e });
+    if (!graph.nodes[other] || seen.has(other)) continue;
+    seen.add(other);
+    out.push({ id: other, edge: e });
     if (out.length >= limit) break;
   }
   return out;

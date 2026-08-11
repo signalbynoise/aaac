@@ -142,10 +142,23 @@ function resolveAgentIndex(manifest, { phase, subagentId, agentIndex }) {
       : findAgentIndexToComplete(manifest, phase));
 }
 export function classifyToolFileMutation(toolName) {
-  if (["Read", "Grep", "Glob", "SemanticSearch"].includes(toolName)) return "read";
+  if (["Grep", "Glob", "SemanticSearch"].includes(toolName)) return "search";
+  if (toolName === "Read") return "read";
   if (toolName === "Write") return "written";
   if (["StrReplace", "Delete"].includes(toolName)) return "edited";
   return null;
+}
+
+function isFullFileReadInput(toolInput = {}) {
+  const hasOffset =
+    toolInput.offset != null ||
+    toolInput.start_line != null ||
+    toolInput.startLine != null;
+  const hasLimit =
+    toolInput.limit != null ||
+    toolInput.end_line != null ||
+    toolInput.endLine != null;
+  return !hasOffset && !hasLimit;
 }
 export function formatHookProgressSummary(hook = {}) {
   const toolName = String(hook.tool_name ?? hook.toolName ?? "");
@@ -168,14 +181,29 @@ export function applyAgentToolProgress(manifest, options = {}) {
   const source = ["metered_hook", "metered_bridge"].includes(prior.files_source)
     ? prior.files_source
     : (options.filesSource ?? "metered_hook");
+  const toolInput =
+    options.toolInput ??
+    options.hook?.tool_input ??
+    options.hook?.toolInput ??
+    options.hook?.arguments ??
+    {};
   const next = {
     ...prior,
     files_source: source,
     files_read: prior.files_read ?? 0,
     files_written: prior.files_written ?? 0,
     files_edited: prior.files_edited ?? 0,
+    full_file_opens: prior.full_file_opens ?? 0,
+    gap_searches: prior.gap_searches ?? 0,
   };
-  if (mutation === "read") next.files_read += 1;
+  if (mutation === "read") {
+    next.files_read += 1;
+    if (isFullFileReadInput(toolInput)) next.full_file_opens += 1;
+  }
+  if (mutation === "search") {
+    next.files_read += 1; // keep aggregate for legacy metrics
+    next.gap_searches += 1;
+  }
   if (mutation === "written") next.files_written += 1;
   if (mutation === "edited") next.files_edited += 1;
   manifest.swarm.agents[index] = next;

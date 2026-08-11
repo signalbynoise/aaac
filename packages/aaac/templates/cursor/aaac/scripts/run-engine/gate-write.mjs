@@ -127,12 +127,7 @@ process.stdin.on("end", () => {
         `Agent separation: launch 1 code-author Task subagent with artifacts/plan.yaml. Parent merges execute_summary.yaml only — never edit source files directly.`,
       );
     }
-    persistEditEvent(
-      manifest,
-      active.run_id,
-      "edit_allowed",
-      `${toolName} in phase ${manifest.phase}${filePath ? `: ${filePath}` : ""}`,
-    );
+    persistEditEvent(manifest, active.run_id, "edit_allowed", `${toolName} in phase ${manifest.phase}`);
     allow();
   }
   if (enforcement.artifact_write_phases?.includes(manifest.phase) && filePath) {

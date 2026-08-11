@@ -5,7 +5,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import {
   loadRegistry,
@@ -317,28 +317,66 @@ recordLog(manifest, {
   level: "info",
 });
 
+
+// Stage summary is off the critical path: next phase can start while it runs.
+// Prefer detached CLI; fall back to sync write if spawn fails.
+const stageSummaryScript = path.join(__dirname, "write-stage-summary.mjs");
+let stageSummaryQueued = false;
 try {
-  const stageSummary = writeStageSummary(runId, completedPhase, {
-    manifest,
-    enforcement,
-  });
-  recordLog(manifest, {
-    event: "stage_summary_written",
-    phase: completedPhase,
-    phase_kind: manifest.phase_kind,
-    detail: `status=${stageSummary.status}${
-      stageSummary.reason ? ` reason=${stageSummary.reason}` : ""
-    }`,
-    level: stageSummary.status === "failed" ? "warn" : "info",
-  });
+  if (fs.existsSync(stageSummaryScript)) {
+    const child = spawn(
+      process.execPath,
+      [stageSummaryScript, runId, completedPhase],
+      {
+        cwd: process.cwd(),
+        detached: true,
+        stdio: "ignore",
+        env: process.env,
+      },
+    );
+    child.unref();
+    stageSummaryQueued = true;
+    recordLog(manifest, {
+      event: "stage_summary_queued",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: "background write-stage-summary.mjs",
+      level: "info",
+    });
+  }
 } catch (err) {
   recordLog(manifest, {
-    event: "stage_summary_failed",
+    event: "stage_summary_queue_failed",
     phase: completedPhase,
     phase_kind: manifest.phase_kind,
     detail: String(err?.message ?? err).slice(0, 300),
     level: "warn",
   });
+}
+if (!stageSummaryQueued) {
+  try {
+    const stageSummary = writeStageSummary(runId, completedPhase, {
+      manifest,
+      enforcement,
+    });
+    recordLog(manifest, {
+      event: "stage_summary_written",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: `status=${stageSummary.status}${
+        stageSummary.reason ? ` reason=${stageSummary.reason}` : ""
+      }`,
+      level: stageSummary.status === "failed" ? "warn" : "info",
+    });
+  } catch (err) {
+    recordLog(manifest, {
+      event: "stage_summary_failed",
+      phase: completedPhase,
+      phase_kind: manifest.phase_kind,
+      detail: String(err?.message ?? err).slice(0, 300),
+      level: "warn",
+    });
+  }
 }
 
 let nextPhase = manifest.pending.shift() ?? null;

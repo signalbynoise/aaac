@@ -53,10 +53,17 @@ repo_memory:
   relations_max_clusters: 8
   # V-next — span-first retrieval (AST symbols inside Stage-1 files)
   span_envelope_lines: 4
+  envelope_max_chars: 2400
   final_spans: 8
   spans_per_file: 2
   max_symbols_per_file: 80
   symbol_neighbor_files: 8
+  stage1_neighbor_files: 6
+  basename_boost: 0.25
+  # Progressive-read hard budgets (per agent; enforced by preToolUse gate)
+  max_agent_files_read: 16
+  max_full_file_opens: 4
+  max_gap_search_globs: 8
 
 ranking:
   semantic_similarity: 0.38

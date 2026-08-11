@@ -217,6 +217,7 @@ export async function selectExperienceForContext(manifest, options = {}) {
       clusters: [],
       call_neighbors: [],
       focus_spans: [],
+      read_pack: { spans: [], impact: [], call_neighbors: [], entry_flows: [] },
       meta: { empty: true, error: true },
     };
   }

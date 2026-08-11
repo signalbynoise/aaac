@@ -43,6 +43,26 @@ function readArtifactText(artifactsDir, name) {
   }
 }
 
+/** Parse YAML list block under a key (confirmed/stale/new_findings). */
+function extractYamlPathList(content, key) {
+  if (!content) return [];
+  const re = new RegExp(
+    `^${key}:\\s*(?:\\[\\]|\\n((?:\\s+-\\s+[^\\n]+\\n?)+))`,
+    "m",
+  );
+  const m = content.match(re);
+  if (!m) return [];
+  if (!m[1]) return [];
+  const out = [];
+  for (const line of m[1].split("\n")) {
+    const item = line.match(/^\s*-\s+(.+?)\s*$/);
+    if (!item) continue;
+    const val = item[1].replace(/^["']|["']$/g, "").trim();
+    if (val && /[./]/.test(val)) out.push(val.replace(/\\/g, "/"));
+  }
+  return [...new Set(out)];
+}
+
 /**
  * @param {object} graph
  * @param {{ trajectory: object, manifest: object, artifactsDir?: string, lessons?: object[] }} input
@@ -65,6 +85,18 @@ export function learnRepoGraphFromRun(graph, {
   }
 
   if (artifactsDir) {
+    const briefYaml = readArtifactText(artifactsDir, "discover_brief.yaml");
+    for (const p of extractYamlPathList(briefYaml, "confirmed")) paths.add(p);
+    for (const p of extractYamlPathList(briefYaml, "new_findings")) paths.add(p);
+    for (const p of extractYamlPathList(briefYaml, "stale")) {
+      const id = nodeIdForPath(p);
+      if (graph.nodes[id]) {
+        graph.nodes[id].valid = false;
+        graph.nodes[id].tags = [
+          ...new Set([...(graph.nodes[id].tags ?? []), "stale"]),
+        ];
+      }
+    }
     for (const name of [
       "discover_brief.yaml",
       "discover-brief.md",
@@ -82,16 +114,29 @@ export function learnRepoGraphFromRun(graph, {
     if (!fs.existsSync(abs)) continue;
     const id = nodeIdForPath(rel);
     const kind = /\.(test|spec)\./i.test(rel) ? "test" : "file";
-    upsertNode(graph, {
+    const prev = graph.nodes[id];
+    // Never overwrite scanned summary/api — that collapses dense Stage-1 recall.
+    const patch = {
       id,
-      kind,
+      kind: prev?.kind ?? kind,
       path: rel,
-      summary: `Learned focus path from successful ${manifest?.command ?? "run"}: ${rel}`,
-      trigger: `${manifest?.command ?? ""} ${rel}`,
+      trigger: prev?.trigger || `${manifest?.command ?? ""} ${rel}`,
       source_files: [rel],
       confidence: 0.7,
-      tags: ["learned", "focus", manifest?.object].filter(Boolean),
-    });
+      tags: [
+        ...new Set([...(prev?.tags ?? []), "learned", "focus", manifest?.object].filter(Boolean)),
+      ],
+    };
+    if (!prev?.summary || /^Learned focus path from successful/i.test(prev.summary)) {
+      // Heal poisoned boilerplate; leave empty so next index scan can refill.
+      patch.summary = prev?.api
+        ? `Exports/symbols: ${String(prev.api).slice(0, 200)}`
+        : `Focus path: ${path.basename(rel)}`;
+    }
+    upsertNode(graph, patch);
+    if (graph.nodes[id]) {
+      graph.nodes[id].hits = (graph.nodes[id].hits ?? 0) + 1;
+    }
     added_nodes.push(id);
   }
 

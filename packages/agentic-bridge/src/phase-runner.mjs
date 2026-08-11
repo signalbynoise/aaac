@@ -11,6 +11,7 @@ import {
   getSwarmAgentSpecs,
   getAgentInitialSummary,
 } from "./prompt-compose.mjs";
+import { synthesizePhaseCheckpointDeterministic } from "./deterministic-checkpoint.mjs";
 import { RunWatcher } from "./run-watcher.mjs";
 import {
   getMissingPhaseArtifacts,
@@ -110,25 +111,75 @@ export class PhaseRunner extends EventEmitter {
       manifest,
     );
     if (missing.length === 0) return;
-    const prompt = composeSwarmCheckpointPrompt(
-      this.workspaceRoot,
-      manifest,
-      phase,
-      swarmAgentCount,
-      missing,
-    );
     const missingNames = missing.map((rel) => String(rel).replace(/^artifacts\//, "")).join(", ");
-    const synthesizingDetail = `Synthesizing phase artifacts (${missingNames})…`;
+    const synthesizingDetail = `Merging phase artifacts (${missingNames})…`;
     log.info("checkpoint", "Synthesizing swarm checkpoint artifacts", {
       runId,
       phase,
       missing,
+      mode: "deterministic",
     });
     appendPhaseOutput(this.workspaceRoot, runId, {
       phase,
       detail: synthesizingDetail,
       level: "info",
     });
+
+    const det = synthesizePhaseCheckpointDeterministic({
+      workspaceRoot: this.workspaceRoot,
+      runId,
+      phase,
+      manifest,
+      swarmAgentCount,
+      missing,
+    });
+    const stillMissing = await getMissingPhaseArtifacts(
+      this.workspaceRoot,
+      runId,
+      phase,
+      manifest,
+    );
+    if (det.ok && stillMissing.length === 0) {
+      log.info("checkpoint", "Deterministic checkpoint satisfied artifacts", {
+        runId,
+        phase,
+        written: det.written,
+      });
+      appendPhaseOutput(this.workspaceRoot, runId, {
+        phase,
+        detail: `Checkpoint merged (${det.written.join(", ") || "ok"})`,
+        level: "info",
+      });
+      this.emit("phase-event", {
+        runId,
+        agentIndex: null,
+        checkpoint: true,
+        type: "completed",
+        detail: "deterministic_checkpoint",
+      });
+      return;
+    }
+
+    log.warn("checkpoint", "Deterministic checkpoint incomplete; LLM fallback", {
+      runId,
+      phase,
+      reason: det.reason,
+      stillMissing,
+    });
+    appendPhaseOutput(this.workspaceRoot, runId, {
+      phase,
+      detail: `Synthesizing phase artifacts (${(stillMissing.length ? stillMissing : missing)
+        .map((rel) => String(rel).replace(/^artifacts\//, ""))
+        .join(", ")})…`,
+      level: "info",
+    });
+    const prompt = composeSwarmCheckpointPrompt(
+      this.workspaceRoot,
+      manifest,
+      phase,
+      swarmAgentCount,
+      stillMissing.length ? stillMissing : missing,
+    );
     for await (const event of this.adapter.runPhase({
       workspaceRoot: this.workspaceRoot,
       runId,

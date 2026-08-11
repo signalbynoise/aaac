@@ -26,20 +26,21 @@ Launch **that many** parallel `Task` subagents (`explore`, `readonly: true`) in 
 
 Add domain-specific angles from inventory skill. Respect ceiling in swarm-sizing.yaml; second wave only when wave_plan requires it.
 
-## Retrieve-then-verify (mandatory — V6)
+## Retrieve-then-verify / verify-and-extend (mandatory — span-first)
 
 Every discovery Task **must**:
 
-1. Read **`artifacts/phase_context.json`** (path relative to the Run dir) — especially `experience.repo_memory`
-2. **Progressive reading (span-first):** start from `experience.repo_memory.focus_spans` — open each `path` at `envelope_start`–`envelope_end` first; widen to the full symbol (`start`–`end`) only if needed; open the full file only for gaps
-3. Use `focus_paths` / `context_hint.recommended_focus_paths` when spans are empty or insufficient
-4. Honor `avoid_paths` (do not expand into skip paths unless the intent requires them)
-5. **Verify** listed spans/paths and invariants against disk (`hash_ok` / file exists). Mark stale or wrong entries
-6. Treat `impact`, `entry_flows`, `clusters`, and `call_neighbors` as verified structure — do **not** re-walk neighbors / dependents / entry chains / callers already listed; open files outside those sets only for gaps
-7. Expand filesystem search **only for gaps** (missing coverage, stale nodes, open questions)
-8. Prefer `experience.repo_memory.scratchpad_excerpt` and invariants over rediscovering architecture from zero
+1. Read **`artifacts/phase_context.json`** — especially `experience.repo_memory.read_pack` and `focus_spans`
+2. **Progressive reading (span-first):** use inlined `envelope_text` / `read_pack.spans` first — do not cold-open those files for the first pass
+3. Widen to full symbol (`start`–`end`) only if needed; full-file Read only for true gaps
+4. Honor hard budgets in `experience.repo_memory.meta.read_budgets` (`max_agent_files_read`, `max_full_file_opens`, `max_gap_search_globs`)
+5. Use `focus_paths` when spans are empty or insufficient; honor `avoid_paths`
+6. **Verify** listed spans/paths/invariants (`hash_ok` / exists). Emit `confirmed` / `stale` / `new_findings`
+7. Treat `impact`, `entry_flows`, `clusters`, and `call_neighbors` as verified structure — do **not** re-walk them
+8. Grep/Glob/filesystem search **only for gaps** not covered by memory
+9. Prefer `scratchpad_excerpt` and invariants over rediscovering architecture from zero
 
-Do **not** cold-walk the whole repo when `repo_memory.nodes` or `focus_spans` is non-empty.
+Do **not** cold-walk the whole repo when `repo_memory.nodes`, `focus_spans`, or `read_pack` is non-empty. Depth is for judgment, not inventory tourism.
 
 ## discover_brief scope_signals (mandatory)
 

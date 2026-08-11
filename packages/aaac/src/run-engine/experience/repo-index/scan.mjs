@@ -1,194 +1,137 @@
 /**
- * V6 — Lightweight scoped filesystem scan + import edge heuristics.
+ * V6 repository scanner — AST symbols (spans) + structural dependencies.
  */
 import fs from "fs";
 import path from "path";
+import { nodeIdForPath } from "../repo-graph.mjs";
 import { loadRetrievalConfig } from "../paths.mjs";
-import { resolveWorkspaceRoot } from "../repo-graph.mjs";
+import {
+  extractImportSpecs,
+  loadPathAliases,
+  loadWorkspacePackages,
+  resolveImportPath,
+  walkCodeFiles,
+} from "./files.mjs";
+import { buildCallEdgesForFile } from "./calls.mjs";
+import { extractSymbolsForFile } from "./symbols.mjs";
 
-const SKIP_DIRS = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "out",
-  "build",
-  "coverage",
-  ".next",
-  "release",
-  ".cursor",
-  ".turbo",
-  "playwright-report",
-]);
-
-const CODE_EXT = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".py",
-  ".go",
-  ".rs",
-  ".java",
-  ".kt",
-  ".swift",
-]);
-
-function shouldSkipDir(name) {
-  return SKIP_DIRS.has(name) || name.startsWith(".");
+function readText(file, maxChars = 200_000) {
+  try {
+    return fs.readFileSync(file, "utf8").slice(0, maxChars);
+  } catch {
+    return "";
+  }
 }
 
-/**
- * @param {string} root
- * @param {number} maxFiles
- * @returns {string[]} relative paths
- */
-export function walkCodeFiles(root, maxFiles = 400) {
-  const out = [];
-  function walk(dir) {
-    if (out.length >= maxFiles) return;
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const ent of entries) {
-      if (out.length >= maxFiles) break;
-      const abs = path.join(dir, ent.name);
-      if (ent.isDirectory()) {
-        if (!shouldSkipDir(ent.name)) walk(abs);
-        continue;
-      }
-      if (!ent.isFile()) continue;
-      const ext = path.extname(ent.name).toLowerCase();
-      if (!CODE_EXT.has(ext)) continue;
-      out.push(path.relative(root, abs).replace(/\\/g, "/"));
-    }
-  }
-  walk(root);
-  return out;
-}
-
-/**
- * Extract relative import/require targets from source text.
- */
-export function extractImportSpecs(source) {
-  const specs = [];
-  const re =
-    /(?:import\s+(?:type\s+)?(?:[^'"\n]+?\s+from\s+)?|export\s+(?:type\s+)?[^'"\n]*?\s+from\s+|require\s*\(\s*)['"]([^'"]+)['"]/g;
-  let m;
-  while ((m = re.exec(source))) {
-    specs.push(m[1]);
-  }
-  return [...new Set(specs)];
-}
-
-/**
- * Resolve a relative import to a repo-relative path if possible.
- */
-export function resolveImportPath(fromRel, spec, root) {
-  if (!spec.startsWith(".")) return null;
-  const fromDir = path.dirname(fromRel);
-  const base = path.normalize(path.join(fromDir, spec)).replace(/\\/g, "/");
-  const candidates = [
-    base,
-    `${base}.ts`,
-    `${base}.tsx`,
-    `${base}.js`,
-    `${base}.mjs`,
-    `${base}.jsx`,
-    path.join(base, "index.ts").replace(/\\/g, "/"),
-    path.join(base, "index.tsx").replace(/\\/g, "/"),
-    path.join(base, "index.js").replace(/\\/g, "/"),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(path.join(root, c))) return c.replace(/\\/g, "/");
-  }
-  return null;
-}
-
-function summarizeFile(rel, source) {
-  const exports = [];
-  const exportRe =
-    /export\s+(?:async\s+)?(?:function|class|const|type|interface|enum)\s+([A-Za-z0-9_]+)/g;
-  let m;
-  while ((m = exportRe.exec(source)) && exports.length < 12) {
-    exports.push(m[1]);
-  }
-  const lines = source.split("\n").length;
-  const kind = /\.(test|spec)\./i.test(rel) || /\/tests?\//i.test(rel)
+function detectKind(relativePath) {
+  return /(^|\/)(__tests__|tests?|e2e)\//.test(relativePath) ||
+    /\.(test|spec)\.[^.]+$/.test(relativePath)
     ? "test"
-    : rel.includes("package.json")
-      ? "module"
-      : "file";
-  const summary = `${kind} ${rel} (~${lines} lines)${
-    exports.length ? `; exports: ${exports.slice(0, 8).join(", ")}` : ""
-  }`;
-  return {
-    kind,
-    summary,
-    api: exports.join(", "),
-    trigger: `${path.basename(rel)} ${exports.slice(0, 6).join(" ")}`,
-  };
+    : "file";
+}
+
+/** Regex name fallback when AST unavailable for a language. */
+function extractSymbolNamesRegex(source) {
+  const symbols = new Set();
+  const patterns = [
+    /\bexport\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g,
+    /\b(?:function|class)\s+([A-Za-z_$][\w$]*)/g,
+    /^\s*def\s+([A-Za-z_][\w]*)\s*\(/gm,
+    /^\s*class\s+([A-Za-z_][\w]*)\s*[:(]/gm,
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(source))) symbols.add(match[1]);
+  }
+  return [...symbols].slice(0, 80);
+}
+
+function summarizeFile(relativePath, source, symbolNames) {
+  const firstComment = source.match(
+    /(?:\/\*\*?([\s\S]*?)\*\/|^\s*\/\/\s*(.+)$|^\s*#\s*(.+)$)/m,
+  );
+  const comment = firstComment
+    ? String(firstComment[1] || firstComment[2] || firstComment[3] || "")
+        .replace(/\s*\*\s?/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 240)
+    : "";
+  const symbolSummary = symbolNames.length
+    ? `Exports/symbols: ${symbolNames.slice(0, 12).join(", ")}`
+    : "";
+  return [relativePath, comment, symbolSummary].filter(Boolean).join(" — ").slice(0, 500);
 }
 
 /**
- * Scan workspace into node/edge descriptors (not yet persisted).
+ * Scan workspace files into graph nodes/edges + AST symbol records.
+ * @returns {Promise<{ root: string, files: string[], nodes: object[], edges: object[], symbols: object[] }>}
  */
-export function scanWorkspace(options = {}) {
-  const root = options.root ?? resolveWorkspaceRoot();
-  const cfg = loadRetrievalConfig();
-  const maxFiles = options.maxFiles ?? cfg.repo_memory?.index_max_files ?? 400;
+export async function scanWorkspace(options = {}) {
+  const root = options.root || process.env.AAAC_WORKSPACE_ROOT || process.cwd();
+  const maxFiles = Number(
+    options.maxFiles ?? loadRetrievalConfig().repo_memory?.index_max_files ?? 4000,
+  );
   const files = walkCodeFiles(root, maxFiles);
+  const fileSet = new Set(files);
+  const aliases = loadPathAliases(root);
+  const workspacePackages = loadWorkspacePackages(root);
   const nodes = [];
   const edges = [];
+  const symbols = [];
 
-  for (const rel of files) {
-    let source = "";
-    try {
-      source = fs.readFileSync(path.join(root, rel), "utf8").slice(0, 120_000);
-    } catch {
-      continue;
-    }
-    const meta = summarizeFile(rel, source);
-    const id = `file:${rel}`;
+  for (const relativePath of files) {
+    const source = readText(path.join(root, relativePath));
+    const id = nodeIdForPath(relativePath);
+    const kind = detectKind(relativePath);
+
+    const astSymbols = await extractSymbolsForFile({
+      path: relativePath,
+      source,
+      fileNodeId: id,
+    });
+    const symbolNames = astSymbols.length
+      ? astSymbols.map((s) => s.name)
+      : extractSymbolNamesRegex(source);
+
     nodes.push({
       id,
-      kind: meta.kind,
-      path: rel,
-      summary: meta.summary,
-      api: meta.api,
-      trigger: meta.trigger,
-      source_files: [rel],
-      confidence: 0.55,
-      tags: [meta.kind, path.extname(rel).slice(1)].filter(Boolean),
+      kind,
+      path: relativePath,
+      summary: summarizeFile(relativePath, source, symbolNames),
+      api: symbolNames.join(", "),
+      source_files: [relativePath],
+      tags: [kind, path.extname(relativePath).slice(1)].filter(Boolean),
+      confidence: 0.8,
     });
+    symbols.push(...astSymbols);
 
     for (const spec of extractImportSpecs(source)) {
-      const target = resolveImportPath(rel, spec, root);
-      if (!target) continue;
-      const toId = `file:${target}`;
-      edges.push({ from: id, to: toId, kind: "imports", weight: 1 });
-      edges.push({ from: toId, to: id, kind: "imported_by", weight: 1 });
+      const target = resolveImportPath(
+        relativePath,
+        spec,
+        root,
+        aliases,
+        workspacePackages,
+      );
+      if (!target || target === relativePath || !fileSet.has(target)) continue;
+      const targetId = nodeIdForPath(target);
+      const directKind = kind === "test" ? "tests" : "imports";
+      const reverseKind = kind === "test" ? "tested_by" : "imported_by";
+      edges.push({ from: id, to: targetId, kind: directKind, weight: 1 });
+      edges.push({ from: targetId, to: id, kind: reverseKind, weight: 1 });
     }
 
-    if (meta.kind === "test") {
-      const guess = rel
-        .replace(/\.(test|spec)\./i, ".")
-        .replace(/\/tests?\//, "/")
-        .replace(/\.test\./, ".");
-      for (const candidate of [guess, guess.replace(/\/__tests__\//, "/")]) {
-        const norm = candidate.replace(/\\/g, "/");
-        if (norm !== rel && fs.existsSync(path.join(root, norm))) {
-          const toId = `file:${norm}`;
-          edges.push({ from: id, to: toId, kind: "tests", weight: 1 });
-          edges.push({ from: toId, to: id, kind: "tested_by", weight: 1 });
-        }
-      }
-    }
+    const callEdges = buildCallEdgesForFile({
+      fromId: id,
+      source,
+      fileSet,
+      nodeIdForPath,
+      resolveSpec: (spec) =>
+        resolveImportPath(relativePath, spec, root, aliases, workspacePackages),
+    });
+    edges.push(...callEdges);
   }
 
-  return { root, files, nodes, edges, maxFiles };
+  return { root, files, nodes, edges, symbols };
 }

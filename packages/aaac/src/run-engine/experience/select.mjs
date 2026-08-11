@@ -212,6 +212,11 @@ export async function selectExperienceForContext(manifest, options = {}) {
       invariants: [],
       edges: [],
       scratchpad_excerpt: "",
+      impact: [],
+      entry_flows: [],
+      clusters: [],
+      call_neighbors: [],
+      focus_spans: [],
       meta: { empty: true, error: true },
     };
   }

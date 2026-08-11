@@ -11,8 +11,31 @@ import {
 } from "./repo-graph.mjs";
 import { loadRepoScratchpad, scratchpadExcerpt } from "./repo-scratchpad.mjs";
 import { searchRepoVectors, getRepoVector } from "./repo-index/build.mjs";
+import { getRepoVectorIndex } from "./repo-index/hnsw.mjs";
+import { relationsForPacket } from "./repo-index/relations.mjs";
+import {
+  expandCandidatePaths,
+  rankFocusSpans,
+} from "./repo-index/span-retrieve.mjs";
 import { emitRepoMemoryEvent } from "./repo-events.mjs";
 import { cosine } from "./index/hnsw.mjs";
+
+function emptyRepoMemoryPacket(extra = {}) {
+  return {
+    focus_paths: [],
+    avoid_paths: [],
+    nodes: [],
+    invariants: [],
+    edges: [],
+    scratchpad_excerpt: "",
+    impact: [],
+    entry_flows: [],
+    clusters: [],
+    call_neighbors: [],
+    focus_spans: [],
+    ...extra,
+  };
+}
 
 function tokenize(text) {
   return String(text ?? "")
@@ -134,13 +157,7 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   const staleDropped = invalidated;
 
   if (!Object.keys(active).length) {
-    const empty = {
-      focus_paths: [],
-      avoid_paths: [],
-      nodes: [],
-      invariants: [],
-      edges: [],
-      scratchpad_excerpt: "",
+    const empty = emptyRepoMemoryPacket({
       meta: {
         candidates: 0,
         latency_ms: Date.now() - started,
@@ -148,7 +165,7 @@ export async function retrieveRepoMemory(manifest, options = {}) {
         empty: true,
         provider: provider.id,
       },
-    };
+    });
     if (emit) {
       emitRepoMemoryEvent({
         phase: "retrieve_done",
@@ -161,10 +178,13 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   const { text: taskText } = buildTaskDocument(manifest, {});
   const [queryVec] = await provider.embed([taskText]);
 
+  const denseStarted = Date.now();
+  const vectorIndex = getRepoVectorIndex();
   const denseHits = searchRepoVectors(queryVec, {
     k: rm.semantic_candidates ?? cfg.semantic_candidates ?? 32,
     slot: "summary",
   });
+  const denseLatencyMs = Date.now() - denseStarted;
   const denseRank = denseHits.map((h) => h.nodeId);
   const denseScore = new Map(denseHits.map((h) => [h.nodeId, h.score]));
 
@@ -263,6 +283,20 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   }
 
   const pad = loadRepoScratchpad();
+  const relational = relationsForPacket(graph, picked, rm);
+
+  // Stage 2 — symbol/span intelligence inside Stage-1 (+ capped neighbors)
+  const spanPaths = expandCandidatePaths(graph, focusPaths, {
+    neighborCap: rm.symbol_neighbor_files ?? 8,
+  });
+  const focusSpans = rankFocusSpans({
+    queryText: taskText,
+    queryVec,
+    candidatePaths: spanPaths,
+    rm,
+    rrfK: cfg.rrf_k,
+  });
+
   const packet = {
     focus_paths: focusPaths,
     avoid_paths: avoidPaths,
@@ -277,13 +311,23 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     invariants: invOut,
     edges: edgeOut,
     scratchpad_excerpt: scratchpadExcerpt(pad, 1200),
+    impact: relational.impact,
+    entry_flows: relational.entry_flows,
+    clusters: relational.clusters,
+    call_neighbors: relational.call_neighbors,
+    focus_spans: focusSpans,
     meta: {
       candidates: fused.length,
       latency_ms: Date.now() - started,
+      dense_latency_ms: denseLatencyMs,
+      index_backend: vectorIndex.backend,
+      index_size: vectorIndex.size(),
       stale_dropped: staleDropped,
       empty: false,
       provider: provider.id,
       nodes_returned: picked.length,
+      focus_spans: focusSpans.length,
+      span_candidate_files: spanPaths.length,
     },
   };
 
@@ -300,8 +344,12 @@ export async function retrieveRepoMemory(manifest, options = {}) {
         nodes: packet.nodes.length,
         invariants: packet.invariants.length,
         focus_paths: packet.focus_paths.length,
+        focus_spans: packet.focus_spans.length,
         stale_dropped: staleDropped,
         latency_ms: packet.meta.latency_ms,
+        dense_latency_ms: denseLatencyMs,
+        index_backend: vectorIndex.backend,
+        index_size: vectorIndex.size(),
         empty: false,
       },
     });

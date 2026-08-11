@@ -195,12 +195,78 @@ describe('V6 repo graph', () => {
   });
 });
 
+describe('V6 import path resolution', () => {
+  let tmp;
+  let prevRoot;
+
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aaac-v6-scan-'));
+    prevRoot = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = tmp;
+    fs.mkdirSync(path.join(tmp, 'src', 'lib'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, '.cursor', 'aaac', 'experience'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(tmp, '.cursor', 'aaac', 'experience', 'retrieval.yaml'),
+      fs.readFileSync(TEMPLATE_RETRIEVAL_YAML, 'utf8'),
+    );
+    fs.writeFileSync(
+      path.join(tmp, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: { paths: { '@/*': ['./src/*'] } },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(tmp, 'src', 'lib', 'utils.ts'),
+      'export const cn = (...a) => a.join(" ");\n',
+    );
+    fs.writeFileSync(
+      path.join(tmp, 'src', 'app.ts'),
+      'import { cn } from "@/lib/utils";\nexport const x = cn("a");\n',
+    );
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    if (prevRoot === undefined) delete process.env.AAAC_WORKSPACE_ROOT;
+    else process.env.AAAC_WORKSPACE_ROOT = prevRoot;
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  it('resolves @/ path aliases into import edges', async () => {
+    const { loadPathAliases, resolveImportPath } = await import(
+      path.join(EXP, 'repo-index/files.mjs')
+    );
+    const { scanWorkspace } = await import(
+      path.join(EXP, 'repo-index/scan.mjs')
+    );
+    const aliases = loadPathAliases(tmp);
+    expect(aliases.some((a) => a.prefix === '@/')).toBe(true);
+    expect(resolveImportPath('src/app.ts', '@/lib/utils', tmp, aliases)).toBe(
+      'src/lib/utils.ts',
+    );
+
+    const scanned = await scanWorkspace({ root: tmp, maxFiles: 50 });
+    const imports = scanned.edges.filter((e) => e.kind === 'imports');
+    expect(imports.some((e) => e.from === 'file:src/app.ts' && e.to === 'file:src/lib/utils.ts')).toBe(
+      true,
+    );
+  });
+});
+
 describe('V6 discover protocol templates', () => {
   it('requires phase_context and retrieve-then-verify', () => {
     const skill = fs.readFileSync(SKILL, 'utf8');
     expect(skill).toMatch(/phase_context\.json/);
     expect(skill).toMatch(/Retrieve-then-verify/);
     expect(skill).toMatch(/repo_memory/);
+    expect(skill).toMatch(/focus_spans/);
+    expect(skill).toMatch(/Progressive reading/);
     expect(skill).toMatch(/confirmed/);
     expect(skill).toMatch(/stale/);
 

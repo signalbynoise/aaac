@@ -44,7 +44,19 @@ repo_memory:
   semantic_candidates: 32
   lexical_candidates: 16
   scratchpad_max_chars: 4000
-  index_max_files: 400
+  index_max_files: 4000
+  blast_depth: 3
+  blast_cap: 40
+  flow_max_hops: 6
+  relations_max_impact: 12
+  relations_max_flows: 8
+  relations_max_clusters: 8
+  # V-next — span-first retrieval (AST symbols inside Stage-1 files)
+  span_envelope_lines: 4
+  final_spans: 8
+  spans_per_file: 2
+  max_symbols_per_file: 80
+  symbol_neighbor_files: 8
 
 ranking:
   semantic_similarity: 0.38

@@ -31,13 +31,15 @@ Add domain-specific angles from inventory skill. Respect ceiling in swarm-sizing
 Every discovery Task **must**:
 
 1. Read **`artifacts/phase_context.json`** (path relative to the Run dir) — especially `experience.repo_memory`
-2. Start from `experience.repo_memory.focus_paths` / `context_hint.recommended_focus_paths`
-3. Honor `avoid_paths` (do not expand into skip paths unless the intent requires them)
-4. **Verify** each focus path and invariant against disk (`hash_ok` / file exists). Mark stale or wrong entries
-5. Expand filesystem search **only for gaps** (missing coverage, stale nodes, open questions)
-6. Prefer `experience.repo_memory.scratchpad_excerpt` and invariants over rediscovering architecture from zero
+2. **Progressive reading (span-first):** start from `experience.repo_memory.focus_spans` — open each `path` at `envelope_start`–`envelope_end` first; widen to the full symbol (`start`–`end`) only if needed; open the full file only for gaps
+3. Use `focus_paths` / `context_hint.recommended_focus_paths` when spans are empty or insufficient
+4. Honor `avoid_paths` (do not expand into skip paths unless the intent requires them)
+5. **Verify** listed spans/paths and invariants against disk (`hash_ok` / file exists). Mark stale or wrong entries
+6. Treat `impact`, `entry_flows`, `clusters`, and `call_neighbors` as verified structure — do **not** re-walk neighbors / dependents / entry chains / callers already listed; open files outside those sets only for gaps
+7. Expand filesystem search **only for gaps** (missing coverage, stale nodes, open questions)
+8. Prefer `experience.repo_memory.scratchpad_excerpt` and invariants over rediscovering architecture from zero
 
-Do **not** cold-walk the whole repo when `repo_memory.nodes` is non-empty.
+Do **not** cold-walk the whole repo when `repo_memory.nodes` or `focus_spans` is non-empty.
 
 ## discover_brief scope_signals (mandatory)
 

@@ -13,6 +13,8 @@ export const EDGE_KINDS = [
   "imported_by",
   "tests",
   "tested_by",
+  "calls",
+  "called_by",
   "owns",
   "owned_by",
   "depends_on",
@@ -25,6 +27,11 @@ export function emptyRepoGraph() {
     updated_at: null,
     nodes: {},
     edges: [],
+    relations: {
+      updated_at: null,
+      clusters: {},
+      entries: [],
+    },
   };
 }
 
@@ -96,6 +103,13 @@ export function upsertNode(graph, node) {
     hits: prev.hits ?? 0,
     last_verified: isoNow(),
     updated_at: isoNow(),
+    // Preserve index-time relational answers until recompute.
+    fan_in: node.fan_in ?? prev.fan_in,
+    fan_out: node.fan_out ?? prev.fan_out,
+    blast_score: node.blast_score ?? prev.blast_score,
+    blast_dependents: node.blast_dependents ?? prev.blast_dependents,
+    cluster_id: node.cluster_id ?? prev.cluster_id,
+    is_entry: node.is_entry ?? prev.is_entry,
   };
   return graph.nodes[id];
 }

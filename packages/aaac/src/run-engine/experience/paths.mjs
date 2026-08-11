@@ -25,9 +25,15 @@ export const REPO_SCRATCHPAD_PATH = path.join(STATE_ROOT, "repo-scratchpad.json"
 export const REPO_INDEX_DIR = path.join(STATE_ROOT, "repo-index");
 export const REPO_INDEX_META_PATH = path.join(REPO_INDEX_DIR, "meta.json");
 export const REPO_INDEX_VECTORS_PATH = path.join(REPO_INDEX_DIR, "vectors.json");
+export const REPO_INDEX_HNSW_PATH = path.join(REPO_INDEX_DIR, "vectors.usearch");
+/** V-next — AST symbol/span sidecar (not Memory Graph nodes). */
+export const REPO_SYMBOLS_PATH = path.join(REPO_INDEX_DIR, "symbols.json");
+export const REPO_SYMBOL_VECTORS_PATH = path.join(REPO_INDEX_DIR, "symbol-vectors.json");
+export const REPO_SYMBOL_META_PATH = path.join(REPO_INDEX_DIR, "symbol-meta.json");
 export const REPO_EVENTS_PATH = path.join(STATE_ROOT, "repo-memory-events.jsonl");
 export const RETRIEVAL_YAML_PATH = path.join(AAAC_ROOT, "experience", "retrieval.yaml");
 export const REPO_VECTOR_SLOTS = ["summary", "api", "invariant", "trigger"];
+export const REPO_SYMBOL_VECTOR_SLOT = "summary";
 /** Shipped with npm — precomputed collective vectors (portable JSON). */
 export const PACKAGED_INDEX_DIR = path.join(AAAC_ROOT, "experience", "packaged-index");
 export const PACKAGED_INDEX_META_PATH = path.join(PACKAGED_INDEX_DIR, "meta.json");
@@ -65,7 +71,18 @@ const DEFAULT_RETRIEVAL = {
     semantic_candidates: 32,
     lexical_candidates: 16,
     scratchpad_max_chars: 4000,
-    index_max_files: 400,
+    index_max_files: 4000,
+    blast_depth: 3,
+    blast_cap: 40,
+    flow_max_hops: 6,
+    relations_max_impact: 12,
+    relations_max_flows: 8,
+    relations_max_clusters: 8,
+    span_envelope_lines: 4,
+    final_spans: 8,
+    spans_per_file: 2,
+    max_symbols_per_file: 80,
+    symbol_neighbor_files: 8,
   },
   hnsw: {
     metric: "cos",
@@ -189,6 +206,21 @@ export function loadRetrievalConfig() {
       "scratchpad_max_chars",
       cfg.repo_memory.scratchpad_max_chars,
     );
+    for (const key of [
+      "blast_depth",
+      "blast_cap",
+      "flow_max_hops",
+      "relations_max_impact",
+      "relations_max_flows",
+      "relations_max_clusters",
+      "span_envelope_lines",
+      "final_spans",
+      "spans_per_file",
+      "max_symbols_per_file",
+      "symbol_neighbor_files",
+    ]) {
+      cfg.repo_memory[key] = readYamlInt(content, key, cfg.repo_memory[key]);
+    }
   } catch {
     // keep defaults
   }

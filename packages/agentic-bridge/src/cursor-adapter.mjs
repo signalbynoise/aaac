@@ -151,7 +151,6 @@ function createOutputState() {
     seenCallIds: new Set(),
     usage: createCursorUsageAccumulator(),
     lineBuffer: createStreamJsonLineBuffer(),
-    findingDenied: false,
   };
 }
 
@@ -201,22 +200,15 @@ function completeChildOutput(state, code) {
   }
   const exitCode = code ?? 1;
   if (!state.error && exitCode !== 0) {
-    if (state.findingDenied) {
-      // Soft-complete: unauthorized finding tool stopped the agent
-      log.warn("cursor-cli", "Agent stopped after unauthorized finding tool", {
-        exitCode,
-      });
+    const message = filterCursorCliStderr(state.stderr);
+    if (message || !hasSubstantiveCursorCliOutput(state.stdout)) {
+      state.error = new Error(message || `cursor agent exited ${exitCode}`);
     } else {
-      const message = filterCursorCliStderr(state.stderr);
-      if (message || !hasSubstantiveCursorCliOutput(state.stdout)) {
-        state.error = new Error(message || `cursor agent exited ${exitCode}`);
-      } else {
-        log.warn("cursor-cli", "Non-zero exit ignored; substantive stdout present", {
-          exitCode,
-          stdoutChars: state.stdout.length,
-          stderrChars: state.stderr.length,
-        });
-      }
+      log.warn("cursor-cli", "Non-zero exit ignored; substantive stdout present", {
+        exitCode,
+        stdoutChars: state.stdout.length,
+        stderrChars: state.stderr.length,
+      });
     }
   }
   state.done = true;
@@ -263,13 +255,12 @@ async function* streamChildOutput(child, timeoutMs) {
       state.resolveWait = resolve;
     });
   }
-  if (state.error && !state.findingDenied) throw state.error;
+  if (state.error) throw state.error;
   return {
     cursorRunId: state.sessionId,
     output: state.resultText || state.stdout,
     finalSummary: state.finalSummary,
     metrics: cursorUsageMetrics(state.usage),
-    findingDenied: state.findingDenied,
   };
 }
 
@@ -295,12 +286,13 @@ function toPhaseStreamEvent(ctx, item) {
 }
 
 /**
- * Last-resort CLI stop when hooks did not deny an unauthorized finding tool.
- * Prefer preToolUse deny; SIGTERM only if the tool already executed.
+ * Observe unauthorized finding tools on CLI. Prefer preToolUse deny so the
+ * agent stays alive and can still write artifacts — never SIGTERM here
+ * (killing mid-phase drops plan_agent_*.md and fails the checkpoint).
  */
-function maybeStopUnauthorizedFinding(child, state, ctx, toolEvent) {
-  if (!toolEvent || toolEvent.type !== "tool") return false;
-  if (!FINDING_TOOLS.test(toolEvent.toolName ?? "")) return false;
+function maybeLogUnauthorizedFinding(ctx, toolEvent) {
+  if (!toolEvent || toolEvent.type !== "tool") return;
+  if (!FINDING_TOOLS.test(toolEvent.toolName ?? "")) return;
 
   const phaseContext = loadPhaseContextForRun(ctx.workspaceRoot, ctx.runId);
   const manifest = loadManifestForRun(ctx.workspaceRoot, ctx.runId);
@@ -317,16 +309,14 @@ function maybeStopUnauthorizedFinding(child, state, ctx, toolEvent) {
     budgets,
     counters,
   });
-  if (decision.allow) return false;
+  if (decision.allow) return;
 
-  log.warn("finding-gate", "Unauthorized finding tool on CLI — stopping agent", {
+  log.warn("finding-gate", "Unauthorized finding tool observed (agent kept alive)", {
     runId: ctx.runId,
     toolName: toolEvent.toolName,
     reason: decision.reason,
+    message: decision.message,
   });
-  state.findingDenied = true;
-  child.kill("SIGTERM");
-  return true;
 }
 
 async function spawnAgentWithRetry(ctx, prompt, envExtras) {
@@ -377,14 +367,12 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
       activeChildren.set(ctx.runId, child);
 
       const stream = streamChildOutput(child, timeoutMs);
-      let findingDenied = false;
       let next = await stream.next();
       while (!next.done) {
-        const { item, state } = next.value;
+        const { item } = next.value;
         const event = toPhaseStreamEvent(ctx, item);
         if (event?.type === "tool") {
-          maybeStopUnauthorizedFinding(child, state, ctx, event);
-          findingDenied = findingDenied || state.findingDenied;
+          maybeLogUnauthorizedFinding(ctx, event);
         }
         if (event?.type === "tool" || event?.semanticSummary) {
           yield event;
@@ -396,10 +384,8 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
         output: "",
         finalSummary: null,
         metrics: {},
-        findingDenied,
       };
-      findingDenied = findingDenied || Boolean(result.findingDenied);
-      if (!result.output && !result.finalSummary && !findingDenied && !result.cursorRunId) {
+      if (!result.output && !result.finalSummary && !result.cursorRunId) {
         // empty — may retry
         throw new Error("cursor agent produced no output");
       }
@@ -412,7 +398,6 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
         cursorRunId: result.cursorRunId,
         finalSummary: validateSealedSummary(result.finalSummary),
         metrics: result.metrics,
-        detail: findingDenied ? "finding_tool_denied" : undefined,
       });
       return;
     } catch (err) {

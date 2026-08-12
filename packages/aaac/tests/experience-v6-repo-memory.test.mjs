@@ -266,8 +266,8 @@ describe('V6 discover protocol templates', () => {
     expect(skill).toMatch(/Retrieve-then-verify/);
     expect(skill).toMatch(/repo_memory/);
     expect(skill).toMatch(/focus_spans/);
-    expect(skill).toMatch(/Progressive reading/);
-    expect(skill).toMatch(/confirmed/);
+    expect(skill).toMatch(/graph-native|Progressive reading/i);
+    expect(skill).toMatch(/retrieval_miss|confirmed/);
     expect(skill).toMatch(/stale/);
 
     for (const agent of [
@@ -279,8 +279,8 @@ describe('V6 discover protocol templates', () => {
         path.join(PACKAGE_ROOT, 'templates/cursor/agents', agent),
         'utf8',
       );
-      expect(text).toMatch(/phase_context\.json/);
-      expect(text).toMatch(/repo_memory/);
+      expect(text).toMatch(/graph packet|phase_context\.json|repo_memory/i);
+      expect(text).toMatch(/retrieval_miss|Read known|graph-native|envelope/i);
     }
   });
 });

@@ -60,6 +60,57 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     ? envBudget
     : 12000;
 
+  const artifactsDir = path.join(runDir(runId), "artifacts");
+  const priorPcPath = path.join(artifactsDir, "phase_context.json");
+  let priorAuthorized = null;
+  let priorHints = null;
+  let healHints = null;
+  try {
+    if (fs.existsSync(priorPcPath)) {
+      const prior = JSON.parse(fs.readFileSync(priorPcPath, "utf8"));
+      priorAuthorized = prior.authorized_fallback ?? null;
+      priorHints = prior.retrieval_hints ?? null;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const healPath = path.join(artifactsDir, "retrieval_heal.json");
+    if (fs.existsSync(healPath)) {
+      const heal = JSON.parse(fs.readFileSync(healPath, "utf8"));
+      if (heal && !heal.consumed_at) {
+        healHints = {
+          paths: heal.resolved_paths ?? [],
+          sought_terms: heal.sought_terms ?? [],
+          resolved_paths: heal.resolved_paths ?? [],
+          retrieval_hints: priorHints,
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const retrievalHints = {
+    paths: [
+      ...new Set([
+        ...(healHints?.paths ?? []),
+        ...(Array.isArray(priorHints)
+          ? priorHints.flatMap((h) => h.resolved_paths ?? [])
+          : []),
+      ]),
+    ],
+    sought_terms: [
+      ...new Set([
+        ...(healHints?.sought_terms ?? []),
+        ...(Array.isArray(priorHints)
+          ? priorHints.map((h) => h.sought).filter(Boolean)
+          : []),
+      ]),
+    ],
+    retrieval_hints: priorHints,
+  };
+
   let experience = {
     lessons: [],
     warnings: [],
@@ -82,6 +133,10 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
       maxLessons,
       maxWarnings,
       contextBudget,
+      retrievalHints:
+        retrievalHints.paths.length || retrievalHints.sought_terms.length
+          ? retrievalHints
+          : null,
     });
     featureRows = experience._feature_rows ?? null;
     profileEnv = experience.profile_env ?? null;
@@ -89,30 +144,6 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     delete experience.profile_env;
   } catch {
     // Experience stores optional on fresh installs
-  }
-
-  // Enforce profile lesson cap if select returned a tighter profile
-  if (
-    experience?.execution?.context_budget &&
-    Array.isArray(experience.lessons) &&
-    experience.execution
-  ) {
-    const lessonCap = experience.lessons.length;
-    void lessonCap;
-  }
-
-  const artifactsDir = path.join(runDir(runId), "artifacts");
-  const priorPcPath = path.join(artifactsDir, "phase_context.json");
-  let priorAuthorized = null;
-  let priorHints = null;
-  try {
-    if (fs.existsSync(priorPcPath)) {
-      const prior = JSON.parse(fs.readFileSync(priorPcPath, "utf8"));
-      priorAuthorized = prior.authorized_fallback ?? null;
-      priorHints = prior.retrieval_hints ?? null;
-    }
-  } catch {
-    // ignore
   }
 
   const context = {
@@ -157,6 +188,18 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
 
   const outPath = path.join(artifactsDir, "phase_context.json");
   writeJson(outPath, context);
+
+  // Mark heal consumed so the next prepare does not re-seed forever
+  try {
+    const healPath = path.join(artifactsDir, "retrieval_heal.json");
+    if (healHints && fs.existsSync(healPath)) {
+      const heal = JSON.parse(fs.readFileSync(healPath, "utf8"));
+      heal.consumed_at = isoNow();
+      writeJson(healPath, heal);
+    }
+  } catch {
+    // ignore
+  }
 
   if (experience?.repo_memory) {
     try {

@@ -190,6 +190,7 @@ export async function selectExperienceForContext(manifest, options = {}) {
     repoMemory = await retrieveRepoMemory(manifest, {
       provider,
       emit: options.emitRepoEvents !== false,
+      retrievalHints: options.retrievalHints ?? null,
     });
     packet.repo_memory = repoMemory;
     packet.context_hint.recommended_focus_paths = [

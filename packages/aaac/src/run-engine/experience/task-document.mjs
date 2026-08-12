@@ -7,14 +7,19 @@
  * @param {{
  *   avoidPaths?: string[],
  *   recentFailures?: string[],
+ *   sought?: string[],
  *   tools?: string[],
  *   language?: string,
  *   frameworks?: string[],
+ *   paths?: string[],
  * }} [hints]
  * @returns {{ doc: object, text: string }}
  */
 export function buildTaskDocument(manifest, hints = {}) {
   const tools = hints.tools ?? ["shell", "filesystem", "git"];
+  const sought = Array.isArray(hints.sought)
+    ? hints.sought.map(String).filter(Boolean)
+    : [];
   const doc = {
     action: manifest.verb ?? "",
     object: manifest.object ?? "",
@@ -25,6 +30,7 @@ export function buildTaskDocument(manifest, hints = {}) {
     frameworks: hints.frameworks ?? [],
     paths: hints.paths ?? [],
     recentFailures: hints.recentFailures ?? [],
+    sought,
     availableTools: tools,
     avoidPaths: hints.avoidPaths ?? [],
   };
@@ -39,6 +45,9 @@ export function buildTaskDocument(manifest, hints = {}) {
   if (doc.frameworks.length) lines.push(`frameworks: ${doc.frameworks.join(" ")}`);
   if (doc.paths.length) lines.push(`paths: ${doc.paths.join(" ")}`);
   lines.push(`intent: ${doc.intent}`);
+  for (const s of doc.sought) {
+    lines.push(`sought: ${s}`);
+  }
   for (const f of doc.recentFailures) {
     lines.push(`recent failure: ${f}`);
   }

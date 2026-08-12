@@ -61,6 +61,16 @@ function isBarrelPath(filePath) {
   return /^(index|main)\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(base);
 }
 
+function pathExistsInActive(active, filePath) {
+  const want = String(filePath ?? "").replace(/\\/g, "/");
+  return Object.values(active).some((n) => n.path === want);
+}
+
+function nodeEntryForPath(active, filePath) {
+  const want = String(filePath ?? "").replace(/\\/g, "/");
+  return Object.entries(active).find(([, n]) => n.path === want) ?? null;
+}
+
 function tokenize(text) {
   return String(text ?? "")
     .toLowerCase()
@@ -202,8 +212,59 @@ function mergeStage1Neighbors(graph, active, focusPaths, picked, neighborCap) {
 }
 
 /**
+ * Normalize retrievalHints from prepare / heal artifacts.
+ * @param {object|null|undefined} hints
+ * @returns {{ paths: string[], sought: string[], recentFailures: string[] }}
+ */
+export function normalizeRetrievalHints(hints = null) {
+  if (!hints || typeof hints !== "object") {
+    return { paths: [], sought: [], recentFailures: [] };
+  }
+  const paths = [
+    ...new Set(
+      [
+        ...(Array.isArray(hints.paths) ? hints.paths : []),
+        ...(Array.isArray(hints.resolved_paths) ? hints.resolved_paths : []),
+        ...(Array.isArray(hints.hint_paths) ? hints.hint_paths : []),
+      ]
+        .map((p) => String(p ?? "").replace(/\\/g, "/").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const sought = [
+    ...new Set(
+      [
+        ...(Array.isArray(hints.sought) ? hints.sought : []),
+        ...(Array.isArray(hints.sought_terms) ? hints.sought_terms : []),
+        ...(Array.isArray(hints.retrieval_hints)
+          ? hints.retrieval_hints.map((h) => h?.sought).filter(Boolean)
+          : []),
+      ]
+        .map((s) => String(s).trim())
+        .filter(Boolean),
+    ),
+  ];
+  const recentFailures = [
+    ...new Set(
+      [
+        ...(Array.isArray(hints.recentFailures) ? hints.recentFailures : []),
+        ...sought,
+      ]
+        .map((s) => String(s).trim())
+        .filter(Boolean),
+    ),
+  ];
+  return { paths, sought, recentFailures };
+}
+
+/**
  * @param {object} manifest
- * @param {{ provider?: object, emit?: boolean, maxNodes?: number }} [options]
+ * @param {{
+ *   provider?: object,
+ *   emit?: boolean,
+ *   maxNodes?: number,
+ *   retrievalHints?: object|null,
+ * }} [options]
  */
 export async function retrieveRepoMemory(manifest, options = {}) {
   const started = Date.now();
@@ -214,6 +275,9 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   const hops = rm.graph_hops ?? 1;
   const provider = options.provider ?? getEmbeddingProvider(options);
   const emit = options.emit !== false;
+  const hintNorm = normalizeRetrievalHints(
+    options.retrievalHints ?? options.queryBoost ?? null,
+  );
 
   const graph = loadRepoGraph();
   const { invalidated } = verifyRepoGraph(graph);
@@ -230,6 +294,9 @@ export async function retrieveRepoMemory(manifest, options = {}) {
         stale_dropped: staleDropped,
         empty: true,
         provider: provider.id,
+        retrieval_hints: hintNorm.sought.length || hintNorm.paths.length
+          ? hintNorm
+          : undefined,
       },
     });
     if (emit) {
@@ -241,7 +308,11 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     return empty;
   }
 
-  const { text: taskText } = buildTaskDocument(manifest, {});
+  const { text: taskText } = buildTaskDocument(manifest, {
+    paths: hintNorm.paths,
+    sought: hintNorm.sought,
+    recentFailures: hintNorm.recentFailures,
+  });
   const [queryVec] = await provider.embed([taskText]);
 
   const denseStarted = Date.now();
@@ -336,9 +407,48 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   }
   candidates.sort((a, b) => b.score - a.score);
 
+  // Seed / boost hint paths ahead of MMR so miss-heal sticks in focus
+  if (hintNorm.paths.length) {
+    const hintSet = new Set(hintNorm.paths);
+    for (const c of candidates) {
+      if (hintSet.has(c.node.path)) c.score += 50;
+    }
+    for (const p of hintNorm.paths) {
+      const entry = nodeEntryForPath(active, p);
+      if (!entry) continue;
+      const [nodeId, node] = entry;
+      if (candidates.some((c) => c.nodeId === nodeId)) continue;
+      candidates.push({
+        nodeId,
+        node,
+        score: 1e6,
+        vector: getRepoVector(nodeId, "summary") ?? getRepoVector(nodeId, "api"),
+      });
+    }
+    candidates.sort((a, b) => b.score - a.score);
+  }
+
   let picked = selectMmrNodes(candidates, maxNodes, cfg.mmr_lambda ?? 0.7);
+  const pickedIds = new Set(picked.map((c) => c.nodeId));
+  for (const p of hintNorm.paths) {
+    const entry = nodeEntryForPath(active, p);
+    if (!entry) continue;
+    const [nodeId, node] = entry;
+    if (pickedIds.has(nodeId)) continue;
+    picked.push({
+      nodeId,
+      node,
+      score: 1e6,
+      vector: getRepoVector(nodeId, "summary") ?? getRepoVector(nodeId, "api"),
+    });
+    pickedIds.add(nodeId);
+  }
+  picked = picked.slice(0, Math.max(maxNodes, hintNorm.paths.length + 2));
   let focusPaths = [
-    ...new Set(picked.map((c) => c.node.path).filter(Boolean)),
+    ...new Set([
+      ...hintNorm.paths.filter((p) => pathExistsInActive(active, p)),
+      ...picked.map((c) => c.node.path).filter(Boolean),
+    ]),
   ];
   ({ focusPaths, picked } = mergeStage1Neighbors(
     graph,
@@ -457,6 +567,11 @@ export async function retrieveRepoMemory(manifest, options = {}) {
       nodes_returned: picked.length,
       focus_spans: focusSpans.length,
       span_candidate_files: spanPaths.length,
+      retrieval_hints_applied: Boolean(
+        hintNorm.paths.length || hintNorm.sought.length,
+      ),
+      hint_paths: hintNorm.paths.slice(0, 16),
+      sought_terms: hintNorm.sought.slice(0, 16),
     },
   };
 

@@ -48,6 +48,7 @@ import {
 } from "./capability-evidence.mjs";
 import { processRunExperience } from "./experience/process.mjs";
 import { preparePhaseContext } from "./prepare-phase-context.mjs";
+import { processRetrievalMisses } from "./retrieval-miss.mjs";
 import { writeStageSummary } from "./write-stage-summary.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -575,6 +576,27 @@ if (!nextPhase) {
   manifest.enforcement.edit_allowed = isEditPhase(nextPhase, enforcement);
   applyNextPhaseSwarmTarget(runId, manifest, nextPhase);
   try {
+    let healResult = null;
+    try {
+      healResult = processRetrievalMisses(runId);
+      if (healResult?.processed > 0) {
+        recordLog(manifest, {
+          event: "retrieval_heal",
+          phase: nextPhase,
+          phase_kind: manifest.phase_kind,
+          detail: `${healResult.action}:${healResult.processed} misses → ${(healResult.resolved_paths ?? []).length} paths`,
+          level: "info",
+        });
+      }
+    } catch (healErr) {
+      recordLog(manifest, {
+        event: "retrieval_heal",
+        phase: nextPhase,
+        phase_kind: manifest.phase_kind,
+        detail: String(healErr?.message ?? healErr).slice(0, 300),
+        level: "warn",
+      });
+    }
     await preparePhaseContext(runId, manifest);
   } catch {
     // soft-fail — do not block phase advance

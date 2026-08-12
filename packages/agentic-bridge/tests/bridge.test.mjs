@@ -534,6 +534,8 @@ describe("agentic-bridge", () => {
     );
     expect(prompt).toContain("discover_agent_1.md");
     expect(prompt).toContain("Do **not** write phase checkpoint artifacts");
+    expect(prompt).toMatch(/graph-native|Repo vector graph packet/i);
+    expect(prompt).toMatch(/retrieval_miss/i);
   });
 
   it("composeSwarmAgentPrompt includes agent spec path and content", () => {

@@ -26,21 +26,21 @@ Launch **that many** parallel `Task` subagents (`explore`, `readonly: true`) in 
 
 Add domain-specific angles from inventory skill. Respect ceiling in swarm-sizing.yaml; second wave only when wave_plan requires it.
 
-## Retrieve-then-verify / verify-and-extend (mandatory — span-first)
+## Retrieve-then-verify / graph-native finding (mandatory — span-first)
 
 Every discovery Task **must**:
 
-1. Read **`artifacts/phase_context.json`** — especially `experience.repo_memory.read_pack` and `focus_spans`
-2. **Progressive reading (span-first):** use inlined `envelope_text` / `read_pack.spans` first — do not cold-open those files for the first pass
-3. Widen to full symbol (`start`–`end`) only if needed; full-file Read only for true gaps
-4. Honor hard budgets in `experience.repo_memory.meta.read_budgets` (`max_agent_files_read`, `max_full_file_opens`, `max_gap_search_globs`)
-5. Use `focus_paths` when spans are empty or insufficient; honor `avoid_paths`
+1. Consume the **inlined repo vector graph packet** in the prompt (and `artifacts/phase_context.json` if needed) — `read_pack`, `focus_spans`, `focus_paths`
+2. **Finding is graph-native** — never Glob or repo-wide Grep/SemanticSearch to discover paths
+3. **Reading is filesystem-native** — Read known paths; progressive: `envelope_text` → symbol range → full file
+4. Honor hard budgets in `experience.repo_memory.meta.read_budgets`
+5. Use `focus_paths` when spans are empty; honor `avoid_paths`
 6. **Verify** listed spans/paths/invariants (`hash_ok` / exists). Emit `confirmed` / `stale` / `new_findings`
 7. Treat `impact`, `entry_flows`, `clusters`, and `call_neighbors` as verified structure — do **not** re-walk them
-8. Grep/Glob/filesystem search **only for gaps** not covered by memory
+8. If the graph misses what you need: emit **`retrieval_miss` / low_confidence** (`sought`, `reason`) — do **not** silently Grep/Glob; the index expands, repairs, or deliberately authorizes fallback
 9. Prefer `scratchpad_excerpt` and invariants over rediscovering architecture from zero
 
-Do **not** cold-walk the whole repo when `repo_memory.nodes`, `focus_spans`, or `read_pack` is non-empty. Depth is for judgment, not inventory tourism.
+Do **not** cold-walk the whole repo when `repo_memory.nodes`, `focus_spans`, or `read_pack` is non-empty.
 
 ## discover_brief scope_signals (mandatory)
 

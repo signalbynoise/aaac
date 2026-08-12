@@ -24,6 +24,47 @@ const CLI_TOOL_KEY_TO_IDE = {
 };
 
 /**
+ * Sanitize tool args for metering / gates (no file contents).
+ * @param {string} toolName
+ * @param {object|null} args
+ */
+export function sanitizeToolArguments(toolName, args) {
+  const obj = parseToolArguments(args);
+  if (!obj) return null;
+  if (toolName === "UpdateCurrentStep") return obj;
+  if (toolName === "Read") {
+    const out = {};
+    if (typeof obj.path === "string") out.path = obj.path;
+    else if (typeof obj.file_path === "string") out.path = obj.file_path;
+    else if (typeof obj.filePath === "string") out.path = obj.filePath;
+    if (obj.offset != null) out.offset = obj.offset;
+    if (obj.limit != null) out.limit = obj.limit;
+    if (obj.start_line != null) out.start_line = obj.start_line;
+    if (obj.end_line != null) out.end_line = obj.end_line;
+    if (obj.startLine != null) out.startLine = obj.startLine;
+    if (obj.endLine != null) out.endLine = obj.endLine;
+    return out;
+  }
+  if (toolName === "Grep" || toolName === "Glob" || toolName === "SemanticSearch") {
+    const out = {};
+    for (const key of [
+      "path",
+      "file_path",
+      "filePath",
+      "target_directory",
+      "glob",
+      "glob_pattern",
+      "pattern",
+      "query",
+    ]) {
+      if (obj[key] != null) out[key] = obj[key];
+    }
+    return out;
+  }
+  return null;
+}
+
+/**
  * @param {object} toolCallObj - event.tool_call payload
  * @returns {{ toolName: string, path: string|null, arguments: object|null, cliKey: string|null } | null}
  */
@@ -38,14 +79,15 @@ export function mapStreamJsonToolCall(toolCallObj) {
       return mapNamedToolCall(name, payload?.arguments ?? payload?.args, cliKey);
     }
     const args = parseToolArguments(payload?.args ?? payload);
+    const toolName = ideName;
     return {
-      toolName: ideName,
+      toolName,
       path: extractPathFromArgs(args),
+      arguments: sanitizeToolArguments(toolName, args),
       cliKey,
     };
   }
 
-  // Unknown shape — try top-level name (SDK-style)
   if (typeof toolCallObj.name === "string" && toolCallObj.name) {
     return mapNamedToolCall(
       toolCallObj.name,
@@ -64,7 +106,7 @@ function mapNamedToolCall(name, rawArgs, cliKey) {
   return {
     toolName,
     path: extractPathFromArgs(args),
-    ...(toolName === "UpdateCurrentStep" ? { arguments: args } : {}),
+    arguments: sanitizeToolArguments(toolName, args),
     cliKey,
   };
 }
@@ -80,7 +122,6 @@ function normalizeFunctionToolName(name) {
   if (/^glob$/i.test(raw) || /^ls$/i.test(raw)) return "Glob";
   if (/sem(antic)?Search/i.test(raw)) return "SemanticSearch";
   if (/^shell$/i.test(raw) || /^Bash$/i.test(raw)) return "Shell";
-  // PascalCase IDE names pass through
   if (/^[A-Z][A-Za-z]+$/.test(raw)) return raw;
   return raw;
 }
@@ -106,18 +147,6 @@ function parseToolArguments(args) {
   return obj && typeof obj === "object" && !Array.isArray(obj) ? obj : null;
 }
 
-/**
- * Parse one NDJSON line into a metering event, or null.
- * Counts tool_call on subtype completed (or started when completed never seen —
- * callers should dedupe by call_id).
- *
- * @param {string} line
- * @returns {{ kind: 'tool', toolName: string, path: string|null, callId: string|null, subtype: string }
- *   | { kind: 'assistant', text: string }
- *   | { kind: 'result', text: string, sessionId: string|null }
- *   | { kind: 'usage', tokens: number, context: number|null, requestId: string|null }
- *   | null}
- */
 export function parseStreamJsonLine(line) {
   const trimmed = String(line ?? "").trim();
   if (!trimmed || trimmed[0] !== "{") return null;
@@ -155,7 +184,6 @@ function parseToolCallEvent(event) {
 function parseAssistantEvent(event) {
   const text = extractAssistantText(event);
   if (!text) return null;
-  // Skip duplicate flushes (partial-output mode): model_call_id present = buffered
   if (event.model_call_id && event.timestamp_ms) return null;
   return { kind: "assistant", text };
 }
@@ -184,16 +212,9 @@ function extractAssistantText(event) {
   return joined || null;
 }
 
-/**
- * Line-buffer for chunked stdout → NDJSON events.
- */
 export function createStreamJsonLineBuffer() {
   let pending = "";
   return {
-    /**
-     * @param {string} chunk
-     * @returns {string[]} complete lines
-     */
     push(chunk) {
       pending += String(chunk ?? "");
       const lines = [];

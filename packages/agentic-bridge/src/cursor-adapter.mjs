@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { spawn } from "child_process";
 import { createLogger } from "./logger.mjs";
 import { composePhasePrompt } from "./prompt-compose.mjs";
@@ -23,6 +25,12 @@ import {
   validateInitialSummary,
   validateSealedSummary,
 } from "@ludecker/aaac/run-engine/agent-progress-contract";
+import {
+  evaluateToolAccess,
+  budgetsFromPhaseContext,
+  FINDING_TOOLS,
+} from "@ludecker/aaac/run-engine/evaluate-finding-tools";
+import { resolveWorkspacePaths } from "./paths.mjs";
 
 const log = createLogger("agentic-bridge:cursor-adapter");
 
@@ -36,7 +44,45 @@ export function formatAdapterStartedDetail(ctx) {
   return JSON.stringify(payload);
 }
 
-async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000) {
+function loadPhaseContextForRun(workspaceRoot, runId) {
+  const { runsRoot } = resolveWorkspacePaths(workspaceRoot);
+  const pcPath = path.join(runsRoot, runId, "artifacts", "phase_context.json");
+  if (!fs.existsSync(pcPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(pcPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function loadManifestForRun(workspaceRoot, runId) {
+  const { runsRoot } = resolveWorkspacePaths(workspaceRoot);
+  const p = path.join(runsRoot, runId, "run.json");
+  if (!fs.existsSync(p)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function agentCountersFromManifest(manifest, phase, agentIndex) {
+  const agents = manifest?.swarm?.agents ?? [];
+  const match =
+    agentIndex != null
+      ? agents.find(
+          (a) => a.phase === phase && Number(a.index) === Number(agentIndex),
+        )
+      : [...agents].reverse().find((a) => a.phase === phase && !a.completed_at);
+  if (!match) return { files_read: 0, full_file_opens: 0, gap_searches: 0 };
+  return {
+    files_read: Number(match.files_read) || 0,
+    full_file_opens: Number(match.full_file_opens) || 0,
+    gap_searches: Number(match.gap_searches) || 0,
+  };
+}
+
+async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000, envExtras = {}) {
   const bin = await resolveCursorBin();
   if (!bin) {
     throw new Error("cursor agent binary not found — install Cursor or run Sign in with Cursor");
@@ -47,7 +93,6 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_00
   }
 
   const modelId = process.env.CURSOR_MODEL?.trim() || "composer-2.5";
-  // stream-json emits tool_call NDJSON for Phase B metering (text format cannot).
   const agentArgs = [
     "-p",
     "-f",
@@ -70,11 +115,17 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_00
     model: modelId,
     api_key: Boolean(apiKey),
     bin,
+    aaac_run_id: envExtras.AAAC_RUN_ID ?? null,
   });
 
   const child = spawn(bin, args, {
     cwd: workspaceRoot,
-    env: { ...process.env, CI: process.env.CI ?? "1", CURSOR_MODEL: modelId },
+    env: {
+      ...process.env,
+      CI: process.env.CI ?? "1",
+      CURSOR_MODEL: modelId,
+      ...envExtras,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -83,7 +134,7 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_00
 
 /**
  * Stream child stdout as Phase B events: tool / progress / completed payload.
- * Yields { kind: 'tool'|'progress' } while running; return value is completed result.
+ * Yields live while running so metering is not post-exit-only.
  * Agent runs are CLI-only (stream-json) — no silent SDK runner.
  */
 function createOutputState() {
@@ -100,6 +151,7 @@ function createOutputState() {
     seenCallIds: new Set(),
     usage: createCursorUsageAccumulator(),
     lineBuffer: createStreamJsonLineBuffer(),
+    findingDenied: false,
   };
 }
 
@@ -149,15 +201,22 @@ function completeChildOutput(state, code) {
   }
   const exitCode = code ?? 1;
   if (!state.error && exitCode !== 0) {
-    const message = filterCursorCliStderr(state.stderr);
-    if (message || !hasSubstantiveCursorCliOutput(state.stdout)) {
-      state.error = new Error(message || `cursor agent exited ${exitCode}`);
-    } else {
-      log.warn("cursor-cli", "Non-zero exit ignored; substantive stdout present", {
+    if (state.findingDenied) {
+      // Soft-complete: unauthorized finding tool stopped the agent
+      log.warn("cursor-cli", "Agent stopped after unauthorized finding tool", {
         exitCode,
-        stdoutChars: state.stdout.length,
-        stderrChars: state.stderr.length,
       });
+    } else {
+      const message = filterCursorCliStderr(state.stderr);
+      if (message || !hasSubstantiveCursorCliOutput(state.stdout)) {
+        state.error = new Error(message || `cursor agent exited ${exitCode}`);
+      } else {
+        log.warn("cursor-cli", "Non-zero exit ignored; substantive stdout present", {
+          exitCode,
+          stdoutChars: state.stdout.length,
+          stderrChars: state.stderr.length,
+        });
+      }
     }
   }
   state.done = true;
@@ -197,19 +256,20 @@ async function* streamChildOutput(child, timeoutMs) {
   attachChildOutputListeners(child, state, timeoutMs);
   while (!state.done || state.queue.length > 0) {
     while (state.queue.length > 0) {
-      yield state.queue.shift();
+      yield { item: state.queue.shift(), state };
     }
     if (state.done) break;
     await new Promise((resolve) => {
       state.resolveWait = resolve;
     });
   }
-  if (state.error) throw state.error;
+  if (state.error && !state.findingDenied) throw state.error;
   return {
     cursorRunId: state.sessionId,
     output: state.resultText || state.stdout,
     finalSummary: state.finalSummary,
     metrics: cursorUsageMetrics(state.usage),
+    findingDenied: state.findingDenied,
   };
 }
 
@@ -220,6 +280,7 @@ function toPhaseStreamEvent(ctx, item) {
       phase: ctx.phase,
       toolName: item.toolName,
       path: item.path ?? null,
+      arguments: item.arguments ?? null,
       callId: item.callId ?? null,
     };
   }
@@ -233,10 +294,50 @@ function toPhaseStreamEvent(ctx, item) {
   });
 }
 
-async function spawnAgentWithRetry(ctx, prompt) {
+/**
+ * Last-resort CLI stop when hooks did not deny an unauthorized finding tool.
+ * Prefer preToolUse deny; SIGTERM only if the tool already executed.
+ */
+function maybeStopUnauthorizedFinding(child, state, ctx, toolEvent) {
+  if (!toolEvent || toolEvent.type !== "tool") return false;
+  if (!FINDING_TOOLS.test(toolEvent.toolName ?? "")) return false;
+
+  const phaseContext = loadPhaseContextForRun(ctx.workspaceRoot, ctx.runId);
+  const manifest = loadManifestForRun(ctx.workspaceRoot, ctx.runId);
+  const counters = agentCountersFromManifest(
+    manifest,
+    ctx.phase,
+    ctx.agentIndex,
+  );
+  const budgets = budgetsFromPhaseContext(phaseContext);
+  const decision = evaluateToolAccess({
+    toolName: toolEvent.toolName,
+    toolInput: toolEvent.arguments ?? { path: toolEvent.path },
+    phaseContext,
+    budgets,
+    counters,
+  });
+  if (decision.allow) return false;
+
+  log.warn("finding-gate", "Unauthorized finding tool on CLI — stopping agent", {
+    runId: ctx.runId,
+    toolName: toolEvent.toolName,
+    reason: decision.reason,
+  });
+  state.findingDenied = true;
+  child.kill("SIGTERM");
+  return true;
+}
+
+async function spawnAgentWithRetry(ctx, prompt, envExtras) {
   let spawned;
   await withCursorCliRetry(async () => {
-    spawned = await runCursorAgentStreaming(ctx.workspaceRoot, prompt);
+    spawned = await runCursorAgentStreaming(
+      ctx.workspaceRoot,
+      prompt,
+      900_000,
+      envExtras,
+    );
   }, { maxAttempts: 2, baseBackoffMs: 2000 });
   return spawned;
 }
@@ -254,49 +355,90 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
     initialSummary: validateInitialSummary(ctx.initialSummary),
   });
   const prompt = ctx.prompt ?? composePhasePrompt(ctx.workspaceRoot, ctx.manifest, ctx.phase);
-  try {
-    const completed = await withCursorCliRetry(async () => {
-      const { child, timeoutMs } = await spawnAgentWithRetry(ctx, prompt);
-      activeChildren.set(ctx.runId, child);
-      try {
-        const stream = streamChildOutput(child, timeoutMs);
-        const events = [];
-        let next = await stream.next();
-        while (!next.done) {
-          const event = toPhaseStreamEvent(ctx, next.value);
-          if (event?.type === "tool" || event?.semanticSummary) events.push(event);
-          next = await stream.next();
-        }
-        if (!next.value) throw new Error("cursor agent produced no output");
-        // Surface keychain failures that arrived as child errors
-        if (next.value?.error && isKeychainAuthError(next.value.error)) {
-          throw next.value.error;
-        }
-        return { events, result: next.value };
-      } finally {
-        activeChildren.delete(ctx.runId);
-      }
-    }, { maxAttempts: 4, baseBackoffMs: 2000 });
+  const envExtras = {
+    AAAC_RUN_ID: ctx.runId,
+    AAAC_SESSION_ID: ctx.manifest?.session_id ?? process.env.AAAC_SESSION_ID ?? "",
+    AAAC_AGENT_INDEX:
+      ctx.agentIndex != null && ctx.agentIndex >= 0 ? String(ctx.agentIndex) : "",
+  };
 
-    for (const event of completed.events) yield event;
-    yield normalizePhaseEvent({
-      runId: ctx.runId,
-      type: "completed",
-      phase: ctx.phase,
-      agentIndex: ctx.agentIndex,
-      cursorRunId: completed.result.cursorRunId,
-      finalSummary: validateSealedSummary(completed.result.finalSummary),
-      metrics: completed.result.metrics,
-    });
-  } catch (err) {
-    activeChildren.delete(ctx.runId);
-    log.error("cursor-adapter", "Phase execution failed", {
-      runId: ctx.runId,
-      phase: ctx.phase,
-      error: String(err),
-    });
-    yield { type: "failed", phase: ctx.phase, detail: String(err) };
+  const maxAttempts = 4;
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    if (cancelled.has(ctx.runId)) {
+      yield { type: "failed", phase: ctx.phase, detail: "cancelled" };
+      return;
+    }
+    let child = null;
+    try {
+      const spawned = await spawnAgentWithRetry(ctx, prompt, envExtras);
+      child = spawned.child;
+      const timeoutMs = spawned.timeoutMs;
+      activeChildren.set(ctx.runId, child);
+
+      const stream = streamChildOutput(child, timeoutMs);
+      let findingDenied = false;
+      let next = await stream.next();
+      while (!next.done) {
+        const { item, state } = next.value;
+        const event = toPhaseStreamEvent(ctx, item);
+        if (event?.type === "tool") {
+          maybeStopUnauthorizedFinding(child, state, ctx, event);
+          findingDenied = findingDenied || state.findingDenied;
+        }
+        if (event?.type === "tool" || event?.semanticSummary) {
+          yield event;
+        }
+        next = await stream.next();
+      }
+      const result = next.value ?? {
+        cursorRunId: null,
+        output: "",
+        finalSummary: null,
+        metrics: {},
+        findingDenied,
+      };
+      findingDenied = findingDenied || Boolean(result.findingDenied);
+      if (!result.output && !result.finalSummary && !findingDenied && !result.cursorRunId) {
+        // empty — may retry
+        throw new Error("cursor agent produced no output");
+      }
+      activeChildren.delete(ctx.runId);
+      yield normalizePhaseEvent({
+        runId: ctx.runId,
+        type: "completed",
+        phase: ctx.phase,
+        agentIndex: ctx.agentIndex,
+        cursorRunId: result.cursorRunId,
+        finalSummary: validateSealedSummary(result.finalSummary),
+        metrics: result.metrics,
+        detail: findingDenied ? "finding_tool_denied" : undefined,
+      });
+      return;
+    } catch (err) {
+      activeChildren.delete(ctx.runId);
+      lastError = err;
+      if (isKeychainAuthError(err)) break;
+      const backoff = 2000 * attempt;
+      log.warn("cursor-adapter", "Agent attempt failed; retrying", {
+        runId: ctx.runId,
+        attempt,
+        error: String(err),
+        backoffMs: backoff,
+      });
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
+      }
+    }
   }
+
+  log.error("cursor-adapter", "Phase execution failed", {
+    runId: ctx.runId,
+    phase: ctx.phase,
+    error: String(lastError),
+  });
+  yield { type: "failed", phase: ctx.phase, detail: String(lastError) };
 }
 
 function cancelAdapterRun(runId, cancelled, activeChildren) {

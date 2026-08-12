@@ -8,6 +8,7 @@
  * Also auto-invoked on Run create (init-run / create-run-manifest) and
  * non-terminal phase advance.
  */
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { isoNow, loadRunManifest, runDir, writeJson } from "./lib.mjs";
@@ -100,6 +101,20 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     void lessonCap;
   }
 
+  const artifactsDir = path.join(runDir(runId), "artifacts");
+  const priorPcPath = path.join(artifactsDir, "phase_context.json");
+  let priorAuthorized = null;
+  let priorHints = null;
+  try {
+    if (fs.existsSync(priorPcPath)) {
+      const prior = JSON.parse(fs.readFileSync(priorPcPath, "utf8"));
+      priorAuthorized = prior.authorized_fallback ?? null;
+      priorHints = prior.retrieval_hints ?? null;
+    }
+  } catch {
+    // ignore
+  }
+
   const context = {
     prepared_at: isoNow(),
     run_id: runId,
@@ -135,7 +150,9 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     instructions:
       experience?.reuse_mode === "delta_or_confirm"
         ? "Read this file only — do not load full prior swarm transcripts. experience.prior_artifacts is SSOT for matching inputs: emit delta_or_confirm only (do not regenerate unchanged plan/report sections). Honor experience.strategy, experience.execution, and experience.graph_targets. Prefer experience.repo_memory (retrieve-then-verify) and experience.repo_facts over cold rediscovery. Stay within experience.context_budget."
-        : "Read this file only — do not load full prior swarm transcripts. Return structured blocks per agent spec. Honor experience.strategy and experience.execution (prioritize/skip). VERIFY-AND-EXTEND repo_memory: (1) consume experience.repo_memory.read_pack / focus_spans.envelope_text first — do not cold-open files for those spans; (2) widen to full symbol (start-end) only if needed; (3) full-file Read only for gaps; (4) emit confirmed/stale/new_findings — filesystem/Grep only for gaps not covered by memory. Treat impact, entry_flows, clusters, call_neighbors as verified structure. Hard budgets in experience.repo_memory.meta.read_budgets (max_agent_files_read / max_full_file_opens / max_gap_search_globs). Prefer experience.repo_facts over rediscovery. Cite experience.lessons with evidence. Stay within experience.context_budget.",
+        : "GRAPH-NATIVE FINDING; FILESYSTEM-NATIVE READING. Find paths/symbols only from experience.repo_memory (focus_paths, read_pack, envelopes, relations) — never Glob or repo-wide Grep. Read known paths with the Read tool (envelope → symbol → full file). If the graph misses what you need: emit retrieval_miss / low_confidence (sought, reason: not_in_focus|envelope_too_thin|stale_claim|symbol_missing|other) — do NOT silently Grep/Glob; the index layer expands, repairs, or deliberately authorizes fallback. VERIFY-AND-EXTEND: confirmed/stale/new_findings. Honor meta.read_budgets. Prefer experience.repo_facts. Cite lessons. Stay within experience.context_budget.",
+    authorized_fallback: priorAuthorized,
+    retrieval_hints: priorHints,
   };
 
   const artifactsDir = path.join(runDir(runId), "artifacts");

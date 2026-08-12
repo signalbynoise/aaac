@@ -130,7 +130,13 @@ export function persistSwarmExpectedSpecs(workspaceRoot, runId, agentSpecs) {
 export function recordAgentToolProgress(
   workspaceRoot,
   runId,
-  { phase, agentIndex = null, toolName, path: filePath = null } = {},
+  {
+    phase,
+    agentIndex = null,
+    toolName,
+    path: filePath = null,
+    toolInput = null,
+  } = {},
 ) {
   if (!toolName) return null;
   return mutateRun(workspaceRoot, runId, (manifest) => {
@@ -139,8 +145,9 @@ export function recordAgentToolProgress(
       agentIndex: agentIndex != null && agentIndex >= 0 ? agentIndex : undefined,
       toolName,
       path: filePath,
+      toolInput: toolInput ?? {},
       filesSource: "metered_bridge",
-      hook: { tool_name: toolName },
+      hook: { tool_name: toolName, tool_input: toolInput ?? {} },
     });
     log.debug("record", "Bridge diagnostic meter applied", {
       runId,
@@ -284,7 +291,11 @@ export function createAgentPhaseEventPersistence(
 ) {
   return {
     recordTool: (event) => recordAgentToolProgress(workspaceRoot, runId, {
-      phase, agentIndex, toolName: event.toolName, path: event.path ?? null,
+      phase,
+      agentIndex,
+      toolName: event.toolName,
+      path: event.path ?? null,
+      toolInput: event.arguments ?? event.toolInput ?? null,
     }),
     recordProgress: (event) => recordAgentSemanticProgress(workspaceRoot, runId, {
       phase, agentIndex, currentStep: event.semanticSummary,

@@ -8,9 +8,10 @@ Map user intent to layers (UI, store, domain, server, shared schemas). Flag file
 
 ## Protocol
 
-1. Trust `artifacts/discover_brief.yaml` + `artifacts/repo_memory.json` / `phase_context` — do not re-inventory the repo
-2. Prefer `read_pack` / `focus_spans.envelope_text` when verifying a claim; widen only for plan gaps
-3. Honor `meta.read_budgets` if present
+1. Trust `artifacts/discover_brief.yaml` + inlined graph packet — do not re-inventory
+2. **Finding is graph-native**; **Read** known paths (`read_pack` / envelopes) to verify claims
+3. On miss: emit **retrieval_miss** — do not silently Grep/Glob
+4. Honor `meta.read_budgets` if present
 
 ## Return
 

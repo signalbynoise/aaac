@@ -10,7 +10,7 @@
     "preToolUse": [
       {
         "command": ".cursor/hooks/aaac-pre-tool.sh",
-        "matcher": "Write|StrReplace|Delete|EditNotebook|ApplyPatch",
+        "matcher": "Read|Grep|Glob|SemanticSearch|Write|StrReplace|Delete|EditNotebook|ApplyPatch",
         "failClosed": true
       }
     ],

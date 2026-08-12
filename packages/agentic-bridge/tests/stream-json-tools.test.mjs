@@ -41,6 +41,8 @@ function verifySemanticArgumentsRemainIsolated() {
           name: "Read",
           arguments: JSON.stringify({
             path: "/Users/example/private-file.ts",
+            offset: 10,
+            limit: 40,
             current_step: "Untrusted ordinary argument",
           }),
         },
@@ -51,8 +53,13 @@ function verifySemanticArgumentsRemainIsolated() {
     kind: "tool",
     toolName: "Read",
     path: "/Users/example/private-file.ts",
+    arguments: {
+      path: "/Users/example/private-file.ts",
+      offset: 10,
+      limit: 40,
+    },
   });
-  expect(ordinary).not.toHaveProperty("arguments");
+  expect(ordinary.arguments).not.toHaveProperty("current_step");
   expect(JSON.stringify(ordinary)).not.toContain("Untrusted ordinary argument");
 }
 
@@ -61,6 +68,7 @@ describe("stream-json-tools", () => {
     expect(mapStreamJsonToolCall({ readToolCall: { args: { path: "a.ts" } } })).toEqual({
       toolName: "Read",
       path: "a.ts",
+      arguments: { path: "a.ts" },
       cliKey: "readToolCall",
     });
     expect(
@@ -75,9 +83,13 @@ describe("stream-json-tools", () => {
     ).toMatchObject({ toolName: "StrReplace", path: "c.ts" });
     expect(
       mapStreamJsonToolCall({
-        grepToolCall: { args: { pattern: "foo" } },
+        grepToolCall: { args: { pattern: "foo", path: "apps/x.ts" } },
       }),
-    ).toMatchObject({ toolName: "Grep", path: null });
+    ).toMatchObject({
+      toolName: "Grep",
+      path: "apps/x.ts",
+      arguments: { pattern: "foo", path: "apps/x.ts" },
+    });
     expect(
       mapStreamJsonToolCall({
         shellToolCall: { args: { command: "ls" } },
@@ -101,6 +113,7 @@ describe("stream-json-tools", () => {
       kind: "tool",
       toolName: "Read",
       path: "docs/architecture.md",
+      arguments: { path: "docs/architecture.md" },
       callId: "c1",
       subtype: "started",
     });

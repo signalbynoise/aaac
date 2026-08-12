@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * preToolUse — enforce progressive-read budgets from repo_memory / retrieval.yaml.
- * Soft-allows when no active run or budgets missing.
+ * preToolUse — graph-native finding + progressive-read budgets.
+ * Soft-allows when no active run.
  */
 import fs from "fs";
 import path from "path";
@@ -10,39 +10,76 @@ import {
   loadRunManifest,
   conversationIdFromHook,
   runDir,
+  readJson,
 } from "./lib.mjs";
 import { loadRetrievalConfig } from "./experience/paths.mjs";
+import {
+  budgetsFromPhaseContext,
+  evaluateToolAccess,
+  READ_TOOL,
+  FINDING_TOOLS,
+} from "./evaluate-finding-tools.mjs";
 
-const READ_TOOLS = /^(Read|Grep|Glob|SemanticSearch)$/i;
-const SEARCH_TOOLS = /^(Grep|Glob|SemanticSearch)$/i;
-
-function loadBudgets(runId) {
-  const defaults = loadRetrievalConfig()?.repo_memory ?? {};
-  const budgets = {
-    max_agent_files_read: defaults.max_agent_files_read ?? 16,
-    max_full_file_opens: defaults.max_full_file_opens ?? 4,
-    max_gap_search_globs: defaults.max_gap_search_globs ?? 8,
-  };
+function loadPhaseContext(runId) {
+  const pcPath = path.join(runDir(runId), "artifacts", "phase_context.json");
+  if (!fs.existsSync(pcPath)) return null;
   try {
-    const pcPath = path.join(runDir(runId), "artifacts", "phase_context.json");
-    if (fs.existsSync(pcPath)) {
-      const pc = JSON.parse(fs.readFileSync(pcPath, "utf8"));
-      const rb = pc?.experience?.repo_memory?.meta?.read_budgets;
-      if (rb && typeof rb === "object") {
-        for (const key of Object.keys(budgets)) {
-          if (Number.isFinite(Number(rb[key]))) budgets[key] = Number(rb[key]);
-        }
-      }
-    }
+    return JSON.parse(fs.readFileSync(pcPath, "utf8"));
   } catch {
-    // keep defaults
+    return null;
   }
-  return budgets;
 }
 
-function currentAgentCounters(manifest) {
+function resolveRunId(hook) {
+  const envRun = process.env.AAAC_RUN_ID?.trim();
+  if (envRun) return envRun;
+
+  const conversationId = conversationIdFromHook(hook);
+  if (conversationId) {
+    const active = loadActiveRun(conversationId);
+    if (active?.run_id) return active.run_id;
+  }
+
+  // Agentic OS sessions: active-runs may be keyed by aos session id
+  const sessionId =
+    process.env.AAAC_SESSION_ID?.trim() ||
+    hook?.session_id ||
+    hook?.sessionId ||
+    null;
+  if (sessionId) {
+    const active = loadActiveRun(sessionId);
+    if (active?.run_id) return active.run_id;
+    // sessions/{id}.json may point at run
+    try {
+      const sessionsRoot = path.join(
+        process.cwd(),
+        ".cursor/aaac/state/sessions",
+      );
+      const sess = readJson(path.join(sessionsRoot, `${sessionId}.json`), null);
+      if (sess?.run_id) return sess.run_id;
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
+function currentAgentCounters(manifest, agentIndex = null) {
   const agents = manifest?.swarm?.agents ?? [];
   const phase = manifest?.phase;
+  if (agentIndex != null && Number.isFinite(Number(agentIndex))) {
+    const byIndex = agents.find(
+      (a) => a.phase === phase && Number(a.index) === Number(agentIndex),
+    );
+    if (byIndex) {
+      return {
+        files_read: Number(byIndex.files_read) || 0,
+        full_file_opens: Number(byIndex.full_file_opens) || 0,
+        gap_searches: Number(byIndex.gap_searches) || 0,
+      };
+    }
+  }
   const open = [...agents]
     .reverse()
     .find((a) => a.phase === phase && !a.completed_at);
@@ -55,16 +92,6 @@ function currentAgentCounters(manifest) {
     full_file_opens: Number(agent.full_file_opens) || 0,
     gap_searches: Number(agent.gap_searches) || 0,
   };
-}
-
-function isFullFileRead(toolName, toolInput) {
-  if (!/^Read$/i.test(toolName)) return false;
-  const input = toolInput ?? {};
-  const hasOffset =
-    input.offset != null || input.start_line != null || input.startLine != null;
-  const hasLimit =
-    input.limit != null || input.end_line != null || input.endLine != null;
-  return !hasOffset && !hasLimit;
 }
 
 let input = "";
@@ -94,21 +121,12 @@ process.stdin.on("end", () => {
   }
 
   const toolName = hook.tool_name ?? hook.toolName ?? "";
-  if (!READ_TOOLS.test(toolName)) allow();
+  if (!READ_TOOL.test(toolName) && !FINDING_TOOLS.test(toolName)) allow();
 
-  const conversationId = conversationIdFromHook(hook);
-  if (!conversationId) allow();
+  const runId = resolveRunId(hook);
+  if (!runId) allow();
 
-  const active = loadActiveRun(conversationId);
-  if (
-    !active?.run_id ||
-    active.status === "completed" ||
-    active.status === "cancelled"
-  ) {
-    allow();
-  }
-
-  const manifest = loadRunManifest(active.run_id);
+  const manifest = loadRunManifest(runId);
   if (
     !manifest ||
     manifest.status === "completed" ||
@@ -117,35 +135,27 @@ process.stdin.on("end", () => {
     allow();
   }
 
-  const budgets = loadBudgets(active.run_id);
-  const counters = currentAgentCounters(manifest);
+  const phaseContext = loadPhaseContext(runId);
+  const retrievalDefaults = loadRetrievalConfig()?.repo_memory ?? {};
+  const budgets = budgetsFromPhaseContext(phaseContext, retrievalDefaults);
+  const agentIndex =
+    hook.agent_index ?? hook.agentIndex ?? process.env.AAAC_AGENT_INDEX ?? null;
+  const counters = currentAgentCounters(manifest, agentIndex);
   const toolInput =
     hook.tool_input ?? hook.toolInput ?? hook.arguments ?? {};
 
-  if (SEARCH_TOOLS.test(toolName)) {
-    if (counters.gap_searches >= budgets.max_gap_search_globs) {
-      deny(
-        "Read budget: gap search limit reached",
-        `max_gap_search_globs=${budgets.max_gap_search_globs} already used. Use repo_memory.read_pack / focus_spans.envelope_text; stop Grep/Glob tourism.`,
-      );
-    }
-    allow();
-  }
+  const decision = evaluateToolAccess({
+    toolName,
+    toolInput,
+    phaseContext,
+    budgets,
+    counters,
+  });
 
-  // Read
-  if (counters.files_read >= budgets.max_agent_files_read) {
+  if (!decision.allow) {
     deny(
-      "Read budget: file read limit reached",
-      `max_agent_files_read=${budgets.max_agent_files_read}. Prefer inlined envelope_text / read_pack; widen only for true gaps.`,
-    );
-  }
-  if (
-    isFullFileRead(toolName, toolInput) &&
-    counters.full_file_opens >= budgets.max_full_file_opens
-  ) {
-    deny(
-      "Read budget: full-file open limit reached",
-      `max_full_file_opens=${budgets.max_full_file_opens}. Read with offset/limit (envelope → symbol) instead of full files.`,
+      decision.user_message ?? "Tool denied",
+      decision.message ?? "Graph-native finding / read budget gate",
     );
   }
   allow();

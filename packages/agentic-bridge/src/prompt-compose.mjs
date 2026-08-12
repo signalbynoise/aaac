@@ -13,6 +13,12 @@ import {
 
 const log = createLogger("agentic-bridge:prompt-compose");
 
+const MAX_INLINE_PACKET_CHARS = 14_000;
+const MAX_ENVELOPE_CHARS = 600;
+const MAX_FOCUS_PATHS = 24;
+const MAX_READ_PACK_ITEMS = 8;
+const MAX_LESSONS = 5;
+
 export function loadPhasesConfig(workspaceRoot) {
   const { aaacRoot } = resolveWorkspacePaths(workspaceRoot);
   return loadPhasesConfigFromAaac(aaacRoot);
@@ -52,8 +58,103 @@ function readPolicySnippets(cursorRoot) {
     .join("\n---\n");
 }
 
+/**
+ * Load phase_context.json for a run (repo memory packet).
+ */
+export function loadPhaseContextPacket(workspaceRoot, runId) {
+  const { runsRoot } = resolveWorkspacePaths(workspaceRoot);
+  const pcPath = path.join(runsRoot, runId, "artifacts", "phase_context.json");
+  if (!fs.existsSync(pcPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(pcPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compact inlined graph packet for swarm prompts — finding is graph-native.
+ */
+export function formatInlineRepoMemoryPacket(phaseContext) {
+  if (!phaseContext) {
+    return `## Repo vector graph packet
+(none — phase_context.json missing; emit retrieval_miss if you cannot proceed without finding tools)
+`;
+  }
+
+  const rm = phaseContext.experience?.repo_memory ?? {};
+  const budgets = rm.meta?.read_budgets ?? {};
+  const focusPaths = (rm.focus_paths ?? []).slice(0, MAX_FOCUS_PATHS);
+  const lessons = (phaseContext.experience?.lessons ?? []).slice(0, MAX_LESSONS);
+  const spans = rm.focus_spans ?? rm.read_pack?.spans ?? [];
+  const packItems = Array.isArray(rm.read_pack)
+    ? rm.read_pack
+    : spans.length
+      ? spans
+      : rm.read_pack?.files ?? [];
+
+  const lines = [
+    "## Repo vector graph packet (SSOT for FINDING)",
+    "",
+    "**Finding is graph-native. Reading is filesystem-native.**",
+    "- Find paths/symbols **only** from this packet — do **not** Glob or repo-wide Grep.",
+    "- **Read** known paths with the Read tool (prefer envelope_text → symbol range → full file).",
+    "- If this packet is insufficient: emit **retrieval_miss** / low_confidence (`sought`, `reason`) — do **not** silently escape to Glob/Grep. The index layer expands, repairs, or deliberately authorizes fallback.",
+    "",
+    `Budgets: max_agent_files_read=${budgets.max_agent_files_read ?? 16}, max_full_file_opens=${budgets.max_full_file_opens ?? 4}, max_gap_search_globs=${budgets.max_gap_search_globs ?? 8}`,
+    `authorized_fallback: ${phaseContext.authorized_fallback?.enabled ? JSON.stringify({
+      paths: phaseContext.authorized_fallback.paths,
+      tools: phaseContext.authorized_fallback.tools,
+      max_searches: phaseContext.authorized_fallback.max_searches,
+    }) : "none (finding-tools denied)"}`,
+    "",
+    "### focus_paths",
+    focusPaths.length ? focusPaths.map((p) => `- ${p}`).join("\n") : "(empty)",
+    "",
+    "### read_pack / envelopes",
+  ];
+
+  let used = lines.join("\n").length;
+  let n = 0;
+  for (const item of packItems) {
+    if (n >= MAX_READ_PACK_ITEMS) break;
+    const p = item?.path ?? item?.file ?? "?";
+    const env = String(item?.envelope_text ?? item?.text ?? "").slice(0, MAX_ENVELOPE_CHARS);
+    const start = item?.start ?? item?.start_line ?? "";
+    const end = item?.end ?? item?.end_line ?? "";
+    const block = `\n#### ${p}${start !== "" ? `:${start}-${end}` : ""}\n\`\`\`\n${env || "(no envelope)"}\n\`\`\`\n`;
+    if (used + block.length > MAX_INLINE_PACKET_CHARS) break;
+    lines.push(block);
+    used += block.length;
+    n += 1;
+  }
+  if (n === 0) lines.push("(empty read_pack)");
+
+  lines.push("", "### lessons");
+  if (lessons.length) {
+    for (const lesson of lessons) {
+      const id = lesson.id ?? lesson.lesson_id ?? "lesson";
+      const summary = String(lesson.summary ?? lesson.title ?? lesson.remedy ?? "").slice(0, 200);
+      lines.push(`- ${id}: ${summary}`);
+    }
+  } else {
+    lines.push("(none)");
+  }
+
+  const impact = rm.impact ?? rm.relations?.impact;
+  if (impact && Array.isArray(impact) && impact.length) {
+    lines.push("", "### impact (trust as structure)", ...impact.slice(0, 8).map((x) => `- ${typeof x === "string" ? x : JSON.stringify(x).slice(0, 120)}`));
+  }
+
+  let text = lines.join("\n");
+  if (text.length > MAX_INLINE_PACKET_CHARS) {
+    text = `${text.slice(0, MAX_INLINE_PACKET_CHARS)}\n…(packet truncated)`;
+  }
+  return text;
+}
+
 export function composePhasePrompt(workspaceRoot, manifest, phase) {
-  const { aaacRoot, cursorRoot, runsRoot } = resolveWorkspacePaths(workspaceRoot);
+  const { cursorRoot, runsRoot } = resolveWorkspacePaths(workspaceRoot);
   const skill = resolveSkillForPhase(workspaceRoot, phase);
   const artifactsDir = path.join(runsRoot, manifest.run_id, "artifacts");
   const skillPath = skill
@@ -61,6 +162,8 @@ export function composePhasePrompt(workspaceRoot, manifest, phase) {
     : null;
   const skillContent = readOptionalFile(skillPath, Number.POSITIVE_INFINITY);
   const policySnippets = readPolicySnippets(cursorRoot);
+  const phaseContext = loadPhaseContextPacket(workspaceRoot, manifest.run_id);
+  const inlinePacket = formatInlineRepoMemoryPacket(phaseContext);
 
   const prompt = `# AAAC Phase Execution — Agentic OS
 
@@ -94,6 +197,8 @@ Required artifact filenames by phase (when applicable):
 
 Update Run manifest confidence fields when this phase produces them.
 
+${inlinePacket}
+
 ## Policies (summary)
 ${policySnippets.slice(0, 4000)}
 
@@ -104,6 +209,7 @@ ${skillContent.slice(0, 12000)}
 - **Do NOT** run \`advance-phase.mjs\`, \`approve-run.mjs\`, or \`resume-run.mjs\`.
 - PhaseRunner advances phases after you finish; only write artifacts to the artifacts directory.
 - Do not change \`run.json\` directly.
+- On graph miss: write retrieval_miss (sought + reason) via \`node .cursor/aaac/scripts/run-engine/record-retrieval-miss.mjs --run-id ${manifest.run_id} --sought "…" --reason not_in_focus\` — never silent Glob/Grep.
 
 Execute this phase completely. Write artifacts to disk. Do not skip validation steps.
 `;
@@ -112,6 +218,7 @@ Execute this phase completely. Write artifacts to disk. Do not skip validation s
     runId: manifest.run_id,
     phase,
     skill,
+    packetChars: inlinePacket.length,
   });
 
   return prompt;
@@ -159,7 +266,7 @@ ${taskPolicy}
 Focus on the angle defined in the agent spec above. Write findings to:
 artifacts/${phase}_agent_${agentIndex + 1}.md
 
-Return structured blocks: Findings, Evidence (path:line), Gaps, Confidence.
+Return structured blocks: Findings, Evidence (path:line), Gaps, Confidence, retrieval_miss (if any).
 
 Do **not** write phase checkpoint artifacts (e.g. discover_brief.yaml, investigation.md) — a separate orchestrator synthesis step runs after all swarm agents finish.
 `;

@@ -77,4 +77,25 @@ describe("deterministic checkpoint", () => {
     );
     expect(Buffer.byteLength(md, "utf8")).toBeLessThanOrEqual(14000);
   });
+
+  it("refuses deterministic report.md so LLM synthesizer must author it", () => {
+    const art = path.join(root, ".cursor", "aaac", "state", "runs", runId, "artifacts");
+    fs.writeFileSync(
+      path.join(art, "report_agent_1.md"),
+      `# reviewer\n\n## Findings\n\nartifacts/report.md is absent.\n`,
+    );
+    const result = synthesizePhaseCheckpointDeterministic({
+      workspaceRoot: root,
+      runId,
+      phase: "report",
+      manifest: { command: "review-architecture", domain: "general" },
+      swarmAgentCount: 1,
+      missing: ["artifacts/report.md"],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/LLM synthesizer/i);
+    expect(
+      fs.existsSync(path.join(root, ".cursor/aaac/state/runs", runId, "artifacts/report.md")),
+    ).toBe(false);
+  });
 });

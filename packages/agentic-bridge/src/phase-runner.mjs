@@ -112,63 +112,82 @@ export class PhaseRunner extends EventEmitter {
     );
     if (missing.length === 0) return;
     const missingNames = missing.map((rel) => String(rel).replace(/^artifacts\//, "")).join(", ");
-    const synthesizingDetail = `Merging phase artifacts (${missingNames})…`;
-    log.info("checkpoint", "Synthesizing swarm checkpoint artifacts", {
-      runId,
-      phase,
-      missing,
-      mode: "deterministic",
-    });
-    appendPhaseOutput(this.workspaceRoot, runId, {
-      phase,
-      detail: synthesizingDetail,
-      level: "info",
-    });
 
-    const det = synthesizePhaseCheckpointDeterministic({
-      workspaceRoot: this.workspaceRoot,
-      runId,
-      phase,
-      manifest,
-      swarmAgentCount,
-      missing,
-    });
-    const stillMissing = await getMissingPhaseArtifacts(
-      this.workspaceRoot,
-      runId,
-      phase,
-      manifest,
-    );
-    if (det.ok && stillMissing.length === 0) {
-      log.info("checkpoint", "Deterministic checkpoint satisfied artifacts", {
+    // Report agents are reviewers — they do not author report.md. Always use the
+    // LLM synthesizer so the user-facing run summary is real (latency OK here).
+    const allowDeterministic = phase !== "report";
+
+    if (allowDeterministic) {
+      const synthesizingDetail = `Merging phase artifacts (${missingNames})…`;
+      log.info("checkpoint", "Synthesizing swarm checkpoint artifacts", {
         runId,
         phase,
-        written: det.written,
+        missing,
+        mode: "deterministic",
       });
       appendPhaseOutput(this.workspaceRoot, runId, {
         phase,
-        detail: `Checkpoint merged (${det.written.join(", ") || "ok"})`,
+        detail: synthesizingDetail,
         level: "info",
       });
-      this.emit("phase-event", {
+
+      const det = synthesizePhaseCheckpointDeterministic({
+        workspaceRoot: this.workspaceRoot,
         runId,
-        agentIndex: null,
-        checkpoint: true,
-        type: "completed",
-        detail: "deterministic_checkpoint",
+        phase,
+        manifest,
+        swarmAgentCount,
+        missing,
       });
-      return;
+      const stillMissing = await getMissingPhaseArtifacts(
+        this.workspaceRoot,
+        runId,
+        phase,
+        manifest,
+      );
+      if (det.ok && stillMissing.length === 0) {
+        log.info("checkpoint", "Deterministic checkpoint satisfied artifacts", {
+          runId,
+          phase,
+          written: det.written,
+        });
+        appendPhaseOutput(this.workspaceRoot, runId, {
+          phase,
+          detail: `Checkpoint merged (${det.written.join(", ") || "ok"})`,
+          level: "info",
+        });
+        this.emit("phase-event", {
+          runId,
+          agentIndex: null,
+          checkpoint: true,
+          type: "completed",
+          detail: "deterministic_checkpoint",
+        });
+        return;
+      }
+
+      log.warn("checkpoint", "Deterministic checkpoint incomplete; LLM fallback", {
+        runId,
+        phase,
+        reason: det.reason,
+        stillMissing,
+      });
+    } else {
+      log.info("checkpoint", "Synthesizing swarm checkpoint artifacts", {
+        runId,
+        phase,
+        missing,
+        mode: "llm",
+      });
     }
 
-    log.warn("checkpoint", "Deterministic checkpoint incomplete; LLM fallback", {
-      runId,
-      phase,
-      reason: det.reason,
-      stillMissing,
-    });
+    const llmMissing = allowDeterministic
+      ? await getMissingPhaseArtifacts(this.workspaceRoot, runId, phase, manifest)
+      : missing;
+    const effectiveMissing = llmMissing.length ? llmMissing : missing;
     appendPhaseOutput(this.workspaceRoot, runId, {
       phase,
-      detail: `Synthesizing phase artifacts (${(stillMissing.length ? stillMissing : missing)
+      detail: `Synthesizing phase artifacts (${effectiveMissing
         .map((rel) => String(rel).replace(/^artifacts\//, ""))
         .join(", ")})…`,
       level: "info",
@@ -178,7 +197,7 @@ export class PhaseRunner extends EventEmitter {
       manifest,
       phase,
       swarmAgentCount,
-      stillMissing.length ? stillMissing : missing,
+      effectiveMissing,
     );
     for await (const event of this.adapter.runPhase({
       workspaceRoot: this.workspaceRoot,

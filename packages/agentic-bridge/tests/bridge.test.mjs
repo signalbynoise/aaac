@@ -369,7 +369,7 @@ describe("cursor-adapter activity formatting", () => {
         /synthesizePhaseCheckpointDeterministic/,
         /Merging phase artifacts|Synthesizing phase artifacts/,
         /checkpoint: true/,
-        /appendPhaseOutput\([\s\S]*synthesizingDetail/,
+        /phase !== ["']report["']/,
         /LLM fallback/,
       ],
     });

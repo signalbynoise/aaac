@@ -344,10 +344,13 @@ export function synthesizePhaseCheckpointDeterministic({
         written.push("artifacts/plan.yaml");
       }
     } else if (phase === "report") {
-      if (need.has("artifacts/report.md")) {
-        writeArtifact(artifactsDir, "artifacts/report.md", buildReportMd(bodies, manifest));
-        written.push("artifacts/report.md");
-      }
+      // Report must be authored by the LLM checkpoint (reviewers do not write
+      // report.md). Refuse deterministic merge so phase-runner always falls back.
+      return {
+        ok: false,
+        written: [],
+        reason: "report.md requires LLM synthesizer (reviewer agents are not authors)",
+      };
     } else {
       // Generic: write a markdown merge for any other missing *.md / *.yaml basename
       for (const rel of need) {

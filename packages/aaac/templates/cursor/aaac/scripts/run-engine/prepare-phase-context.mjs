@@ -155,7 +155,6 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     retrieval_hints: priorHints,
   };
 
-  const artifactsDir = path.join(runDir(runId), "artifacts");
   const outPath = path.join(artifactsDir, "phase_context.json");
   writeJson(outPath, context);
 

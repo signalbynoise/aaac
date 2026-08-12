@@ -271,7 +271,7 @@ describe("historical stage-summary graph fallback", () => {
     expect(writeSummary(runId)).toMatchObject({
       status: "validated",
       layman:
-        "Find all files, routes, tests, and migrations belonging to the target domain — using retrieve-then-verify",
+        "Find all files, routes, tests, and migrations belonging to the target domain — using the repo vector graph packet (find via graph, read via filesystem)",
     });
     expect(readPersistedSummary(runId).source_artifacts).toEqual([
       "phase-roster:discover:agent-spec:.cursor/agents/discovery-inventory.md#Role",
@@ -291,7 +291,7 @@ describe("historical stage-summary graph fallback", () => {
 
     expect(writeSummary(runId)).toMatchObject({
       status: "validated",
-      layman: "Find all files, routes, tests, and migrations belonging to the target domain — using retrieve-then-verify",
+      layman: "Find all files, routes, tests, and migrations belonging to the target domain — using the repo vector graph packet (find via graph, read via filesystem)",
     });
     expect(readPersistedSummary(runId).source_artifacts).toEqual([
       "phase-roster:discover:agent-spec:.cursor/agents/discovery-inventory.md#Role",

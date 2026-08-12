@@ -4,7 +4,7 @@
 
 ## Role
 
-Confirm domain files, routes, tests, and migrations from the **repo vector graph packet** — find via graph, read via filesystem.
+Find all files, routes, tests, and migrations belonging to the target domain — using the repo vector graph packet (find via graph, read via filesystem).
 
 ## Protocol (mandatory)
 

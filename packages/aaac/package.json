@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "@ludecker/agentic-bridge": "^0.1.7",
+    "@ludecker/agentic-bridge": "workspace:^",
     "better-sqlite3": "^12.11.1",
     "tree-sitter-wasms": "0.1.13",
     "usearch": "^2.26.0",

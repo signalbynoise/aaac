@@ -53,6 +53,30 @@ aliases:
   grok-4.5-medium-fast: grok-4.5-fast
   grok-4.5-low-fast: grok-4.5-fast
   grok-4.5-fast: grok-4.5-fast
+  cursor-grok-4.6: grok-4.6
+  cursor-grok-4.6-high: grok-4.6
+  cursor-grok-4.6-high-fast: grok-4.6-fast
+  cursor-grok-4.6-medium: grok-4.6
+  cursor-grok-4.6-medium-fast: grok-4.6-fast
+  cursor-grok-4.6-low: grok-4.6
+  cursor-grok-4.6-low-fast: grok-4.6-fast
+  cursor-grok-4.6-xhigh: grok-4.6
+  cursor-grok-4.6-xhigh-fast: grok-4.6-fast
+  cursor-grok-4.6-extra-high: grok-4.6
+  cursor-grok-4.6-extra-high-fast: grok-4.6-fast
+  cursor-grok-4.6-fast: grok-4.6-fast
+  grok-4.6-high: grok-4.6
+  grok-4.6-high-fast: grok-4.6-fast
+  grok-4.6-medium: grok-4.6
+  grok-4.6-medium-fast: grok-4.6-fast
+  grok-4.6-low: grok-4.6
+  grok-4.6-low-fast: grok-4.6-fast
+  grok-4.6-xhigh: grok-4.6
+  grok-4.6-xhigh-fast: grok-4.6-fast
+  grok-4.6-extra-high: grok-4.6
+  grok-4.6-extra-high-fast: grok-4.6-fast
+  grok-4.6-fast: grok-4.6-fast
+  grok-4.6: grok-4.6
   gpt-5.3-codex: gpt-5.3-codex
   gpt-5.3-codex-fast: gpt-5.3-codex
   gpt-5.3-codex-high: gpt-5.3-codex
@@ -410,6 +434,22 @@ models:
     input_per_million: 4
     output_per_million: 18
     cache_read_per_million: 0.5
+  grok-4.6:
+    display_name: "Grok 4.6"
+    context_window: 200000
+    provider: Cursor
+    pool: first_party
+    input_per_million: 2
+    output_per_million: 6
+    cache_read_per_million: 0.5
+  grok-4.6-fast:
+    display_name: "Grok 4.6 Fast"
+    context_window: 200000
+    provider: Cursor
+    pool: first_party
+    input_per_million: 4
+    output_per_million: 12
+    cache_read_per_million: 1
   kimi-k2.7-code:
     display_name: "Kimi K2.7 Code"
     context_window: 200000

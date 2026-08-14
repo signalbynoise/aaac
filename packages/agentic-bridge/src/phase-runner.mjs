@@ -29,6 +29,7 @@ import { persistAgentPhaseEvent } from "./phase-event-contract.mjs";
 import { loadPhasesConfig, resolveSubagentTypeForPhase }
   from "@ludecker/aaac/run-engine/swarm-agent-specs";
 import { resolveWorkspacePaths } from "./paths.mjs";
+import { resolveAaacPhaseModel } from "./aaac-model.mjs";
 const log = createLogger("agentic-bridge:phase-runner");
 function isGatePhaseEntry(manifest, phase, workspaceRoot) {
   if (manifest?.phase_kind === "gate") return true;
@@ -76,11 +77,16 @@ export class PhaseRunner extends EventEmitter {
     const phasesConfig = loadPhasesConfig(aaacRoot);
     const subagentType = resolveSubagentTypeForPhase(phase, phasesConfig);
     const initialSummary = getAgentInitialSummary(this.workspaceRoot, agentSpec);
+    const model = await resolveAaacPhaseModel(this.workspaceRoot, {
+      phase,
+      agentSpecId: agentSpec?.id ?? null,
+      subagentType,
+    });
     recordAgentLaunch(this.workspaceRoot, runId, {
       agentIndex,
       phase,
       subagentType,
-      model: process.env.CURSOR_MODEL ?? null,
+      model,
       description: agentSpec?.id ?? `${phase} swarm agent ${agentIndex + 1}/${count}`,
       agentSpecId: agentSpec?.id ?? null,
       agentSpecPath: agentSpec?.cursorPath ?? null,
@@ -97,6 +103,8 @@ export class PhaseRunner extends EventEmitter {
       prompt,
       agentIndex,
       initialSummary,
+      agentSpec,
+      subagentType,
     })) {
       this.emit("phase-event", { runId, agentIndex, ...event });
       persistAgentPhaseEvent(event, persistence);

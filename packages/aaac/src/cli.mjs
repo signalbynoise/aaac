@@ -219,7 +219,7 @@ async function cmdRun(args, argv) {
       targetDir,
       autoApprove,
       json: json || true,
-      model: process.env.CURSOR_MODEL || "composer-2.5",
+      model: process.env.CURSOR_MODEL || undefined,
     });
   } catch (err) {
     if (!json && err?.result) {

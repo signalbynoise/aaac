@@ -1,9 +1,13 @@
+# AAAC model routing SSOT.
+# Provider lock: Grok 4.6 variants only. Other providers are rejected at load time.
 version: 1
+provider: grok
+family: grok-4.6
 
 tiers:
-  fast: composer-2.5-fast
-  codex: gpt-5.3-codex-high-fast
-  reasoning: claude-sonnet-5-thinking-high
+  fast: grok-4.6-fast
+  codex: grok-4.6-high
+  reasoning: grok-4.6-xhigh
 
 default_tier: fast
 

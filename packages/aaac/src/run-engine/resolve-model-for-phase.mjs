@@ -2,7 +2,7 @@
  * Resolve model tier + slug for a phase/subagent launch.
  * Precedence: agent_specs > phases > subagent_types > default_tier
  */
-import { MODEL_ROUTING_PATH, loadModelRouting } from "./load-model-routing.mjs";
+import { getModelRoutingPath, loadModelRouting } from "./load-model-routing.mjs";
 
 const LOG_LEVEL_PRIORITY = {
   debug: 0,
@@ -186,10 +186,10 @@ export function resolveModelForPhase(args = {}) {
   debugLog("debug", "resolve_phase", "resolved model for phase", {
     ...args,
     ...result,
-    routing_path: MODEL_ROUTING_PATH,
+    routing_path: getModelRoutingPath(),
   });
 
   return result;
 }
 
-export { MODEL_ROUTING_PATH };
+export { getModelRoutingPath as MODEL_ROUTING_PATH };

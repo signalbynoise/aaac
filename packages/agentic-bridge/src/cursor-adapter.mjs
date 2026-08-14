@@ -31,6 +31,7 @@ import {
   FINDING_TOOLS,
 } from "@ludecker/aaac/run-engine/evaluate-finding-tools";
 import { resolveWorkspacePaths } from "./paths.mjs";
+import { DEFAULT_AAAC_MODEL_SLUG, resolveAaacPhaseModel } from "./aaac-model.mjs";
 
 const log = createLogger("agentic-bridge:cursor-adapter");
 
@@ -92,7 +93,7 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_00
     throw new Error("Not signed in to Cursor — use Sign in with Cursor in Agentic OS");
   }
 
-  const modelId = process.env.CURSOR_MODEL?.trim() || "composer-2.5";
+  const modelId = envExtras.CURSOR_MODEL?.trim() || DEFAULT_AAAC_MODEL_SLUG;
   const agentArgs = [
     "-p",
     "-f",
@@ -345,11 +346,17 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
     initialSummary: validateInitialSummary(ctx.initialSummary),
   });
   const prompt = ctx.prompt ?? composePhasePrompt(ctx.workspaceRoot, ctx.manifest, ctx.phase);
+  const modelId = await resolveAaacPhaseModel(ctx.workspaceRoot, {
+    phase: ctx.phase,
+    agentSpecId: ctx.agentSpec?.id ?? null,
+    subagentType: ctx.subagentType ?? null,
+  });
   const envExtras = {
     AAAC_RUN_ID: ctx.runId,
     AAAC_SESSION_ID: ctx.manifest?.session_id ?? process.env.AAAC_SESSION_ID ?? "",
     AAAC_AGENT_INDEX:
       ctx.agentIndex != null && ctx.agentIndex >= 0 ? String(ctx.agentIndex) : "",
+    CURSOR_MODEL: modelId,
   };
 
   const maxAttempts = 4;

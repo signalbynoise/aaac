@@ -1,16 +1,25 @@
 import { describe, expect, it, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { resolveModelForPhase, resolveModelTierDetail } from '../src/run-engine/resolve-model-for-phase.mjs';
-import { resetModelRoutingCache } from '../src/run-engine/load-model-routing.mjs';
+import {
+  resetModelRoutingCache,
+  loadModelRouting,
+  isAllowedAaacModelSlug,
+  AAAC_MODEL_FAMILY,
+  AAAC_MODEL_PROVIDER,
+} from '../src/run-engine/load-model-routing.mjs';
 
 describe('resolve-model-for-phase', () => {
   beforeEach(() => {
     resetModelRoutingCache();
   });
 
-  it('returns codex for execute phase', () => {
+  it('returns grok-4.6-high for execute phase', () => {
     const result = resolveModelForPhase({ phase: 'execute' });
     expect(result.tier).toBe('codex');
-    expect(result.model_slug).toBe('gpt-5.3-codex-high-fast');
+    expect(result.model_slug).toBe('grok-4.6-high');
     expect(result.source).toBe('phases');
   });
 
@@ -20,18 +29,18 @@ describe('resolve-model-for-phase', () => {
       agent_spec_id: 'code-author',
     });
     expect(result.tier).toBe('codex');
-    expect(result.model_slug).toBe('gpt-5.3-codex-high-fast');
+    expect(result.model_slug).toBe('grok-4.6-high');
     expect(result.source).toBe('agent_specs');
   });
 
-  it('falls back to fast tier when unmapped', () => {
+  it('falls back to fast Grok 4.6 when unmapped', () => {
     const result = resolveModelForPhase({
       phase: 'unmapped-phase',
       agent_spec_id: 'missing-spec',
       subagent_type: 'missing-subagent-type',
     });
     expect(result.tier).toBe('fast');
-    expect(result.model_slug).toBe('composer-2.5-fast');
+    expect(result.model_slug).toBe('grok-4.6-fast');
     expect(result.source).toBe('default_tier');
   });
 
@@ -52,7 +61,57 @@ describe('resolve-model-for-phase', () => {
       agent_spec_id: 'discovery-inventory',
     });
     expect(result.tier).toBe('fast');
-    expect(result.model_slug).toBe('composer-2.5-fast');
+    expect(result.model_slug).toBe('grok-4.6-fast');
     expect(result.source).toBe('agent_specs');
+  });
+
+  it('returns grok-4.6-xhigh for reasoning phases', () => {
+    const result = resolveModelForPhase({ phase: 'plan' });
+    expect(result.tier).toBe('reasoning');
+    expect(result.model_slug).toBe('grok-4.6-xhigh');
+  });
+
+  it('allows only Grok 4.6 slugs', () => {
+    expect(isAllowedAaacModelSlug('grok-4.6-fast')).toBe(true);
+    expect(isAllowedAaacModelSlug('cursor-grok-4.6-xhigh-fast')).toBe(true);
+    expect(isAllowedAaacModelSlug('grok-4.5-fast')).toBe(false);
+    expect(isAllowedAaacModelSlug('composer-2.5-fast')).toBe(false);
+    expect(isAllowedAaacModelSlug('gpt-5.3-codex-high-fast')).toBe(false);
+    expect(isAllowedAaacModelSlug('claude-sonnet-5-thinking-high')).toBe(false);
+  });
+
+  it('coerces non-Grok YAML slugs to Grok 4.6 defaults', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aaac-routing-'));
+    const aaacDir = path.join(dir, '.cursor', 'aaac');
+    fs.mkdirSync(aaacDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(aaacDir, 'model-routing.yaml'),
+      [
+        'version: 1',
+        'tiers:',
+        '  fast: composer-2.5-fast',
+        '  codex: gpt-5.3-codex-high-fast',
+        '  reasoning: claude-sonnet-5-thinking-high',
+        'default_tier: fast',
+        '',
+      ].join('\n'),
+    );
+    const previous = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = dir;
+    resetModelRoutingCache();
+    try {
+      const routing = loadModelRouting();
+      expect(routing.provider).toBe(AAAC_MODEL_PROVIDER);
+      expect(routing.family).toBe(AAAC_MODEL_FAMILY);
+      expect(routing.tiers.fast).toBe('grok-4.6-fast');
+      expect(routing.tiers.codex).toBe('grok-4.6-high');
+      expect(routing.tiers.reasoning).toBe('grok-4.6-xhigh');
+      expect(resolveModelForPhase({ phase: 'execute' }).model_slug).toBe('grok-4.6-high');
+    } finally {
+      if (previous == null) delete process.env.AAAC_WORKSPACE_ROOT;
+      else process.env.AAAC_WORKSPACE_ROOT = previous;
+      resetModelRoutingCache();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

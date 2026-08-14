@@ -48,14 +48,49 @@ function aaacRoot() {
   return path.resolve(__dirname, "../../..", "aaac");
 }
 
-const MODEL_ROUTING_PATH = path.join(aaacRoot(), "model-routing.yaml");
+function getModelRoutingPath() {
+  return path.join(aaacRoot(), "model-routing.yaml");
+}
+
+/** AAAC may only dispatch Grok 4.6 variants. */
+export const AAAC_MODEL_PROVIDER = "grok";
+export const AAAC_MODEL_FAMILY = "grok-4.6";
+export const DEFAULT_AAAC_MODEL_SLUG = "grok-4.6-fast";
+export const AAAC_ALLOWED_MODEL_PATTERN = /^(cursor-)?grok-4\.6(?:-[a-z0-9]+)*$/i;
+
+export function isAllowedAaacModelSlug(slug) {
+  return typeof slug === "string" && AAAC_ALLOWED_MODEL_PATTERN.test(slug.trim());
+}
+
+function coerceGrokSlug(slug, fallback = DEFAULT_AAAC_MODEL_SLUG) {
+  if (slug == null) return slug;
+  if (isAllowedAaacModelSlug(slug)) return slug.trim();
+  debugLog("warn", "coerce", "rejected non-Grok model slug", {
+    slug,
+    fallback,
+    provider: AAAC_MODEL_PROVIDER,
+    family: AAAC_MODEL_FAMILY,
+  });
+  return fallback;
+}
+
+function coerceTiers(tiers) {
+  const out = {};
+  for (const [name, slug] of Object.entries(tiers ?? {})) {
+    const fallback = DEFAULT_ROUTING.tiers[name] ?? DEFAULT_AAAC_MODEL_SLUG;
+    out[name] = coerceGrokSlug(slug, fallback);
+  }
+  return out;
+}
 
 const DEFAULT_ROUTING = {
   version: 1,
+  provider: AAAC_MODEL_PROVIDER,
+  family: AAAC_MODEL_FAMILY,
   tiers: {
-    fast: "composer-2.5-fast",
-    codex: "gpt-5.3-codex-high-fast",
-    reasoning: "claude-sonnet-5-thinking-high",
+    fast: "grok-4.6-fast",
+    codex: "grok-4.6-high",
+    reasoning: "grok-4.6-xhigh",
   },
   default_tier: "fast",
   phases: {
@@ -184,10 +219,10 @@ function normalizeRouting(parsed) {
     return { ...DEFAULT_ROUTING };
   }
 
-  const tiers = {
+  const tiers = coerceTiers({
     ...DEFAULT_ROUTING.tiers,
     ...(parsed.tiers ?? {}),
-  };
+  });
 
   const defaultTier =
     typeof parsed.default_tier === "string" && parsed.default_tier
@@ -197,6 +232,8 @@ function normalizeRouting(parsed) {
   const normalized = {
     ...DEFAULT_ROUTING,
     ...parsed,
+    provider: AAAC_MODEL_PROVIDER,
+    family: AAAC_MODEL_FAMILY,
     tiers,
     default_tier: defaultTier,
     phases: {
@@ -227,8 +264,9 @@ function normalizeRouting(parsed) {
 export function loadModelRouting() {
   if (cachedRouting) return cachedRouting;
 
-  debugLog("debug", "load", "loading model routing", { path: MODEL_ROUTING_PATH });
-  const parsed = loadYamlFile(MODEL_ROUTING_PATH);
+  const routingPath = getModelRoutingPath();
+  debugLog("debug", "load", "loading model routing", { path: routingPath });
+  const parsed = loadYamlFile(routingPath);
   cachedRouting = normalizeRouting(parsed);
   debugLog("debug", "load", "model routing loaded", {
     version: cachedRouting.version,
@@ -242,4 +280,4 @@ export function resetModelRoutingCache() {
   debugLog("debug", "cache", "model routing cache reset");
 }
 
-export { MODEL_ROUTING_PATH };
+export { getModelRoutingPath, getModelRoutingPath as MODEL_ROUTING_PATH };

@@ -44,7 +44,7 @@ export function normalizeModelSlug(raw) {
   let prev = null;
   while (prev !== slug) {
     prev = slug;
-    slug = slug.replace(/-(thinking|fast|high|medium|low|max)(-fast|-high|-medium|-low)?$/, "");
+    slug = slug.replace(/-(extra-high|xhigh|thinking|fast|high|medium|low|max)(-fast)?$/, "");
   }
   return slug || null;
 }

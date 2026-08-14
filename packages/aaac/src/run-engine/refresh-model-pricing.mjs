@@ -26,6 +26,18 @@ const STATIC_ALIASES = {
   "cursor-grok-4.5": "grok-4.5",
   "cursor-grok-4.5-high": "grok-4.5",
   "cursor-grok-4.5-high-fast": "grok-4.5",
+  "grok-4.6": "grok-4.6",
+  "grok-4.6-fast": "grok-4.6-fast",
+  "grok-4.6-high": "grok-4.6",
+  "grok-4.6-high-fast": "grok-4.6-fast",
+  "grok-4.6-xhigh": "grok-4.6",
+  "grok-4.6-xhigh-fast": "grok-4.6-fast",
+  "cursor-grok-4.6": "grok-4.6",
+  "cursor-grok-4.6-fast": "grok-4.6-fast",
+  "cursor-grok-4.6-high": "grok-4.6",
+  "cursor-grok-4.6-high-fast": "grok-4.6-fast",
+  "cursor-grok-4.6-xhigh": "grok-4.6",
+  "cursor-grok-4.6-xhigh-fast": "grok-4.6-fast",
   "gpt-5.3-codex": "gpt-5.3-codex",
   "gpt-5.3-codex-fast": "gpt-5.3-codex",
   "gpt-5.3-codex-high": "gpt-5.3-codex",
@@ -48,6 +60,7 @@ const STATIC_ALIASES = {
 const SLUG_OVERRIDES = {
   "composer-2-5": "composer-2.5",
   "grok-4-5": "grok-4.5",
+  "grok-4-6": "grok-4.6",
   "claude-4-5-haiku": "claude-4.5-haiku",
   "claude-4-5-opus": "claude-4.5-opus",
   "claude-4-5-sonnet": "claude-4.5-sonnet",
@@ -200,7 +213,7 @@ function buildYaml(markdown, fetchedAt) {
     "first_party",
   );
 
-  const firstParty = new Set(["composer-2.5", "grok-4.5"]);
+  const firstParty = new Set(["composer-2.5", "grok-4.5", "grok-4.6"]);
   const seen = new Set(["auto"]);
   for (const row of rows) {
     let key = slugify(row.name);

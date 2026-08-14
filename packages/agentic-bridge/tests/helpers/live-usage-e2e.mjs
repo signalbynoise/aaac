@@ -9,7 +9,7 @@ import { computeUsageContextPercent, resolveModelContextWindow } from "../../src
 
 export const LIVE_USAGE_E2E = process.env.LIVE_CURSOR_USAGE_E2E === "1";
 
-export const E2E_MODEL = process.env.CURSOR_MODEL?.trim() || "composer-2.5";
+export const E2E_MODEL = process.env.CURSOR_MODEL?.trim() || "grok-4.6-fast";
 
 export const E2E_PROMPT =
   "Reply with exactly the single word pong and nothing else. Do not use tools, read files, or run commands.";

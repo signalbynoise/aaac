@@ -148,7 +148,7 @@ Policy: [.cursor/policies/agent-separation.md](../policies/agent-separation.md)
 - **Parent orchestrator must not assess** — no self-scoring, gate passes, investigation conclusions, or report without independent Task subagents.
 - **Hooks** deny decision-artifact writes until the Run swarm **target** Task launches are recorded (`manifest.swarm.target_agents`; floors in `swarm-sizing.yaml`).
 - **Writer / tester / reviewer** remain separated in execute → test_execute → verify → review_swarm; parent delegates prod edits to code-author Task in `execute`.
-- **Model selection before Task launch:** resolve model via `resolve-model-for-phase.mjs` (reads `model-routing.yaml`) and pass the resolved `model` parameter to each Task tool call.
+- **Model selection before Task launch:** resolve model via `resolve-model-for-phase.mjs` (reads `model-routing.yaml`) and pass the resolved Grok 4.6 `model` parameter to each Task tool call. Other providers are not allowed.
 
 ### Fix swarm (mandatory on fix verb / fix_mode)
 

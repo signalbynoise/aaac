@@ -12,6 +12,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveRunEngineScript } from "../lib/run-engine-paths.mjs";
+import {
+  DEFAULT_AAAC_MODEL_SLUG,
+  isAllowedAaacModelSlug,
+} from "./load-model-routing.mjs";
+import { resolveModelForPhase } from "./resolve-model-for-phase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -202,6 +207,12 @@ async function driveWithCursorAgent(targetDir, runId, {
     if (!phase) {
       throw new Error(`Run ${runId} has no current phase`);
     }
+    const resolved = resolveModelForPhase({ phase });
+    const phaseModel = isAllowedAaacModelSlug(resolved?.model_slug)
+      ? resolved.model_slug
+      : isAllowedAaacModelSlug(model)
+        ? model
+        : DEFAULT_AAAC_MODEL_SLUG;
     const prompt = [
       "You are executing an AAAC Run phase headlessly.",
       `Run: ${runId}`,
@@ -215,7 +226,7 @@ async function driveWithCursorAgent(targetDir, runId, {
     await runCursorOnce({
       workdir: targetDir,
       prompt,
-      model,
+      model: phaseModel,
       timeoutMs,
     });
     ensurePhaseArtifact(targetDir, runId, phase);
@@ -254,7 +265,7 @@ async function driveWithCursorAgent(targetDir, runId, {
 export async function runAaacHeadless(prompt, {
   targetDir = process.cwd(),
   autoApprove = false,
-  model = process.env.CURSOR_MODEL || "composer-2.5",
+  model = DEFAULT_AAAC_MODEL_SLUG,
   timeoutMs = Number(process.env.AAAC_RUN_TIMEOUT_MS || 1_800_000),
   json = false,
 } = {}) {

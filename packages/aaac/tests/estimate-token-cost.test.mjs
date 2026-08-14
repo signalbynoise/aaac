@@ -28,12 +28,19 @@ it("loads Cursor-sourced rates with fetched_at", () => {
     expect(pricing.models["composer-2.5"]?.output_per_million).toBe(2.5);
     expect(pricing.models["grok-4.5"]?.input_per_million).toBe(2);
     expect(pricing.models["grok-4.5"]?.output_per_million).toBe(6);
+    expect(pricing.models["grok-4.6"]?.input_per_million).toBe(2);
+    expect(pricing.models["grok-4.6"]?.output_per_million).toBe(6);
+    expect(pricing.models["grok-4.6-fast"]?.input_per_million).toBe(4);
+    expect(pricing.models["grok-4.6-fast"]?.output_per_million).toBe(12);
 });
 
 it("resolves agent slugs via aliases", () => {
+    expect(normalizeModelSlug("cursor-grok-4.6-xhigh-fast")).toBe("grok-4.6");
     expect(normalizeModelSlug("cursor-grok-4.5-high-fast")).toBe("grok-4.5");
     expect(resolvePricingModelKey("cursor-grok-4.5-high-fast")).toBe("grok-4.5-fast");
     expect(resolvePricingModelKey("cursor-grok-4.5-medium-fast")).toBe("grok-4.5-fast");
+    expect(resolvePricingModelKey("cursor-grok-4.6-xhigh-fast")).toBe("grok-4.6-fast");
+    expect(resolvePricingModelKey("grok-4.6-high")).toBe("grok-4.6");
     expect(resolvePricingModelKey("composer-2.5-fast")).toBe("composer-2.5");
     expect(resolvePricingModelKey("gpt-5.3-codex-high-fast")).toBe("gpt-5.3-codex");
     expect(loadModelPricing().models["grok-4.5-fast"]?.input_per_million).toBe(4);

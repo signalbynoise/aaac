@@ -385,7 +385,7 @@ describe("cursor-adapter activity formatting", () => {
   it("agent runs never import Cursor SDK", () => {
     const adapterSource = readBridgeSource("../src/cursor-adapter.mjs");
     expectSourceContract(adapterSource, {
-      required: [/runCursorAgentStreaming/],
+        required: [/runCursorAgentStreaming/, /resolveAaacPhaseModel/],
       forbidden: [
         /await import\(["']@cursor\/sdk["']\)/,
         /runViaSdk/,

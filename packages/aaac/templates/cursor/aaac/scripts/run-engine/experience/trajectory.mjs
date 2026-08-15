@@ -6,9 +6,15 @@ import fs from "fs";
 import path from "path";
 import { isoNow } from "../lib.mjs";
 import { signatureKey } from "./stats.mjs";
+import { harvestPathsTouched } from "./repo-learn.mjs";
+
+function isGateFailResult(result) {
+  return result === "fail" || result?.result === "fail" || result?.status === "fail";
+}
 
 /**
- * Quality gate: success + no gate fails + required review artifacts present.
+ * Quality gate: completed + no unresolved failure.
+ * Recovered gate retries and context-budget warnings are recorded, not blocking.
  * @returns {{ ok: boolean, score: number, reasons: string[] }}
  */
 export function assessRunQuality(manifest, { artifactsDir = null, failures = [] } = {}) {
@@ -16,14 +22,27 @@ export function assessRunQuality(manifest, { artifactsDir = null, failures = [] 
   const success = manifest?.status === "completed";
   if (!success) reasons.push("not_completed");
 
-  const gateFails = Array.isArray(failures) ? failures.length : 0;
-  const logGates = (manifest?.log ?? []).filter(
-    (e) =>
-      e?.event === "gate_fail" ||
-      String(e?.detail ?? "").includes("context_budget_exceeded"),
+  const gateResults = manifest?.gates?.results ?? {};
+  const unresolvedGates = Object.entries(gateResults)
+    .filter(([, result]) => isGateFailResult(result))
+    .map(([name]) => name);
+  if (unresolvedGates.length) {
+    reasons.push(`unresolved_gates:${unresolvedGates.join(",")}`);
+  }
+
+  if (manifest?.blocked_reason) reasons.push("unresolved_block");
+  if (manifest?.awaiting_approval) reasons.push("awaiting_approval");
+
+  const recovered = (manifest?.log ?? []).filter((e) => e?.event === "gate_fail").length;
+  if (recovered > 0) reasons.push(`recovered_gate_fails:${recovered}`);
+
+  const budgetWarns = (manifest?.log ?? []).filter((e) =>
+    String(e?.detail ?? "").includes("context_budget_exceeded"),
   ).length;
-  const gates = Math.max(gateFails, logGates);
-  if (gates > 0) reasons.push(`gate_fails:${gates}`);
+  if (budgetWarns > 0) reasons.push(`context_budget_warnings:${budgetWarns}`);
+
+  // Historical extractFailures are informational only — recovered retries must not block.
+  void failures;
 
   if (artifactsDir && fs.existsSync(artifactsDir)) {
     const verb = manifest?.verb ?? "";
@@ -36,10 +55,18 @@ export function assessRunQuality(manifest, { artifactsDir = null, failures = [] 
     }
   }
 
-  const ok = success && gates === 0 && !reasons.some((r) => r.startsWith("missing_"));
+  const blocking = reasons.some(
+    (r) =>
+      r === "not_completed" ||
+      r.startsWith("unresolved_gates:") ||
+      r === "unresolved_block" ||
+      r === "awaiting_approval" ||
+      r.startsWith("missing_"),
+  );
+  const ok = !blocking;
   return {
     ok,
-    score: ok ? 1 : success && gates === 0 ? 0.5 : 0,
+    score: ok ? 1 : success && unresolvedGates.length === 0 ? 0.5 : 0,
     reasons,
   };
 }
@@ -94,6 +121,7 @@ export function buildTrajectory(manifest, {
     null;
   const durationMs = manifest?.metrics?.duration_ms ?? null;
   const filesReadTotal = sumFilesRead(agents);
+  const pathsTouched = harvestPathsTouched(artifactsDir);
 
   return {
     version: 1,
@@ -108,6 +136,7 @@ export function buildTrajectory(manifest, {
     tokens,
     duration_ms: durationMs,
     files_read_total: filesReadTotal,
+    paths_touched: pathsTouched,
     agent_count: agents.length,
     steps,
     profile_id: profileId,

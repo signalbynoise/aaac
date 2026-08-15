@@ -21,16 +21,106 @@ import {
 import { upsertRepoNodesIntoIndex } from "./repo-index/build.mjs";
 import { emitRepoMemoryEvent } from "./repo-events.mjs";
 
+const BRIEF_ARTIFACTS = [
+  "discover_brief.yaml",
+  "discover-brief.md",
+  "discovery-brief.md",
+  "investigation.md",
+];
+
 function extractPathsFromText(text) {
   if (!text) return [];
   const re =
-    /(?:^|[\s`"'(])((?:apps|packages|src|tests?|\.cursor)\/[A-Za-z0-9_./+-]+\.[A-Za-z0-9]+)(?=[\s`"'`),:]|$)/gm;
+    /(?:^|[\s`"'(])((?:apps|packages|src|tests?|docs|\.cursor)\/[A-Za-z0-9_./+-]+\.[A-Za-z0-9]+)(?=[\s`"'`),:]|$)/gm;
   const out = [];
   let m;
   while ((m = re.exec(String(text)))) {
     out.push(m[1].replace(/\\/g, "/"));
   }
   return [...new Set(out)];
+}
+
+function normalizeRelPath(p) {
+  return String(p ?? "")
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "")
+    .trim();
+}
+
+function pathExistsInWorkspace(rel) {
+  const n = normalizeRelPath(rel);
+  if (!n) return false;
+  const root = resolveWorkspaceRoot();
+  const abs = path.isAbsolute(n) ? n : path.join(root, n);
+  try {
+    return fs.existsSync(abs);
+  } catch {
+    return false;
+  }
+}
+
+function pathTokensFromSought(sought) {
+  const text = String(sought ?? "").trim();
+  const out = extractPathsFromText(` ${text} `);
+  const first = text.split(/\s+/)[0] ?? "";
+  if (
+    /^(?:apps|packages|src|tests?|docs|\.cursor)\//.test(first) ||
+    /^[A-Za-z0-9_./+-]+\.[A-Za-z0-9]{1,8}$/.test(first)
+  ) {
+    out.unshift(normalizeRelPath(first));
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+
+function sharesSoughtToken(sought, relPath) {
+  const tokens = tokenizeSought(sought);
+  const hay = normalizeRelPath(relPath).toLowerCase();
+  const base = path.basename(hay);
+  return tokens.some((t) => t.length > 2 && (hay.includes(t) || base.includes(t)));
+}
+
+/**
+ * Harvest confirmed / new_findings / prose paths / phase_context focus for learn.
+ * @param {string|null} artifactsDir
+ * @param {string[]} [extra]
+ * @returns {string[]}
+ */
+export function harvestPathsTouched(artifactsDir, extra = []) {
+  const out = new Set();
+  const add = (p) => {
+    const n = normalizeRelPath(p);
+    if (n) out.add(n);
+  };
+  for (const p of extra ?? []) add(p);
+  if (!artifactsDir || !fs.existsSync(artifactsDir)) return [...out];
+
+  const briefYaml = readArtifactText(artifactsDir, "discover_brief.yaml");
+  for (const p of extractYamlPathList(briefYaml, "confirmed")) add(p);
+  for (const p of extractYamlPathList(briefYaml, "new_findings")) add(p);
+  for (const name of BRIEF_ARTIFACTS) {
+    for (const p of extractPathsFromText(readArtifactText(artifactsDir, name))) add(p);
+  }
+
+  try {
+    const pcPath = path.join(artifactsDir, "phase_context.json");
+    if (fs.existsSync(pcPath)) {
+      const pc = JSON.parse(fs.readFileSync(pcPath, "utf8"));
+      const rm = pc.experience?.repo_memory ?? pc.repo_memory ?? {};
+      for (const p of rm.focus_paths ?? []) add(p);
+      for (const s of rm.focus_spans ?? []) add(s?.path);
+      const pack = rm.read_pack;
+      if (Array.isArray(pack)) {
+        for (const item of pack) add(item?.path ?? item);
+      } else if (pack && typeof pack === "object") {
+        for (const s of pack.spans ?? []) add(s?.path);
+        for (const f of pack.files ?? []) add(f?.path ?? f);
+      }
+    }
+  } catch {
+    // ignore malformed phase_context
+  }
+
+  return [...out];
 }
 
 function readArtifactText(artifactsDir, name) {
@@ -78,16 +168,15 @@ export function learnRepoGraphFromRun(graph, {
   const added_nodes = [];
   let added_edges = 0;
   const root = resolveWorkspaceRoot();
-  const paths = new Set();
-
-  for (const p of trajectory.paths_touched ?? trajectory.focus_paths ?? []) {
-    if (typeof p === "string") paths.add(p.replace(/\\/g, "/"));
-  }
+  const paths = new Set(
+    harvestPathsTouched(artifactsDir, [
+      ...(trajectory.paths_touched ?? []),
+      ...(trajectory.focus_paths ?? []),
+    ]),
+  );
 
   if (artifactsDir) {
     const briefYaml = readArtifactText(artifactsDir, "discover_brief.yaml");
-    for (const p of extractYamlPathList(briefYaml, "confirmed")) paths.add(p);
-    for (const p of extractYamlPathList(briefYaml, "new_findings")) paths.add(p);
     for (const p of extractYamlPathList(briefYaml, "stale")) {
       const id = nodeIdForPath(p);
       if (graph.nodes[id]) {
@@ -96,15 +185,6 @@ export function learnRepoGraphFromRun(graph, {
           ...new Set([...(graph.nodes[id].tags ?? []), "stale"]),
         ];
       }
-    }
-    for (const name of [
-      "discover_brief.yaml",
-      "discover-brief.md",
-      "discovery-brief.md",
-      "investigation.md",
-    ]) {
-      const text = readArtifactText(artifactsDir, name);
-      for (const p of extractPathsFromText(text)) paths.add(p);
     }
   }
 
@@ -197,7 +277,8 @@ export function learnRepoGraphFromRun(graph, {
 
 /**
  * Learn verified retrieval_miss → path mappings into the durable graph.
- * Only persists resolutions that intersect confirmed/new_findings or paths_touched.
+ * Confirms path-shaped soughts that exist on disk and by_sought hits that
+ * sit in harvested paths or share a token with the sought term.
  *
  * @param {object} graph
  * @param {{
@@ -247,17 +328,16 @@ export function learnFromRetrievalMisses(graph, {
   })();
 
   const misses = Array.isArray(missStore.misses) ? missStore.misses : [];
-  if (!misses.length && !(heal?.resolved_paths?.length)) {
+  if (!misses.length && !(heal?.resolved_paths?.length) && !(heal?.sought_terms?.length)) {
     return { learned, skipped: [{ sought: "*", reason: "no_misses" }], added_nodes };
   }
 
-  const confirmed = new Set();
-  const briefYaml = readArtifactText(artifactsDir, "discover_brief.yaml");
-  for (const p of extractYamlPathList(briefYaml, "confirmed")) confirmed.add(p.replace(/\\/g, "/"));
-  for (const p of extractYamlPathList(briefYaml, "new_findings")) confirmed.add(p.replace(/\\/g, "/"));
-  for (const p of trajectory.paths_touched ?? trajectory.focus_paths ?? []) {
-    if (typeof p === "string") confirmed.add(p.replace(/\\/g, "/"));
-  }
+  const harvested = new Set(
+    harvestPathsTouched(artifactsDir, [
+      ...(trajectory.paths_touched ?? []),
+      ...(trajectory.focus_paths ?? []),
+    ]),
+  );
 
   const soughtTerms = [
     ...new Set([
@@ -266,29 +346,39 @@ export function learnFromRetrievalMisses(graph, {
     ]),
   ];
   const bySought = heal?.by_sought && typeof heal.by_sought === "object" ? heal.by_sought : {};
-  const defaultResolved = (heal?.resolved_paths ?? []).map((p) => String(p).replace(/\\/g, "/"));
 
   for (const sought of soughtTerms) {
-    const candidates = [
-      ...new Set([
-        ...(bySought[sought] ?? []).map((p) => String(p).replace(/\\/g, "/")),
-        ...defaultResolved,
-      ]),
-    ].filter(Boolean);
+    const verified = [];
+    const seen = new Set();
+    const addVerified = (rel) => {
+      const n = normalizeRelPath(rel);
+      if (!n || seen.has(n)) return;
+      seen.add(n);
+      verified.push(n);
+    };
 
-    if (!candidates.length) {
-      skipped.push({ sought, reason: "empty_expand" });
-      continue;
+    for (const p of pathTokensFromSought(sought)) {
+      if (pathExistsInWorkspace(p)) addVerified(p);
     }
 
-    const verified = candidates.filter((p) => confirmed.has(p));
     if (!verified.length) {
-      skipped.push({ sought, reason: "unconfirmed" });
+      for (const raw of bySought[sought] ?? []) {
+        const p = normalizeRelPath(raw);
+        if (!p) continue;
+        if (harvested.has(p) || (pathExistsInWorkspace(p) && sharesSoughtToken(sought, p))) {
+          addVerified(p);
+        }
+      }
+    }
+
+    if (!verified.length) {
+      const hadExpand = (bySought[sought] ?? []).length > 0;
+      skipped.push({ sought, reason: hadExpand ? "unconfirmed" : "empty_expand" });
       continue;
     }
 
     const aliasTokens = tokenizeSought(sought);
-    for (const rel of verified.slice(0, 8)) {
+    for (const rel of verified.slice(0, 4)) {
       const id = nodeIdForPath(rel);
       const prev = graph.nodes[id];
       const tags = [
@@ -363,6 +453,22 @@ function tokenizeSought(text) {
 /**
  * Full post-run repo memory update.
  */
+function writeMissLearnTelemetry(artifactsDir, manifest, missLearn, extra = {}) {
+  if (!artifactsDir) return;
+  try {
+    writeJsonSafe(path.join(artifactsDir, "retrieval-miss-learn.json"), {
+      run_id: manifest?.run_id ?? null,
+      prepared_at: new Date().toISOString(),
+      learned: missLearn.learned ?? [],
+      skipped: missLearn.skipped ?? [],
+      added_nodes: missLearn.added_nodes ?? [],
+      ...extra,
+    });
+  } catch {
+    // optional telemetry
+  }
+}
+
 export async function processRepoMemoryFromRun({
   trajectory,
   manifest,
@@ -371,7 +477,15 @@ export async function processRepoMemoryFromRun({
   emit = true,
 }) {
   if (!trajectory?.quality?.ok) {
-    return { ok: false, skipped: true, reason: "quality_not_ok" };
+    const missLearn = {
+      learned: [],
+      skipped: [{ sought: "*", reason: "quality_not_ok" }],
+      added_nodes: [],
+    };
+    writeMissLearnTelemetry(artifactsDir, manifest, missLearn, {
+      reason: "quality_not_ok",
+    });
+    return { ok: false, skipped: true, reason: "quality_not_ok", miss_learn: missLearn };
   }
 
   try {
@@ -388,20 +502,7 @@ export async function processRepoMemoryFromRun({
       artifactsDir,
     });
     saveRepoGraph(graph);
-
-    if (artifactsDir) {
-      try {
-        writeJsonSafe(path.join(artifactsDir, "retrieval-miss-learn.json"), {
-          run_id: manifest?.run_id ?? null,
-          prepared_at: new Date().toISOString(),
-          learned: missLearn.learned,
-          skipped: missLearn.skipped,
-          added_nodes: missLearn.added_nodes,
-        });
-      } catch {
-        // optional telemetry
-      }
-    }
+    writeMissLearnTelemetry(artifactsDir, manifest, missLearn);
 
     const pad = loadRepoScratchpad();
     const focusIds = learn.added_nodes.length

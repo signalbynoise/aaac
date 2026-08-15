@@ -6,8 +6,12 @@ import { fileURLToPath } from "url";
 import { emptyRepoGraph, upsertNode, nodeIdForPath } from "../src/run-engine/experience/repo-graph.mjs";
 import { buildTaskDocument } from "../src/run-engine/experience/task-document.mjs";
 import { normalizeRetrievalHints } from "../src/run-engine/experience/retrieve-repo.mjs";
-import { learnFromRetrievalMisses } from "../src/run-engine/experience/repo-learn.mjs";
+import {
+  learnFromRetrievalMisses,
+  processRepoMemoryFromRun,
+} from "../src/run-engine/experience/repo-learn.mjs";
 import { normalizeRetrievalMiss } from "../src/run-engine/retrieval-miss.mjs";
+import { assessRunQuality } from "../src/run-engine/experience/trajectory.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -282,5 +286,210 @@ describe("learnFromRetrievalMisses", () => {
     });
     expect(out.learned.length).toBe(0);
     expect(out.skipped.some((s) => s.reason === "unconfirmed")).toBe(true);
+  });
+
+  it("learns a path-shaped sought when confirmed YAML is empty and the file exists", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-miss-path-"));
+    const prev = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = tmp;
+    const rel = "docs/master_rules.md";
+    fs.mkdirSync(path.join(tmp, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, rel), "# rules\n");
+    const artifacts = path.join(tmp, "artifacts");
+    fs.mkdirSync(artifacts, { recursive: true });
+    fs.writeFileSync(
+      path.join(artifacts, "retrieval_misses.json"),
+      JSON.stringify({
+        misses: [{ sought: rel, reason: "not_in_focus" }],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "retrieval_heal.json"),
+      JSON.stringify({
+        sought_terms: [rel],
+        resolved_paths: ["apps/unrelated/other.ts"],
+        by_sought: { [rel]: [] },
+        action: "expand",
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "discover_brief.yaml"),
+      "confirmed:\n\nnew_findings:\n",
+    );
+
+    const graph = emptyRepoGraph();
+    const out = learnFromRetrievalMisses(graph, {
+      trajectory: { quality: { ok: true } },
+      manifest: { object: "architecture", run_id: "run_path" },
+      artifactsDir: artifacts,
+    });
+    if (prev === undefined) delete process.env.AAAC_WORKSPACE_ROOT;
+    else process.env.AAAC_WORKSPACE_ROOT = prev;
+
+    expect(out.learned.length).toBe(1);
+    expect(out.learned[0].paths).toContain(rel);
+  });
+
+  it("does not attach global resolved_paths to an unrelated sought", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-miss-noise-"));
+    const artifacts = path.join(tmp, "artifacts");
+    fs.mkdirSync(artifacts, { recursive: true });
+    const popular = "apps/agentic-os/src/main/repo-memory.ts";
+    fs.writeFileSync(
+      path.join(artifacts, "retrieval_misses.json"),
+      JSON.stringify({
+        misses: [{ sought: "PhaseTimeline.tsx graph coupling", reason: "not_in_focus" }],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "retrieval_heal.json"),
+      JSON.stringify({
+        sought_terms: ["PhaseTimeline.tsx graph coupling"],
+        resolved_paths: [popular],
+        by_sought: { "PhaseTimeline.tsx graph coupling": [] },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "discover_brief.yaml"),
+      `confirmed:\n  - ${popular}\n`,
+    );
+
+    const graph = emptyRepoGraph();
+    const out = learnFromRetrievalMisses(graph, {
+      trajectory: { quality: { ok: true }, paths_touched: [popular] },
+      manifest: { object: "component" },
+      artifactsDir: artifacts,
+    });
+    expect(out.learned.length).toBe(0);
+    expect(out.skipped.some((s) => s.sought.includes("PhaseTimeline"))).toBe(true);
+  });
+});
+
+describe("assessRunQuality", () => {
+  it("treats recovered gate_fail as quality-ok when current gates pass", () => {
+    const q = assessRunQuality({
+      status: "completed",
+      command: "release-app",
+      verb: "release",
+      gates: { results: { validate: "pass" } },
+      log: [
+        {
+          event: "gate_fail",
+          phase: "validate",
+          detail: "validate: architecture confidence 0.88 < 0.9",
+        },
+      ],
+    });
+    expect(q.ok).toBe(true);
+    expect(q.reasons.some((r) => r.startsWith("recovered_gate_fails:"))).toBe(true);
+  });
+
+  it("blocks learning when a gate result is still fail", () => {
+    const q = assessRunQuality({
+      status: "completed",
+      command: "release-app",
+      verb: "release",
+      gates: { results: { validate: "fail" } },
+      log: [{ event: "gate_fail", phase: "validate", detail: "still failing" }],
+    });
+    expect(q.ok).toBe(false);
+    expect(q.reasons.some((r) => r.startsWith("unresolved_gates:"))).toBe(true);
+  });
+
+  it("does not block on context_budget_exceeded warnings", () => {
+    const q = assessRunQuality({
+      status: "completed",
+      command: "review-module",
+      verb: "review",
+      gates: { results: { validate: "pass" } },
+      log: [{ event: "warn", detail: "context_budget_exceeded" }],
+    });
+    expect(q.ok).toBe(true);
+    expect(q.reasons).toContain("context_budget_warnings:1");
+  });
+});
+
+describe("processRepoMemoryFromRun telemetry", () => {
+  it("writes retrieval-miss-learn.json when quality is not ok", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-miss-skip-tel-"));
+    const artifacts = path.join(tmp, "artifacts");
+    fs.mkdirSync(artifacts, { recursive: true });
+    const out = await processRepoMemoryFromRun({
+      trajectory: { quality: { ok: false } },
+      manifest: { run_id: "run_skip" },
+      artifactsDir: artifacts,
+      emit: false,
+    });
+    expect(out.skipped).toBe(true);
+    expect(out.reason).toBe("quality_not_ok");
+    const tel = JSON.parse(
+      fs.readFileSync(path.join(artifacts, "retrieval-miss-learn.json"), "utf8"),
+    );
+    expect(tel.reason).toBe("quality_not_ok");
+    expect(tel.skipped[0].reason).toBe("quality_not_ok");
+  });
+});
+
+describe("terminal heal then learn", () => {
+  it("processRetrievalMisses then learn sees by_sought for last-phase misses", async () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-term-heal-"));
+    const prev = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = tmpRoot;
+    const rel = "apps/foo/last-phase.ts";
+    fs.mkdirSync(path.join(tmpRoot, "apps/foo"), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, rel), "export const x = 1;\n");
+
+    const runId = "run_terminal_heal";
+    const runDir = path.join(tmpRoot, ".cursor", "aaac", "state", "runs", runId);
+    const artifacts = path.join(runDir, "artifacts");
+    fs.mkdirSync(artifacts, { recursive: true });
+    fs.mkdirSync(path.join(tmpRoot, ".cursor", "aaac", "state"), { recursive: true });
+    fs.writeFileSync(
+      path.join(runDir, "run.json"),
+      JSON.stringify({
+        run_id: runId,
+        command: "/review component",
+        verb: "review",
+        object: "component",
+        phase: "report",
+        status: "completed",
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "phase_context.json"),
+      JSON.stringify({
+        experience: { repo_memory: { focus_paths: [rel] } },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "retrieval_misses.json"),
+      JSON.stringify({
+        version: 1,
+        misses: [{ sought: rel, reason: "not_in_focus" }],
+      }),
+    );
+
+    vi.resetModules();
+    const { processRetrievalMisses } = await import(
+      "../src/run-engine/retrieval-miss.mjs"
+    );
+    const healResult = processRetrievalMisses(runId);
+    expect(healResult.processed).toBe(1);
+    const heal = JSON.parse(
+      fs.readFileSync(path.join(artifacts, "retrieval_heal.json"), "utf8"),
+    );
+    expect(heal.sought_terms).toContain(rel);
+
+    const graph = emptyRepoGraph();
+    const out = learnFromRetrievalMisses(graph, {
+      trajectory: { quality: { ok: true }, paths_touched: [rel] },
+      manifest: { run_id: runId, object: "component" },
+      artifactsDir: artifacts,
+    });
+    if (prev === undefined) delete process.env.AAAC_WORKSPACE_ROOT;
+    else process.env.AAAC_WORKSPACE_ROOT = prev;
+
+    expect(out.learned.length).toBeGreaterThanOrEqual(1);
+    expect(out.learned[0].paths).toContain(rel);
   });
 });

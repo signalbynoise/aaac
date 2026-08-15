@@ -44,6 +44,7 @@ import {
   writeRepoMapMarkdown,
 } from "./repo-knowledge.mjs";
 import { processRepoMemoryFromRun } from "./repo-learn.mjs";
+import { processRetrievalMisses } from "../retrieval-miss.mjs";
 import {
   loadProfilesStore,
   saveProfilesStore,
@@ -250,7 +251,13 @@ export async function processRunExperience(runId, options = {}) {
     saveRepoKnowledgeStore(repoStore);
   }
 
-  // V6 — repo vector graph learn
+  // V6 — heal last-phase misses, then repo vector graph learn
+  try {
+    processRetrievalMisses(runId);
+  } catch {
+    // soft-fail — do not block experience write
+  }
+
   let repoMemoryUpdate = null;
   try {
     repoMemoryUpdate = await processRepoMemoryFromRun({

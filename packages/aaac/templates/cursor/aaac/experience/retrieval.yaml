@@ -45,6 +45,8 @@ repo_memory:
   lexical_candidates: 16
   scratchpad_max_chars: 4000
   index_max_files: 4000
+  # Agents retrieve production logic. Test fixtures are not graph nodes.
+  index_include_tests: false
   blast_depth: 3
   blast_cap: 40
   flow_max_hops: 6

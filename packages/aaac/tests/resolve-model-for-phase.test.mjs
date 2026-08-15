@@ -7,8 +7,10 @@ import {
   resetModelRoutingCache,
   loadModelRouting,
   isAllowedAaacModelSlug,
+  toCursorCliModelSlug,
   AAAC_MODEL_FAMILY,
   AAAC_MODEL_PROVIDER,
+  DEFAULT_AAAC_MODEL_SLUG,
 } from '../src/run-engine/load-model-routing.mjs';
 
 describe('resolve-model-for-phase', () => {
@@ -16,10 +18,10 @@ describe('resolve-model-for-phase', () => {
     resetModelRoutingCache();
   });
 
-  it('returns grok-4.6-high for execute phase', () => {
+  it('returns cursor-grok-4.6-high for execute phase', () => {
     const result = resolveModelForPhase({ phase: 'execute' });
     expect(result.tier).toBe('codex');
-    expect(result.model_slug).toBe('grok-4.6-high');
+    expect(result.model_slug).toBe('cursor-grok-4.6-high');
     expect(result.source).toBe('phases');
   });
 
@@ -29,7 +31,7 @@ describe('resolve-model-for-phase', () => {
       agent_spec_id: 'code-author',
     });
     expect(result.tier).toBe('codex');
-    expect(result.model_slug).toBe('grok-4.6-high');
+    expect(result.model_slug).toBe('cursor-grok-4.6-high');
     expect(result.source).toBe('agent_specs');
   });
 
@@ -40,7 +42,7 @@ describe('resolve-model-for-phase', () => {
       subagent_type: 'missing-subagent-type',
     });
     expect(result.tier).toBe('fast');
-    expect(result.model_slug).toBe('grok-4.6-fast');
+    expect(result.model_slug).toBe('cursor-grok-4.6-medium-fast');
     expect(result.source).toBe('default_tier');
   });
 
@@ -61,14 +63,23 @@ describe('resolve-model-for-phase', () => {
       agent_spec_id: 'discovery-inventory',
     });
     expect(result.tier).toBe('fast');
-    expect(result.model_slug).toBe('grok-4.6-fast');
+    expect(result.model_slug).toBe('cursor-grok-4.6-medium-fast');
     expect(result.source).toBe('agent_specs');
   });
 
-  it('returns grok-4.6-xhigh for reasoning phases', () => {
+  it('returns cursor-grok-4.6-xhigh for reasoning phases', () => {
     const result = resolveModelForPhase({ phase: 'plan' });
     expect(result.tier).toBe('reasoning');
-    expect(result.model_slug).toBe('grok-4.6-xhigh');
+    expect(result.model_slug).toBe('cursor-grok-4.6-xhigh');
+  });
+
+  it('maps AAAC shorthand onto Cursor CLI slugs', () => {
+    expect(toCursorCliModelSlug('grok-4.6-fast')).toBe('cursor-grok-4.6-medium-fast');
+    expect(toCursorCliModelSlug('grok-4.6-high')).toBe('cursor-grok-4.6-high');
+    expect(toCursorCliModelSlug('grok-4.6-xhigh')).toBe('cursor-grok-4.6-xhigh');
+    expect(toCursorCliModelSlug('cursor-grok-4.6-fast')).toBe('cursor-grok-4.6-medium-fast');
+    expect(toCursorCliModelSlug('cursor-grok-4.6-high-fast')).toBe('cursor-grok-4.6-high-fast');
+    expect(toCursorCliModelSlug('composer-2.5-fast')).toBe(DEFAULT_AAAC_MODEL_SLUG);
   });
 
   it('allows only Grok 4.6 slugs', () => {
@@ -103,10 +114,45 @@ describe('resolve-model-for-phase', () => {
       const routing = loadModelRouting();
       expect(routing.provider).toBe(AAAC_MODEL_PROVIDER);
       expect(routing.family).toBe(AAAC_MODEL_FAMILY);
-      expect(routing.tiers.fast).toBe('grok-4.6-fast');
-      expect(routing.tiers.codex).toBe('grok-4.6-high');
-      expect(routing.tiers.reasoning).toBe('grok-4.6-xhigh');
-      expect(resolveModelForPhase({ phase: 'execute' }).model_slug).toBe('grok-4.6-high');
+      expect(routing.tiers.fast).toBe('cursor-grok-4.6-medium-fast');
+      expect(routing.tiers.codex).toBe('cursor-grok-4.6-high');
+      expect(routing.tiers.reasoning).toBe('cursor-grok-4.6-xhigh');
+      expect(resolveModelForPhase({ phase: 'execute' }).model_slug).toBe('cursor-grok-4.6-high');
+    } finally {
+      if (previous == null) delete process.env.AAAC_WORKSPACE_ROOT;
+      else process.env.AAAC_WORKSPACE_ROOT = previous;
+      resetModelRoutingCache();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('coerces installed shorthand YAML slugs to Cursor CLI ids', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aaac-routing-shorthand-'));
+    const aaacDir = path.join(dir, '.cursor', 'aaac');
+    fs.mkdirSync(aaacDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(aaacDir, 'model-routing.yaml'),
+      [
+        'version: 1',
+        'tiers:',
+        '  fast: grok-4.6-fast',
+        '  codex: grok-4.6-high',
+        '  reasoning: grok-4.6-xhigh',
+        'default_tier: fast',
+        '',
+      ].join('\n'),
+    );
+    const previous = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = dir;
+    resetModelRoutingCache();
+    try {
+      const routing = loadModelRouting();
+      expect(routing.tiers.fast).toBe('cursor-grok-4.6-medium-fast');
+      expect(routing.tiers.codex).toBe('cursor-grok-4.6-high');
+      expect(routing.tiers.reasoning).toBe('cursor-grok-4.6-xhigh');
+      expect(resolveModelForPhase({ phase: 'discover' }).model_slug).toBe(
+        'cursor-grok-4.6-medium-fast',
+      );
     } finally {
       if (previous == null) delete process.env.AAAC_WORKSPACE_ROOT;
       else process.env.AAAC_WORKSPACE_ROOT = previous;

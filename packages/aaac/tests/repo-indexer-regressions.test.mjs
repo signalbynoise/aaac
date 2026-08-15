@@ -192,6 +192,132 @@ describe('repo indexer regressions', () => {
     expect(scanned.nodes).toHaveLength(2);
   });
 
+  it('excludes test files from the memory graph by default', async () => {
+    writeWorkspaceFile(workspace, 'src/logic.ts', 'export const logic = 1;\n');
+    writeWorkspaceFile(
+      workspace,
+      'src/logic.test.ts',
+      'import { logic } from "./logic.ts";\nexport const spec = logic;\n',
+    );
+    writeWorkspaceFile(
+      workspace,
+      'tests/logic.spec.ts',
+      'export const suite = true;\n',
+    );
+
+    const { scanWorkspace } = await import(SCAN_MODULE);
+    const scanned = await scanWorkspace({ root: workspace });
+
+    expect(scanned.files).toEqual(['src/logic.ts']);
+    expect(scanned.nodes.map((node) => node.path)).toEqual(['src/logic.ts']);
+    expect(scanned.nodes.every((node) => node.kind === 'file')).toBe(true);
+  });
+
+  it('indexes test files only when index_include_tests is true', async () => {
+    writeWorkspaceFile(
+      workspace,
+      '.cursor/aaac/experience/retrieval.yaml',
+      'repo_memory:\n  index_include_tests: true\n',
+    );
+    writeWorkspaceFile(workspace, 'src/logic.ts', 'export const logic = 1;\n');
+    writeWorkspaceFile(
+      workspace,
+      'src/logic.test.ts',
+      'export const spec = true;\n',
+    );
+
+    const { scanWorkspace } = await import(SCAN_MODULE);
+    const scanned = await scanWorkspace({ root: workspace });
+
+    expect(scanned.files).toEqual(['src/logic.test.ts', 'src/logic.ts']);
+    expect(scanned.nodes.find((node) => node.path === 'src/logic.test.ts')?.kind).toBe(
+      'test',
+    );
+  });
+
+  it('prunes leftover test nodes and vectors on incremental rebuild', async () => {
+    writeWorkspaceFile(workspace, 'src/logic.ts', 'export const logic = 1;\n');
+    writeWorkspaceFile(
+      workspace,
+      REPO_GRAPH_RELATIVE_PATH,
+      `${JSON.stringify({
+        version: 1,
+        updated_at: null,
+        nodes: {
+          'file:src/logic.ts': {
+            id: 'file:src/logic.ts',
+            kind: 'file',
+            path: 'src/logic.ts',
+            source_files: ['src/logic.ts'],
+          },
+          'file:src/logic.test.ts': {
+            id: 'file:src/logic.test.ts',
+            kind: 'test',
+            path: 'src/logic.test.ts',
+            source_files: ['src/logic.test.ts'],
+          },
+        },
+        edges: [
+          {
+            from: 'file:src/logic.test.ts',
+            to: 'file:src/logic.ts',
+            kind: 'tests',
+            weight: 1,
+          },
+        ],
+      })}\n`,
+    );
+    writeWorkspaceFile(
+      workspace,
+      path.join(REPO_INDEX_RELATIVE_PATH, 'meta.json'),
+      `${JSON.stringify({
+        version: 1,
+        rows: {
+          'file:src/logic.ts': { hashes: { summary: 'keep' } },
+          'file:src/logic.test.ts': { hashes: { summary: 'drop' } },
+        },
+        provider: 'repo-index-test',
+        model: 'deterministic',
+        dims: 2,
+      })}\n`,
+    );
+    writeWorkspaceFile(
+      workspace,
+      path.join(REPO_INDEX_RELATIVE_PATH, 'vectors.json'),
+      JSON.stringify({
+        dims: 2,
+        entries: {
+          'file:src/logic.ts::summary': [1, 1],
+          'file:src/logic.test.ts::summary': [9, 1],
+        },
+      }),
+    );
+
+    const { buildRepoIndex } = await import(BUILD_MODULE);
+    const result = await buildRepoIndex({
+      root: workspace,
+      force: false,
+      emit: false,
+      provider: deterministicProvider(),
+    });
+    const persisted = JSON.parse(
+      fs.readFileSync(path.join(workspace, REPO_GRAPH_RELATIVE_PATH), 'utf8'),
+    );
+    const persistedVectors = JSON.parse(
+      fs.readFileSync(
+        path.join(workspace, REPO_INDEX_RELATIVE_PATH, 'vectors.json'),
+        'utf8',
+      ),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(Object.keys(persisted.nodes)).toEqual(['file:src/logic.ts']);
+    expect(persisted.edges).toEqual([]);
+    expect(Object.keys(persistedVectors.entries)).not.toEqual(
+      expect.arrayContaining(['file:src/logic.test.ts::summary']),
+    );
+  });
+
   it('uses git inventory to exclude gitignored code files', async () => {
     execFileSync('git', ['init', '--quiet'], { cwd: workspace });
     writeWorkspaceFile(workspace, '.gitignore', 'src/ignored.ts\n');

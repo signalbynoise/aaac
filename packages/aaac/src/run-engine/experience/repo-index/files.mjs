@@ -54,6 +54,15 @@ function normalizePath(value) {
   return String(value).replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
+/** Test fixtures are not memory-graph nodes — agents retrieve production logic. */
+export function isTestPath(file) {
+  const relativePath = normalizePath(file);
+  return (
+    /(^|\/)(__tests__|tests?|e2e)\//.test(relativePath) ||
+    /\.(test|spec)\.[^.]+$/.test(relativePath)
+  );
+}
+
 function isCodeFile(file) {
   return CODE_EXTENSIONS.has(path.extname(file).toLowerCase());
 }
@@ -126,9 +135,11 @@ function listFilesystemCodeFiles(root, maxFiles = Number.POSITIVE_INFINITY) {
   return files;
 }
 
-export function walkCodeFiles(root, maxFiles = 4000) {
+export function walkCodeFiles(root, maxFiles = 4000, options = {}) {
+  const includeTests = options.includeTests === true;
   const files = listGitCodeFiles(root) ?? listFilesystemCodeFiles(root, maxFiles);
-  return sortFiles([...new Set(files)]).slice(0, maxFiles);
+  const eligible = includeTests ? files : files.filter((file) => !isTestPath(file));
+  return sortFiles([...new Set(eligible)]).slice(0, maxFiles);
 }
 
 export function extractImportSpecs(source) {

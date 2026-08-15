@@ -10,17 +10,18 @@ import { computeWorkspacePaths } from "./aaac-status.mjs";
 import {
   DEFAULT_AAAC_MODEL_SLUG,
   isAllowedAaacModelSlug,
+  toCursorCliModelSlug,
 } from "@ludecker/aaac/run-engine/load-model-routing";
 
 const log = createLogger("agentic-bridge:aaac-model");
 
-export { DEFAULT_AAAC_MODEL_SLUG, isAllowedAaacModelSlug };
+export { DEFAULT_AAAC_MODEL_SLUG, isAllowedAaacModelSlug, toCursorCliModelSlug };
 
 export async function resolveAaacPhaseModel(
   workspaceRoot,
   { phase, agentSpecId, subagentType } = {},
 ) {
-  const fallback = DEFAULT_AAAC_MODEL_SLUG;
+  const fallback = toCursorCliModelSlug(DEFAULT_AAAC_MODEL_SLUG);
   if (!workspaceRoot) {
     log.warn("resolve", "No workspace root; using Grok 4.6 fallback", { fallback });
     return fallback;
@@ -51,8 +52,9 @@ export async function resolveAaacPhaseModel(
   }
 
   if (isAllowedAaacModelSlug(slug)) {
-    log.debug("resolve", "Resolved Grok 4.6 phase model", { phase, model: slug });
-    return slug;
+    const model = toCursorCliModelSlug(slug, fallback);
+    log.debug("resolve", "Resolved Grok 4.6 phase model", { phase, model, requested: slug });
+    return model;
   }
 
   log.warn("resolve", "Rejected non-Grok or missing phase model", {

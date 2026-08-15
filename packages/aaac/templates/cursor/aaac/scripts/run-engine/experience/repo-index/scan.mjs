@@ -7,6 +7,7 @@ import { nodeIdForPath } from "../repo-graph.mjs";
 import { loadRetrievalConfig } from "../paths.mjs";
 import {
   extractImportSpecs,
+  isTestPath,
   loadPathAliases,
   loadWorkspacePackages,
   resolveImportPath,
@@ -24,10 +25,7 @@ function readText(file, maxChars = 200_000) {
 }
 
 function detectKind(relativePath) {
-  return /(^|\/)(__tests__|tests?|e2e)\//.test(relativePath) ||
-    /\.(test|spec)\.[^.]+$/.test(relativePath)
-    ? "test"
-    : "file";
+  return isTestPath(relativePath) ? "test" : "file";
 }
 
 /** Regex name fallback when AST unavailable for a language. */
@@ -72,7 +70,10 @@ export async function scanWorkspace(options = {}) {
   const maxFiles = Number(
     options.maxFiles ?? loadRetrievalConfig().repo_memory?.index_max_files ?? 4000,
   );
-  const files = walkCodeFiles(root, maxFiles);
+  const includeTests =
+    options.includeTests ??
+    loadRetrievalConfig().repo_memory?.index_include_tests === true;
+  const files = walkCodeFiles(root, maxFiles, { includeTests });
   const fileSet = new Set(files);
   const aliases = loadPathAliases(root);
   const workspacePackages = loadWorkspacePackages(root);

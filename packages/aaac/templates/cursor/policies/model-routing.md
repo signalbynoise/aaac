@@ -14,9 +14,9 @@ Parent orchestrators must resolve Task model selection from the SSOT at `.cursor
 
 | Tier | Slug | Used for |
 |------|------|----------|
-| `fast` | `grok-4.6-fast` | Discover, verify, review, explore |
-| `codex` | `grok-4.6-high` | Execute, test_execute, code-author |
-| `reasoning` | `grok-4.6-xhigh` | Plan, gates, root cause, report |
+| `fast` | `cursor-grok-4.6-medium-fast` | Discover, verify, review, explore |
+| `codex` | `cursor-grok-4.6-high` | Execute, test_execute, code-author |
+| `reasoning` | `cursor-grok-4.6-xhigh` | Plan, gates, root cause, report |
 
 ## Pricing SSOT
 

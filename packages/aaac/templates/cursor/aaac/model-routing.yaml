@@ -5,9 +5,9 @@ provider: grok
 family: grok-4.6
 
 tiers:
-  fast: grok-4.6-fast
-  codex: grok-4.6-high
-  reasoning: grok-4.6-xhigh
+  fast: cursor-grok-4.6-medium-fast
+  codex: cursor-grok-4.6-high
+  reasoning: cursor-grok-4.6-xhigh
 
 default_tier: fast
 

@@ -19,7 +19,16 @@ import {
   writeRepoMapFromScratchpad,
 } from "./repo-scratchpad.mjs";
 import { upsertRepoNodesIntoIndex } from "./repo-index/build.mjs";
+import { isTestPath } from "./repo-index/files.mjs";
+import { loadRetrievalConfig } from "./paths.mjs";
 import { emitRepoMemoryEvent } from "./repo-events.mjs";
+
+function shouldLearnPath(rel) {
+  return (
+    loadRetrievalConfig().repo_memory?.index_include_tests === true ||
+    !isTestPath(rel)
+  );
+}
 
 const BRIEF_ARTIFACTS = [
   "discover_brief.yaml",
@@ -188,12 +197,12 @@ export function learnRepoGraphFromRun(graph, {
     }
   }
 
-  const pathList = [...paths].slice(0, 40);
+  const pathList = [...paths].filter(shouldLearnPath).slice(0, 40);
   for (const rel of pathList) {
     const abs = path.isAbsolute(rel) ? rel : path.join(root, rel);
     if (!fs.existsSync(abs)) continue;
     const id = nodeIdForPath(rel);
-    const kind = /\.(test|spec)\./i.test(rel) ? "test" : "file";
+    const kind = "file";
     const prev = graph.nodes[id];
     // Never overwrite scanned summary/api — that collapses dense Stage-1 recall.
     const patch = {
@@ -377,8 +386,16 @@ export function learnFromRetrievalMisses(graph, {
       continue;
     }
 
+    const includeTests =
+      loadRetrievalConfig().repo_memory?.index_include_tests === true;
+    const indexable = verified.filter(shouldLearnPath);
+    if (!indexable.length) {
+      skipped.push({ sought, reason: "test_path" });
+      continue;
+    }
+
     const aliasTokens = tokenizeSought(sought);
-    for (const rel of verified.slice(0, 4)) {
+    for (const rel of indexable.slice(0, 4)) {
       const id = nodeIdForPath(rel);
       const prev = graph.nodes[id];
       const tags = [
@@ -400,7 +417,7 @@ export function learnFromRetrievalMisses(graph, {
         .join(" ");
       upsertNode(graph, {
         id,
-        kind: prev?.kind ?? (/\.(test|spec)\./i.test(rel) ? "test" : "file"),
+        kind: prev?.kind === "test" && includeTests ? "test" : (prev?.kind ?? "file"),
         path: rel,
         trigger: triggerBits.slice(0, 400),
         summary:

@@ -72,6 +72,7 @@ const DEFAULT_RETRIEVAL = {
     lexical_candidates: 16,
     scratchpad_max_chars: 4000,
     index_max_files: 4000,
+    index_include_tests: false,
     blast_depth: 3,
     blast_cap: 40,
     flow_max_hops: 6,
@@ -133,6 +134,14 @@ function readYamlString(content, fieldName, fallback) {
     new RegExp(`^\\s*${fieldName}:\\s*["']?([^"'\\n#]+?)["']?\\s*$`, "m"),
   );
   return match ? match[1].trim() : fallback;
+}
+
+function readYamlBool(content, fieldName, fallback) {
+  const match = content.match(
+    new RegExp(`^\\s*${fieldName}:\\s*(true|false)\\b`, "im"),
+  );
+  if (!match) return fallback;
+  return match[1].toLowerCase() === "true";
 }
 
 /** @returns {typeof DEFAULT_RETRIEVAL} */
@@ -206,6 +215,11 @@ export function loadRetrievalConfig() {
       content,
       "index_max_files",
       cfg.repo_memory.index_max_files,
+    );
+    cfg.repo_memory.index_include_tests = readYamlBool(
+      content,
+      "index_include_tests",
+      cfg.repo_memory.index_include_tests,
     );
     cfg.repo_memory.scratchpad_max_chars = readYamlInt(
       content,

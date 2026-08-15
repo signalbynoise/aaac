@@ -15,6 +15,7 @@ import { resolveRunEngineScript } from "../lib/run-engine-paths.mjs";
 import {
   DEFAULT_AAAC_MODEL_SLUG,
   isAllowedAaacModelSlug,
+  toCursorCliModelSlug,
 } from "./load-model-routing.mjs";
 import { resolveModelForPhase } from "./resolve-model-for-phase.mjs";
 
@@ -208,11 +209,13 @@ async function driveWithCursorAgent(targetDir, runId, {
       throw new Error(`Run ${runId} has no current phase`);
     }
     const resolved = resolveModelForPhase({ phase });
-    const phaseModel = isAllowedAaacModelSlug(resolved?.model_slug)
-      ? resolved.model_slug
-      : isAllowedAaacModelSlug(model)
-        ? model
-        : DEFAULT_AAAC_MODEL_SLUG;
+    const phaseModel = toCursorCliModelSlug(
+      isAllowedAaacModelSlug(resolved?.model_slug)
+        ? resolved.model_slug
+        : isAllowedAaacModelSlug(model)
+          ? model
+          : DEFAULT_AAAC_MODEL_SLUG,
+    );
     const prompt = [
       "You are executing an AAAC Run phase headlessly.",
       `Run: ${runId}`,

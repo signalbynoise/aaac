@@ -55,23 +55,71 @@ function getModelRoutingPath() {
 /** AAAC may only dispatch Grok 4.6 variants. */
 export const AAAC_MODEL_PROVIDER = "grok";
 export const AAAC_MODEL_FAMILY = "grok-4.6";
-export const DEFAULT_AAAC_MODEL_SLUG = "grok-4.6-fast";
+/** Cursor CLI / Task slugs require `cursor-` plus an effort token. */
+export const DEFAULT_CURSOR_GROK_EFFORT = "medium";
+export const DEFAULT_AAAC_MODEL_SLUG = "cursor-grok-4.6-medium-fast";
 export const AAAC_ALLOWED_MODEL_PATTERN = /^(cursor-)?grok-4\.6(?:-[a-z0-9]+)*$/i;
+const CURSOR_GROK_EFFORTS = new Set(["low", "medium", "high", "xhigh"]);
 
 export function isAllowedAaacModelSlug(slug) {
   return typeof slug === "string" && AAAC_ALLOWED_MODEL_PATTERN.test(slug.trim());
 }
 
+/**
+ * Map AAAC Grok shorthand onto a Cursor CLI / Task model id.
+ * `grok-4.6-fast` is not a Cursor model; the CLI expects
+ * `cursor-grok-4.6-{low|medium|high|xhigh}[-fast]`.
+ */
+export function toCursorCliModelSlug(slug, fallback = DEFAULT_AAAC_MODEL_SLUG) {
+  const raw = typeof slug === "string" ? slug.trim() : "";
+  const source = isAllowedAaacModelSlug(raw)
+    ? raw
+    : isAllowedAaacModelSlug(fallback)
+      ? fallback.trim()
+      : DEFAULT_AAAC_MODEL_SLUG;
+  const normalized = source.toLowerCase().replace(/^cursor-/, "");
+  if (!normalized.startsWith("grok-4.6")) {
+    return DEFAULT_AAAC_MODEL_SLUG;
+  }
+
+  const tokens = normalized
+    .slice("grok-4.6".length)
+    .replace(/^-/, "")
+    .split("-")
+    .filter(Boolean);
+  const fast = tokens.includes("fast");
+  let effort = null;
+  if (tokens.includes("xhigh") || (tokens.includes("extra") && tokens.includes("high"))) {
+    effort = "xhigh";
+  } else if (tokens.includes("high")) {
+    effort = "high";
+  } else if (tokens.includes("medium")) {
+    effort = "medium";
+  } else if (tokens.includes("low")) {
+    effort = "low";
+  } else if (tokens.includes("max")) {
+    effort = "xhigh";
+  } else if (tokens.includes("none")) {
+    effort = DEFAULT_CURSOR_GROK_EFFORT;
+  }
+  if (!CURSOR_GROK_EFFORTS.has(effort)) {
+    effort = DEFAULT_CURSOR_GROK_EFFORT;
+  }
+  return `cursor-grok-4.6-${effort}${fast ? "-fast" : ""}`;
+}
+
 function coerceGrokSlug(slug, fallback = DEFAULT_AAAC_MODEL_SLUG) {
   if (slug == null) return slug;
-  if (isAllowedAaacModelSlug(slug)) return slug.trim();
+  if (isAllowedAaacModelSlug(slug)) {
+    return toCursorCliModelSlug(slug, fallback);
+  }
   debugLog("warn", "coerce", "rejected non-Grok model slug", {
     slug,
     fallback,
     provider: AAAC_MODEL_PROVIDER,
     family: AAAC_MODEL_FAMILY,
   });
-  return fallback;
+  return toCursorCliModelSlug(fallback);
 }
 
 function coerceTiers(tiers) {
@@ -88,9 +136,9 @@ const DEFAULT_ROUTING = {
   provider: AAAC_MODEL_PROVIDER,
   family: AAAC_MODEL_FAMILY,
   tiers: {
-    fast: "grok-4.6-fast",
-    codex: "grok-4.6-high",
-    reasoning: "grok-4.6-xhigh",
+    fast: "cursor-grok-4.6-medium-fast",
+    codex: "cursor-grok-4.6-high",
+    reasoning: "cursor-grok-4.6-xhigh",
   },
   default_tier: "fast",
   phases: {

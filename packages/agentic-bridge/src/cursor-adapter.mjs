@@ -31,7 +31,7 @@ import {
   FINDING_TOOLS,
 } from "@ludecker/aaac/run-engine/evaluate-finding-tools";
 import { resolveWorkspacePaths } from "./paths.mjs";
-import { DEFAULT_AAAC_MODEL_SLUG, resolveAaacPhaseModel } from "./aaac-model.mjs";
+import { DEFAULT_AAAC_MODEL_SLUG, resolveAaacPhaseModel, toCursorCliModelSlug } from "./aaac-model.mjs";
 
 const log = createLogger("agentic-bridge:cursor-adapter");
 
@@ -93,7 +93,7 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_00
     throw new Error("Not signed in to Cursor — use Sign in with Cursor in Agentic OS");
   }
 
-  const modelId = envExtras.CURSOR_MODEL?.trim() || DEFAULT_AAAC_MODEL_SLUG;
+  const modelId = toCursorCliModelSlug(envExtras.CURSOR_MODEL?.trim() || DEFAULT_AAAC_MODEL_SLUG);
   const agentArgs = [
     "-p",
     "-f",

@@ -25,6 +25,7 @@ import {
   countNodesByKind,
 } from "../repo-graph.mjs";
 import { scanWorkspace } from "./scan.mjs";
+import { isTestPath } from "./files.mjs";
 import { emitRepoMemoryEvent } from "../repo-events.mjs";
 import {
   getRepoVectorIndex,
@@ -326,6 +327,17 @@ export async function upsertRepoNodesIntoIndex(graph, options = {}) {
     upserted += 1;
   }
 
+  if (!options.nodeIds) {
+    const keep = new Set(Object.keys(graph.nodes ?? {}));
+    for (const id of Object.keys(meta.rows)) {
+      if (!keep.has(id)) delete meta.rows[id];
+    }
+    for (const key of Object.keys(vectors.entries)) {
+      const id = key.split("::")[0];
+      if (!keep.has(id)) delete vectors.entries[key];
+    }
+  }
+
   saveMeta(meta);
   saveVectors(vectors);
   // Refresh HNSW (usearch) derived index from portable JSON SSOT.
@@ -402,6 +414,27 @@ function addSemanticGlueEdges(
   return semanticEdges;
 }
 
+function shouldIndexTests() {
+  return loadRetrievalConfig().repo_memory?.index_include_tests === true;
+}
+
+function pruneTestGraphNodes(graph) {
+  if (shouldIndexTests()) return [];
+  const dropped = [];
+  for (const [id, node] of Object.entries(graph.nodes ?? {})) {
+    if (node?.kind === "test" || isTestPath(node?.path ?? "")) {
+      dropped.push(id);
+      delete graph.nodes[id];
+    }
+  }
+  if (!dropped.length) return dropped;
+  const drop = new Set(dropped);
+  graph.edges = (graph.edges ?? []).filter(
+    (edge) => !drop.has(edge.from) && !drop.has(edge.to),
+  );
+  return dropped;
+}
+
 /**
  * Full or incremental index of the workspace into repo-graph + vectors.
  */
@@ -416,6 +449,7 @@ export async function buildRepoIndex(options = {}) {
     for (const e of scanned.edges) {
       upsertEdge(graph, e.from, e.to, e.kind, e.weight);
     }
+    pruneTestGraphNodes(graph);
     verifyRepoGraph(graph);
     // Persist structure first so the UI can stream-load the graph before embeddings finish.
     saveRepoGraph(graph);

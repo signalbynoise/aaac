@@ -157,7 +157,7 @@ export async function resolveContextRequest({
             notes: because,
             phase: manifest?.phase ?? null,
           },
-          { dedupe: true },
+          { dedupe: true, workspaceRoot },
         );
       } catch {
         // optional
@@ -199,7 +199,7 @@ export async function resolveContextRequest({
           notes: `granted:${added.join(",")}`,
           phase: manifest?.phase ?? null,
         },
-        { dedupe: true },
+        { dedupe: true, workspaceRoot },
       );
     } catch {
       // optional

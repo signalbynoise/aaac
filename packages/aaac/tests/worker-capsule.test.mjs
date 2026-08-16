@@ -173,6 +173,46 @@ describe("request_context resolver", () => {
     expect(fs.existsSync(path.join(capsuleDir, "apps/foo/other.ts"))).toBe(false);
   });
 
+  it("writes retrieval misses under workspaceRoot even when env points elsewhere", async () => {
+    const { root, src } = writeWorkspace();
+    const poison = tmpDir("aaac-poison-root-");
+    const prev = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = poison;
+    try {
+      const { capsuleDir } = materializeWorkerCapsule({
+        workspaceRoot: root,
+        runId: "run_miss_root",
+        phaseContext: { experience: { repo_memory: { focus_paths: [src] } } },
+        manifest: { verb: "check" },
+        phase: "discover",
+      });
+      await resolveContextRequest({
+        workspaceRoot: root,
+        runId: "run_miss_root",
+        manifest: { verb: "check", intent: "modularity", phase: "discover" },
+        capsuleDir,
+        need: "layer-boundary architecture SSOT",
+        retrieve: false,
+      });
+      const missPath = path.join(
+        root,
+        ".cursor/aaac/state/runs/run_miss_root/artifacts/retrieval_misses.json",
+      );
+      expect(fs.existsSync(missPath)).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(
+            poison,
+            ".cursor/aaac/state/runs/run_miss_root/artifacts/retrieval_misses.json",
+          ),
+        ),
+      ).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.AAAC_WORKSPACE_ROOT;
+      else process.env.AAAC_WORKSPACE_ROOT = prev;
+    }
+  });
+
   it("grants a basename/graph hit and read_context serves it", async () => {
     const { root, src } = writeWorkspace();
     const { capsuleDir } = materializeWorkerCapsule({

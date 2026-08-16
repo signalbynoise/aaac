@@ -79,7 +79,7 @@ export function normalizeRetrievalMiss(raw = {}) {
  * Append miss to artifacts/retrieval_misses.json
  * @param {string} runId
  * @param {object} rawMiss
- * @param {{ dedupe?: boolean }} [opts]
+ * @param {{ dedupe?: boolean, workspaceRoot?: string }} [opts]
  */
 export function recordRetrievalMiss(runId, rawMiss, opts = {}) {
   const normalized = normalizeRetrievalMiss(rawMiss);
@@ -88,7 +88,7 @@ export function recordRetrievalMiss(runId, rawMiss, opts = {}) {
     err.code = "INVALID_RETRIEVAL_MISS";
     throw err;
   }
-  const artifactsDir = path.join(runDir(runId), "artifacts");
+  const artifactsDir = path.join(runDir(runId, opts.workspaceRoot), "artifacts");
   fs.mkdirSync(artifactsDir, { recursive: true });
   const storePath = path.join(artifactsDir, "retrieval_misses.json");
   const store = readJson(storePath, { version: 1, misses: [] });
@@ -339,10 +339,10 @@ async function retrieveHitsForSought(soughtTerms, runId, bySought) {
  * or deliberately authorize Grep when expand fails / repeats.
  *
  * @param {string} runId
- * @param {{ authorize?: boolean, maxPaths?: number, retrieve?: boolean }} [opts]
+ * @param {{ authorize?: boolean, maxPaths?: number, retrieve?: boolean, workspaceRoot?: string }} [opts]
  */
 export async function processRetrievalMisses(runId, opts = {}) {
-  const artifactsDir = path.join(runDir(runId), "artifacts");
+  const artifactsDir = path.join(runDir(runId, opts.workspaceRoot), "artifacts");
   fs.mkdirSync(artifactsDir, { recursive: true });
   const storePath = path.join(artifactsDir, "retrieval_misses.json");
   const store = readJson(storePath, { version: 1, misses: [] });

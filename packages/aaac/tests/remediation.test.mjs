@@ -21,6 +21,10 @@ describe("remediation-config", () => {
       path.join(cursorAaac, "scripts/run-engine/lib.mjs"),
     );
     fs.copyFileSync(
+      path.join(REPO_ROOT, ".cursor/aaac/scripts/run-engine/workspace-roots.mjs"),
+      path.join(cursorAaac, "scripts/run-engine/workspace-roots.mjs"),
+    );
+    fs.copyFileSync(
       path.join(REPO_ROOT, ".cursor/aaac/scripts/remediation/lib/remediation-config.mjs"),
       path.join(cursorAaac, "scripts/remediation/lib/remediation-config.mjs"),
     );
@@ -97,6 +101,10 @@ describe("init-campaign", () => {
     fs.copyFileSync(
       path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/run-engine/lib.mjs"),
       path.join(cursorAaac, "scripts/run-engine/lib.mjs"),
+    );
+    fs.copyFileSync(
+      path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/run-engine/workspace-roots.mjs"),
+      path.join(cursorAaac, "scripts/run-engine/workspace-roots.mjs"),
     );
     for (const file of fs.readdirSync(
       path.join(SOURCE_REPO_ROOT, "packages/aaac/templates/cursor/aaac/scripts/remediation"),

@@ -2,26 +2,12 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { resolveWorkspaceRoots } from "./workspace-roots.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function resolveRoots() {
-  const workspaceOverride = process.env.AAAC_WORKSPACE_ROOT;
-  if (workspaceOverride) {
-    const repoRoot = path.resolve(workspaceOverride);
-    const cursorRoot = path.join(repoRoot, ".cursor");
-    return { repoRoot, cursorRoot };
-  }
-  const monorepoRoot = path.resolve(__dirname, "../../../..");
-  const dogfoodAaac = path.join(monorepoRoot, ".cursor", "aaac");
-  if (fs.existsSync(path.join(dogfoodAaac, "enforcement.json"))) {
-    return {
-      repoRoot: monorepoRoot,
-      cursorRoot: path.join(monorepoRoot, ".cursor"),
-    };
-  }
-  const cursorRoot = path.resolve(__dirname, "../../..");
-  return { repoRoot: path.resolve(cursorRoot, ".."), cursorRoot };
+function resolveRoots(workspaceRoot = null) {
+  return resolveWorkspaceRoots({ moduleDir: __dirname, workspaceRoot });
 }
 
 const { repoRoot: REPO_ROOT_VALUE, cursorRoot: CURSOR_ROOT_VALUE } = resolveRoots();
@@ -106,12 +92,12 @@ export function saveActiveRun(conversationId, data) {
   writeJson(activeRunPath(conversationId), data);
 }
 
-export function loadRunManifest(runId) {
-  return readJson(path.join(RUNS_ROOT, runId, "run.json"));
+export function loadRunManifest(runId, workspaceRoot = null) {
+  return readJson(path.join(runDir(runId, workspaceRoot), "run.json"));
 }
 
-export function runDir(runId) {
-  return path.join(RUNS_ROOT, runId);
+export function runDir(runId, workspaceRoot = null) {
+  return path.join(resolveRoots(workspaceRoot).runsRoot, String(runId));
 }
 
 export function parseAaacPrompt(text) {

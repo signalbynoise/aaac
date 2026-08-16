@@ -163,6 +163,94 @@ export function basenameMatchesSought(relPath, sought) {
   return hits.length >= 2;
 }
 
+const IDENTIFIER_STOP = new Set([
+  "SOURCE_CONTEXT",
+  "PACKET_CACHE",
+  "PACKET_CACHE_HIT",
+  "NOT_GRANTED",
+  "TRUE_RETRIEVAL",
+  "TRUE_RETRIEVAL_MISS",
+  "CONCEPTUAL_REQUEST",
+  "ENVELOPE_TOO_THIN",
+  "DISCOVERY_ATTEMPT",
+  "OPS_CONTEXT_REQUEST",
+  "PROCESS_CONTEXT_REQUEST",
+  "PATH_ALIAS",
+  "PATH_NORMALIZED",
+  "REDUNDANT_READ",
+]);
+
+/**
+ * PascalCase / camelCase / CONST_CASE tokens as the worker wrote them.
+ * significantSoughtTokens splits these and cannot match node.api symbols.
+ * The camel regex requires a lowercase run before an interior capital so
+ * FOUR_LEVEL / SOURCE_CONTEXT are not split into fake identifiers.
+ */
+export function identifierTokensFromSought(sought) {
+  const text = String(sought ?? "");
+  const out = [];
+  for (const m of text.matchAll(/[A-Za-z][a-z0-9]*[a-z][A-Z][A-Za-z0-9]*/g)) {
+    out.push(m[0]);
+  }
+  for (const m of text.matchAll(/\b[A-Z][A-Z0-9]*(_[A-Z0-9]+)+\b/g)) {
+    out.push(m[0]);
+  }
+  for (const m of text.matchAll(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g)) {
+    if (m[0].length >= 8) out.push(m[0]);
+  }
+  return [...new Set(out.filter((t) => !IDENTIFIER_STOP.has(t)))];
+}
+
+function compactIdent(s) {
+  return String(s ?? "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * True when a sought identifier names this file (basename) or an exported symbol (api).
+ */
+export function identifierMatchesNode(relPath, api, sought) {
+  const ids = identifierTokensFromSought(sought);
+  if (!ids.length) return false;
+  const compactBase = compactIdent(
+    path.basename(normalizeRelPath(relPath)).replace(/\.[^.]+$/, ""),
+  );
+  const apiLower = ` ${String(api ?? "").toLowerCase()} `;
+  for (const id of ids) {
+    const compactId = compactIdent(id);
+    if (compactId.length < 6) continue;
+    if (
+      compactBase === compactId ||
+      (compactId.length >= 8 && compactBase.includes(compactId)) ||
+      (compactBase.length >= 8 && compactId.includes(compactBase))
+    ) {
+      return true;
+    }
+    const needle = id.toLowerCase();
+    if (apiLower.includes(` ${needle} `) || apiLower.includes(` ${needle},`)) {
+      return true;
+    }
+    if (apiLower.includes(`, ${needle} `) || apiLower.includes(`, ${needle},`)) {
+      return true;
+    }
+    if (apiLower.trim() === needle) return true;
+  }
+  return false;
+}
+
+export function nodeMatchesSought(relPath, sought, api = "") {
+  const n = normalizeRelPath(relPath);
+  const pathTokens = extractPathTokensFromSought(sought).map(normalizeRelPath);
+  if (pathTokens.includes(n) || pathTokens.includes(path.basename(n))) {
+    return true;
+  }
+  return (
+    basenameMatchesSought(relPath, sought) ||
+    identifierMatchesNode(relPath, api, sought)
+  );
+}
+
 /**
  * @param {string} rel
  * @param {string} workspaceRoot

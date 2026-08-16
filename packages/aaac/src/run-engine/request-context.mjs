@@ -10,8 +10,9 @@ import { loadRetrievalConfig } from "./experience/paths.mjs";
 import {
   CONTEXT_EVENTS,
   classifySought,
-  isSourceContextPath,
 } from "./context-taxonomy.mjs";
+import { isLearnableGrantPath } from "./experience/granted-paths.mjs";
+import { nodeMatchesSought } from "./sought-paths.mjs";
 import {
   addGrantToCapsule,
   grantPathSet,
@@ -31,7 +32,7 @@ export function capsuleBudgets(retrievalDefaults = null) {
 function workerNamedUngrantedPath(need, grants) {
   const n = normalizeRepoPath(need);
   if (!n || !n.includes("/")) return null;
-  if (!isSourceContextPath(n)) return null;
+  if (!isLearnableGrantPath(n)) return null;
   if (grantPathSet(grants).has(n)) return n;
   return n;
 }
@@ -108,9 +109,11 @@ export async function resolveContextRequest({
   const resolved = resolvePathsForSought(soughtTerms, {
     maxPaths: budgets.max_files_per_expansion,
     knownFocus: [...grantPathSet(grants)],
+    workspaceRoot,
+    allowExactDisk: false,
   });
 
-  let paths = (resolved.paths ?? []).filter(isSourceContextPath);
+  let paths = (resolved.paths ?? []).filter(isLearnableGrantPath);
   if (retrieve && !paths.length) {
     try {
       const { retrieveRepoMemory } = await import("./experience/retrieve-repo.mjs");
@@ -123,26 +126,46 @@ export async function resolveContextRequest({
           emit: false,
           maxNodes: budgets.max_files_per_expansion,
           retrievalHints: { sought_terms: soughtTerms },
+          workspaceRoot,
         },
       );
-      paths = [
+      const apiByPath = {};
+      for (const n of packet.nodes ?? []) {
+        const p = normalizeRepoPath(n?.path);
+        if (p) apiByPath[p] = `${n.api ?? ""} ${n.summary ?? ""}`;
+      }
+      const candidates = [
         ...new Set(
           [...(packet.focus_paths ?? []), ...(packet.nodes ?? []).map((n) => n?.path)]
             .map(normalizeRepoPath)
-            .filter(isSourceContextPath),
+            .filter(isLearnableGrantPath),
         ),
-      ].slice(0, budgets.max_files_per_expansion);
+      ];
+      paths = candidates
+        .filter((p) => nodeMatchesSought(p, needText, apiByPath[p] ?? ""))
+        .slice(0, budgets.max_files_per_expansion);
     } catch {
       // graph retrieve optional
     }
   }
 
-  paths = paths.filter((p) => !grantPathSet(grants).has(p)).slice(
+  const already = paths.filter((p) => grantPathSet(grants).has(p));
+  const fresh = paths.filter((p) => !grantPathSet(grants).has(p)).slice(
     0,
     budgets.max_files_per_expansion,
   );
 
-  if (!paths.length) {
+  if (!fresh.length && already.length) {
+    return {
+      ok: true,
+      status: "IN_PACKET",
+      taxonomy: CONTEXT_EVENTS.PACKET_CACHE_HIT,
+      packet_delta: { paths: already },
+      message: `Already granted. Read: ${already.join(", ")}`,
+    };
+  }
+
+  if (!fresh.length) {
     if (runId) {
       try {
         recordRetrievalMiss(
@@ -173,7 +196,7 @@ export async function resolveContextRequest({
   }
 
   const added = [];
-  for (const rel of paths) {
+  for (const rel of fresh) {
     const result = addGrantToCapsule({
       workspaceRoot,
       capsuleDir,

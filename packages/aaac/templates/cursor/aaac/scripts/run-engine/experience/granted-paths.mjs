@@ -5,7 +5,7 @@
 import fs from "fs";
 import path from "path";
 import { normalizeRepoPath } from "../evaluate-finding-tools.mjs";
-import { extractPathTokensFromSought, basenameMatchesSought } from "../sought-paths.mjs";
+import { extractPathTokensFromSought, basenameMatchesSought, identifierMatchesNode } from "../sought-paths.mjs";
 import { CONTEXT_EVENTS, isSourceContextPath } from "../context-taxonomy.mjs";
 
 const GRANTED_NOTES_RE = /^granted:(.+)$/i;
@@ -144,6 +144,7 @@ export function confirmLearnCandidates({
   bySoughtHits = [],
   harvested = [],
   pathExists = () => false,
+  apiByPath = {},
 } = {}) {
   const harvestedSet = new Set(
     (Array.isArray(harvested) ? harvested : []).map(normalizeGrantedPath).filter(Boolean),
@@ -172,7 +173,8 @@ export function confirmLearnCandidates({
     (p) =>
       pathTokens.includes(p) ||
       pathTokens.includes(path.basename(p)) ||
-      grantedPathConfirmed(p, sought),
+      grantedPathConfirmed(p, sought) ||
+      identifierMatchesNode(p, apiByPath[p], sought),
   );
   const harvestedGrants = grantConfirmed.filter((p) => harvestedSet.has(p));
   const grantFinal =
@@ -181,7 +183,10 @@ export function confirmLearnCandidates({
 
   for (const p of resolverHits) {
     if (seen.has(p) || !isLearnableGrantPath(p)) continue;
-    if (harvestedSet.has(p) || (pathExists(p) && basenameMatchesSought(p, sought))) {
+    if (harvestedSet.has(p) || (pathExists(p) && (
+      basenameMatchesSought(p, sought) ||
+      identifierMatchesNode(p, apiByPath[p], sought)
+    ))) {
       add(p);
     }
   }

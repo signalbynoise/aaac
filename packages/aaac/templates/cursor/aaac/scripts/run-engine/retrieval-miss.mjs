@@ -8,10 +8,9 @@ import { isoNow, loadRunManifest, runDir, writeJson, readJson } from "./lib.mjs"
 import { normalizeRepoPath } from "./evaluate-finding-tools.mjs";
 import { loadRepoGraph, verifyRepoGraph, resolveWorkspaceRoot } from "./experience/repo-graph.mjs";
 import {
-  basenameMatchesSought,
   extractPathTokensFromSought,
+  nodeMatchesSought,
   pathExistsUnderRoot,
-  significantSoughtTokens,
 } from "./sought-paths.mjs";
 import { CONTEXT_EVENTS } from "./context-taxonomy.mjs";
 import {
@@ -196,8 +195,7 @@ function workspaceRoot() {
   }
 }
 
-function exactPathsForSought(sought) {
-  const root = workspaceRoot();
+function exactPathsForSought(sought, root) {
   const tokens = extractPathTokensFromSought(sought);
   const hits = [];
   for (const t of tokens) {
@@ -213,7 +211,7 @@ function exactPathsForSought(sought) {
  * Path-on-disk first, then strict basename/symbol match. No lexical spray.
  *
  * @param {string[]} soughtTerms
- * @param {{ maxPaths?: number, knownFocus?: string[], graph?: object|null }} [opts]
+ * @param {{ maxPaths?: number, knownFocus?: string[], graph?: object|null, workspaceRoot?: string, allowExactDisk?: boolean }} [opts]
  * @returns {{ paths: string[], by_sought: Record<string, string[]>, verified: boolean }}
  */
 export function resolvePathsForSought(soughtTerms, opts = {}) {
@@ -223,11 +221,12 @@ export function resolvePathsForSought(soughtTerms, opts = {}) {
     return { paths: [], by_sought: {}, verified: true };
   }
 
+  const root = opts.workspaceRoot || workspaceRoot();
   let graph = opts.graph ?? null;
   if (!graph) {
     try {
-      graph = loadRepoGraph();
-      verifyRepoGraph(graph);
+      graph = loadRepoGraph(opts.workspaceRoot);
+      verifyRepoGraph(graph, opts.workspaceRoot);
     } catch {
       graph = null;
     }
@@ -238,9 +237,10 @@ export function resolvePathsForSought(soughtTerms, opts = {}) {
   );
   const bySought = {};
   const resolved = [];
+  const allowExactDisk = opts.allowExactDisk !== false;
 
   for (const sought of terms) {
-    const exact = exactPathsForSought(sought);
+    const exact = allowExactDisk ? exactPathsForSought(sought, root) : [];
     if (exact.length) {
       bySought[sought] = exact.slice(0, maxPaths);
       resolved.push(...bySought[sought]);
@@ -251,18 +251,7 @@ export function resolvePathsForSought(soughtTerms, opts = {}) {
     for (const node of Object.values(active)) {
       const p = normalizeRepoPath(node.path);
       if (!p) continue;
-      if (basenameMatchesSought(p, sought)) {
-        symbolHits.push(p);
-        continue;
-      }
-      const apiTokens = new Set(
-        String(node.api ?? "")
-          .toLowerCase()
-          .split(/[^a-z0-9]+/)
-          .filter((t) => t.length >= 8),
-      );
-      const soughtTokens = significantSoughtTokens(sought).filter((t) => t.length >= 8);
-      if (soughtTokens.some((t) => apiTokens.has(t))) {
+      if (nodeMatchesSought(p, sought, node.api ?? node.summary ?? "")) {
         symbolHits.push(p);
       }
     }
@@ -270,10 +259,10 @@ export function resolvePathsForSought(soughtTerms, opts = {}) {
     resolved.push(...bySought[sought]);
   }
 
-  const known = new Set((opts.knownFocus ?? []).map(normalizeRepoPath));
-  const paths = [...new Set(resolved.map(normalizeRepoPath).filter(Boolean))]
-    .filter((p) => !known.has(p) || true)
-    .slice(0, maxPaths);
+  const paths = [...new Set(resolved.map(normalizeRepoPath).filter(Boolean))].slice(
+    0,
+    maxPaths,
+  );
 
   return { paths, by_sought: bySought, verified: true };
 }
@@ -290,12 +279,12 @@ function loadHeal(artifactsDir) {
   });
 }
 
-async function retrieveHitsForSought(soughtTerms, runId, bySought) {
+async function retrieveHitsForSought(soughtTerms, runId, bySought, workspaceRoot) {
   const unresolved = soughtTerms.filter((s) => !(bySought[s] ?? []).length);
   if (!unresolved.length) return bySought;
   try {
     const { retrieveRepoMemory } = await import("./experience/retrieve-repo.mjs");
-    const manifest = loadRunManifest(runId) ?? {
+    const manifest = loadRunManifest(runId, workspaceRoot) ?? {
       verb: "review",
       object: unresolved[0],
       intent: unresolved.join(" "),
@@ -310,21 +299,29 @@ async function retrieveHitsForSought(soughtTerms, runId, bySought) {
         emit: false,
         maxNodes: 8,
         retrievalHints: { sought_terms: unresolved },
+        workspaceRoot,
       },
     );
+    const apiByPath = {};
+    for (const n of packet.nodes ?? []) {
+      const p = normalizeRepoPath(n?.path);
+      if (p) apiByPath[p] = `${n.api ?? ""} ${n.summary ?? ""}`;
+    }
     const candidates = [
       ...(packet.focus_paths ?? []),
       ...(packet.nodes ?? []).map((n) => n?.path),
     ].filter(Boolean);
     for (const sought of unresolved) {
       const hits = candidates
-        .filter(
-          (p) =>
-            basenameMatchesSought(p, sought) ||
+        .filter((p) => {
+          const n = normalizeRepoPath(p);
+          return (
+            nodeMatchesSought(n, sought, apiByPath[n] ?? "") ||
             extractPathTokensFromSought(sought).some(
-              (t) => normalizeRepoPath(t) === normalizeRepoPath(p),
-            ),
-        )
+              (t) => normalizeRepoPath(t) === n,
+            )
+          );
+        })
         .slice(0, 4);
       bySought[sought] = hits;
     }
@@ -380,11 +377,20 @@ export async function processRetrievalMisses(runId, opts = {}) {
 
   let { paths: resolvedPaths, by_sought: bySought } = resolvePathsForSought(
     soughtTerms,
-    { maxPaths: opts.maxPaths ?? MAX_EXPANDED_PATHS, knownFocus },
+    {
+      maxPaths: opts.maxPaths ?? MAX_EXPANDED_PATHS,
+      knownFocus,
+      workspaceRoot: opts.workspaceRoot,
+    },
   );
 
   if (opts.retrieve !== false) {
-    bySought = await retrieveHitsForSought(soughtTerms, runId, bySought);
+    bySought = await retrieveHitsForSought(
+      soughtTerms,
+      runId,
+      bySought,
+      opts.workspaceRoot,
+    );
     resolvedPaths = [
       ...new Set(
         Object.values(bySought)

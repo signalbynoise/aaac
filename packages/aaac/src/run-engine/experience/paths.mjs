@@ -3,7 +3,31 @@
  */
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { AAAC_ROOT, STATE_ROOT } from "../lib.mjs";
+import { resolveWorkspaceRoots } from "../workspace-roots.mjs";
+
+const RUN_ENGINE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Live state/index paths. Import-time STATE_ROOT is frozen; the host sets
+ * AAAC_WORKSPACE_ROOT after first import, so callers must use this.
+ */
+export function liveExperiencePaths(workspaceRoot = null) {
+  const roots = resolveWorkspaceRoots({
+    moduleDir: RUN_ENGINE_DIR,
+    workspaceRoot,
+  });
+  const repoIndexDir = path.join(roots.stateRoot, "repo-index");
+  return {
+    ...roots,
+    repoGraphPath: path.join(roots.stateRoot, "repo-graph.json"),
+    repoIndexDir,
+    repoIndexVectorsPath: path.join(repoIndexDir, "vectors.json"),
+    repoIndexHnswPath: path.join(repoIndexDir, "vectors.usearch"),
+    retrievalYamlPath: path.join(roots.aaacRoot, "experience", "retrieval.yaml"),
+  };
+}
 
 export { AAAC_ROOT, STATE_ROOT };
 

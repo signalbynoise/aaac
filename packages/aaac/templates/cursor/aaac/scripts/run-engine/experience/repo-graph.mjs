@@ -5,7 +5,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { isoNow, readJson, writeJson } from "../lib.mjs";
-import { REPO_GRAPH_PATH } from "./paths.mjs";
+import { liveExperiencePaths } from "./paths.mjs";
 
 export const NODE_KINDS = ["file", "module", "test", "invariant", "claim"];
 export const EDGE_KINDS = [
@@ -35,13 +35,14 @@ export function emptyRepoGraph() {
   };
 }
 
-export function loadRepoGraph() {
-  return readJson(REPO_GRAPH_PATH, emptyRepoGraph());
+export function loadRepoGraph(workspaceRoot = null) {
+  const live = liveExperiencePaths(workspaceRoot).repoGraphPath;
+  return readJson(live, emptyRepoGraph());
 }
 
-export function saveRepoGraph(graph) {
+export function saveRepoGraph(graph, workspaceRoot = null) {
   graph.updated_at = isoNow();
-  writeJson(REPO_GRAPH_PATH, graph);
+  writeJson(liveExperiencePaths(workspaceRoot).repoGraphPath, graph);
 }
 
 export function hashFile(absPath) {
@@ -54,7 +55,8 @@ export function hashFile(absPath) {
   }
 }
 
-export function resolveWorkspaceRoot() {
+export function resolveWorkspaceRoot(workspaceRoot = null) {
+  if (workspaceRoot) return path.resolve(workspaceRoot);
   return process.env.AAAC_WORKSPACE_ROOT || process.cwd();
 }
 
@@ -137,8 +139,8 @@ export function upsertEdge(graph, from, to, kind, weight = 1) {
 /**
  * Re-hash file-backed nodes; mark invalid when content drifts.
  */
-export function verifyRepoGraph(graph) {
-  const root = resolveWorkspaceRoot();
+export function verifyRepoGraph(graph, workspaceRoot = null) {
+  const root = resolveWorkspaceRoot(workspaceRoot);
   let verified = 0;
   let invalidated = 0;
   for (const node of Object.values(graph.nodes ?? {})) {

@@ -10,7 +10,7 @@ import {
   knownPathsFromPhaseContext,
   normalizeRepoPath,
 } from "./evaluate-finding-tools.mjs";
-import { isSourceContextPath } from "./context-taxonomy.mjs";
+import { isLearnableGrantPath } from "./experience/granted-paths.mjs";
 
 export const CAPSULE_OUTPUT_REL = ".aaac/OUTPUT.md";
 export const CAPSULE_GRANTS_REL = ".aaac/grants.json";
@@ -54,7 +54,7 @@ function copyFileNoFollow(src, dest) {
 }
 
 export function sourceGrantPaths(phaseContext) {
-  return knownPathsFromPhaseContext(phaseContext).filter(isSourceContextPath);
+  return knownPathsFromPhaseContext(phaseContext).filter(isLearnableGrantPath);
 }
 
 /**
@@ -89,7 +89,7 @@ export function materializeWorkerCapsule({
 
   const known = knownPathsFromPhaseContext(phaseContext);
   for (const rel of known) {
-    if (!isSourceContextPath(rel)) {
+    if (!isLearnableGrantPath(rel)) {
       skipped.push({ path: rel, reason: "not_source" });
       continue;
     }
@@ -217,7 +217,7 @@ export function addGrantToCapsule({
   packetVersion = "delta",
 } = {}) {
   const n = normalizeRepoPath(relPath);
-  if (!n || !isSourceContextPath(n)) return { ok: false, reason: "not_source" };
+  if (!n || !isLearnableGrantPath(n)) return { ok: false, reason: "not_source" };
   const src = path.join(workspaceRoot, n);
   let st;
   try {

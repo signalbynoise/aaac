@@ -388,12 +388,20 @@ export function learnFromRetrievalMisses(graph, {
       continue;
     }
 
+    const apiByPath = {};
+    for (const p of [...grantedPaths, ...bySoughtHits]) {
+      const node = graph?.nodes?.[nodeIdForPath(p)];
+      if (node?.api || node?.summary) {
+        apiByPath[p] = `${node.api ?? ""} ${node.summary ?? ""}`;
+      }
+    }
     const { confirmed: verified, skipReason } = confirmLearnCandidates({
       sought,
       grantedPaths,
       bySoughtHits,
       harvested: [...harvested],
       pathExists: pathExistsInWorkspace,
+      apiByPath,
     });
 
     if (!verified.length) {

@@ -292,8 +292,8 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     options.retrievalHints ?? options.queryBoost ?? null,
   );
 
-  const graph = loadRepoGraph();
-  const { invalidated } = verifyRepoGraph(graph);
+  const graph = loadRepoGraph(options.workspaceRoot);
+  const { invalidated } = verifyRepoGraph(graph, options.workspaceRoot);
   const active = Object.fromEntries(
     Object.entries(graph.nodes ?? {}).filter(([, n]) => n.valid !== false),
   );
@@ -562,6 +562,7 @@ export async function retrieveRepoMemory(manifest, options = {}) {
       path: c.node.path,
       kind: c.node.kind,
       summary: c.node.summary,
+      api: c.node.api,
       score: Math.round(c.score * 1000) / 1000,
       hash_ok: c.node.valid !== false,
     })),

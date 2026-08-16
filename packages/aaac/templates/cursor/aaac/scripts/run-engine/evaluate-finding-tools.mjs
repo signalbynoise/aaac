@@ -17,11 +17,35 @@ const DEFAULT_BUDGETS = {
  * @param {string} p
  * @returns {string}
  */
-export function normalizeRepoPath(p) {
-  return String(p ?? "")
+const OPERATIONAL_READ_PREFIXES = [
+  ".cursor/aaac/state/runs/",
+  ".cursor/agents/",
+  ".cursor/skills/",
+];
+
+export function workspaceRootForPaths() {
+  return String(process.env.AAAC_WORKSPACE_ROOT || process.cwd())
     .replace(/\\/g, "/")
+    .replace(/\/$/, "");
+}
+
+export function normalizeRepoPath(p) {
+  let n = String(p ?? "")
+    .replace(/\\/g, "/")
+    .replace(/^file:\/\//, "")
     .replace(/^\.\//, "")
     .trim();
+  if (!n) return "";
+  const root = workspaceRootForPaths();
+  if (root && (n === root || n.startsWith(`${root}/`))) {
+    n = n.slice(root.length).replace(/^\//, "");
+  }
+  return n;
+}
+
+export function isOperationalReadPath(p) {
+  const n = normalizeRepoPath(p);
+  return OPERATIONAL_READ_PREFIXES.some((prefix) => n.startsWith(prefix));
 }
 
 /**
@@ -288,6 +312,9 @@ export function evaluateReadScope({
     return { allow: true };
   }
   const scope = toolPathScope(toolInput);
+  if (scope && isOperationalReadPath(scope)) {
+    return { allow: true };
+  }
   const known = knownPathsFromPhaseContext(phaseContext);
   if (scope && pathInKnownSet(scope, known)) {
     return { allow: true };

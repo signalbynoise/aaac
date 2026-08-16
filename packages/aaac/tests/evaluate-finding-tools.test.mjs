@@ -128,6 +128,27 @@ describe("evaluateFindingTool", () => {
     expect(d.allow).toBe(true);
   });
 
+  it("allows an absolute workspace path that is already in the packet", () => {
+    const root = process.env.AAAC_WORKSPACE_ROOT || process.cwd();
+    const d = evaluateToolAccess({
+      toolName: "Read",
+      toolInput: { path: `${root}/apps/foo/src/a.ts`, offset: 1, limit: 20 },
+      phaseContext: pc,
+    });
+    expect(d.allow).toBe(true);
+  });
+
+  it("allows operational AAAC run-artifact Reads", () => {
+    const d = evaluateReadScope({
+      toolName: "Read",
+      toolInput: {
+        path: ".cursor/aaac/state/runs/run_x/artifacts/phase_context.json",
+      },
+      phaseContext: pc,
+    });
+    expect(d.allow).toBe(true);
+  });
+
   it("denies the 7th known Read when cap is 6", () => {
     const d = evaluateReadBudget({
       toolName: "Read",

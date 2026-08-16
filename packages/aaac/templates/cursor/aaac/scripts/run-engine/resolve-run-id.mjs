@@ -77,9 +77,17 @@ export function resolveRunId(hook = {}, env = process.env) {
   const envRun = String(env.AAAC_RUN_ID ?? "").trim();
   if (envRun) return { runId: envRun, source: "env" };
 
-  const conversationId = conversationIdFromHook(hook);
+  // IDE chats send conversation_id. Do not inherit a CLI swarm sidecar.
+  const conversationId = hook?.conversation_id ?? hook?.conversationId ?? null;
   if (conversationId) {
     const active = loadActiveRun(conversationId);
+    if (active?.run_id) return { runId: active.run_id, source: "active_run" };
+    return { runId: null, source: "conversation_no_run" };
+  }
+
+  const hookSession = conversationIdFromHook(hook);
+  if (hookSession) {
+    const active = loadActiveRun(hookSession);
     if (active?.run_id) return { runId: active.run_id, source: "active_run" };
   }
 

@@ -59,6 +59,15 @@ describe("resolveRunId + cli-latest sidecar", () => {
     expect(resolved.source).toBe("env");
   });
 
+  it("does not inherit sidecar when the hook has a conversation and no active run", async () => {
+    vi.resetModules();
+    const api = await import("../src/run-engine/resolve-run-id.mjs");
+    api.writeCliLatestSidecar({ run_id: "run_sidecar" });
+    const resolved = api.resolveRunId({ conversation_id: "conv-ide" }, {});
+    expect(resolved.runId).toBe(null);
+    expect(resolved.source).toBe("conversation_no_run");
+  });
+
   it("writeCliLatestSidecarAt writes under an explicit workspace", async () => {
     vi.resetModules();
     const { writeCliLatestSidecarAt } = await import(

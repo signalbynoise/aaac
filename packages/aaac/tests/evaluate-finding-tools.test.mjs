@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateFindingTool,
   evaluateReadBudget,
+  evaluateReadScope,
   evaluateToolAccess,
   knownPathsFromPhaseContext,
   pathInKnownSet,
@@ -101,6 +102,41 @@ describe("evaluateFindingTool", () => {
     const paths = knownPathsFromPhaseContext(pc);
     expect(paths).toContain("apps/foo/src/a.ts");
     expect(pathInKnownSet("apps/foo/src/a.ts", paths)).toBe(true);
+  });
+
+  it("denies Read of a path not in the packet", () => {
+    const d = evaluateToolAccess({
+      toolName: "Read",
+      toolInput: { path: "apps/other/secret.ts" },
+      phaseContext: pc,
+    });
+    expect(d.allow).toBe(false);
+    expect(d.reason).toBe("read_not_in_packet");
+    expect(d.miss.sought).toBe("apps/other/secret.ts");
+  });
+
+  it("allows Read after healed_paths includes the file", () => {
+    const healed = {
+      ...pc,
+      healed_paths: ["apps/other/secret.ts"],
+    };
+    const d = evaluateReadScope({
+      toolName: "Read",
+      toolInput: { path: "apps/other/secret.ts" },
+      phaseContext: healed,
+    });
+    expect(d.allow).toBe(true);
+  });
+
+  it("denies the 7th known Read when cap is 6", () => {
+    const d = evaluateReadBudget({
+      toolName: "Read",
+      toolInput: { path: "apps/foo/src/a.ts", offset: 1, limit: 10 },
+      budgets: { max_agent_files_read: 6, max_full_file_opens: 2, max_gap_search_globs: 8 },
+      counters: { files_read: 6, full_file_opens: 0, gap_searches: 0 },
+    });
+    expect(d.allow).toBe(false);
+    expect(d.reason).toBe("files_read_budget");
   });
 });
 

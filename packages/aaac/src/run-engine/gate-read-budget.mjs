@@ -1,24 +1,26 @@
 #!/usr/bin/env node
 /**
  * preToolUse — graph-native finding + progressive-read budgets.
- * Soft-allows when no active run.
+ * Soft-allows only when no run can be resolved (logged as soft_allow_no_run).
  */
 import fs from "fs";
 import path from "path";
-import {
-  loadActiveRun,
-  loadRunManifest,
-  conversationIdFromHook,
-  runDir,
-  readJson,
-} from "./lib.mjs";
+import { loadRunManifest, runDir } from "./lib.mjs";
+import { resolveRunId } from "./resolve-run-id.mjs";
 import { loadRetrievalConfig } from "./experience/paths.mjs";
+import { resolveWorkspaceRoot } from "./experience/repo-graph.mjs";
 import {
   budgetsFromPhaseContext,
   evaluateToolAccess,
   READ_TOOL,
   FINDING_TOOLS,
+  toolPathScope,
 } from "./evaluate-finding-tools.mjs";
+import {
+  healPathIntoPhaseContext,
+  recordRetrievalMiss,
+} from "./retrieval-miss.mjs";
+import { pathExistsUnderRoot } from "./sought-paths.mjs";
 
 function loadPhaseContext(runId) {
   const pcPath = path.join(runDir(runId), "artifacts", "phase_context.json");
@@ -28,41 +30,6 @@ function loadPhaseContext(runId) {
   } catch {
     return null;
   }
-}
-
-function resolveRunId(hook) {
-  const envRun = process.env.AAAC_RUN_ID?.trim();
-  if (envRun) return envRun;
-
-  const conversationId = conversationIdFromHook(hook);
-  if (conversationId) {
-    const active = loadActiveRun(conversationId);
-    if (active?.run_id) return active.run_id;
-  }
-
-  // Agentic OS sessions: active-runs may be keyed by aos session id
-  const sessionId =
-    process.env.AAAC_SESSION_ID?.trim() ||
-    hook?.session_id ||
-    hook?.sessionId ||
-    null;
-  if (sessionId) {
-    const active = loadActiveRun(sessionId);
-    if (active?.run_id) return active.run_id;
-    // sessions/{id}.json may point at run
-    try {
-      const sessionsRoot = path.join(
-        process.cwd(),
-        ".cursor/aaac/state/sessions",
-      );
-      const sess = readJson(path.join(sessionsRoot, `${sessionId}.json`), null);
-      if (sess?.run_id) return sess.run_id;
-    } catch {
-      // ignore
-    }
-  }
-
-  return null;
 }
 
 function currentAgentCounters(manifest, agentIndex = null) {
@@ -94,6 +61,19 @@ function currentAgentCounters(manifest, agentIndex = null) {
   };
 }
 
+function emitSoftAllow(toolName, hook) {
+  const event = {
+    event: "soft_allow_no_run",
+    tool: toolName,
+    session_id: hook?.session_id ?? hook?.sessionId ?? null,
+  };
+  try {
+    console.error(JSON.stringify(event));
+  } catch {
+    // ignore
+  }
+}
+
 let input = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => (input += c));
@@ -113,6 +93,10 @@ process.stdin.on("end", () => {
     process.exit(0);
   };
 
+  if (process.env.AAAC_ORCHESTRATOR_CHAT === "1") {
+    allow();
+  }
+
   let hook;
   try {
     hook = JSON.parse(input || "{}");
@@ -123,8 +107,12 @@ process.stdin.on("end", () => {
   const toolName = hook.tool_name ?? hook.toolName ?? "";
   if (!READ_TOOL.test(toolName) && !FINDING_TOOLS.test(toolName)) allow();
 
-  const runId = resolveRunId(hook);
-  if (!runId) allow();
+  const resolved = resolveRunId(hook);
+  const runId = resolved.runId;
+  if (!runId) {
+    emitSoftAllow(toolName, hook);
+    allow();
+  }
 
   const manifest = loadRunManifest(runId);
   if (
@@ -153,6 +141,43 @@ process.stdin.on("end", () => {
   });
 
   if (!decision.allow) {
+    const scope = toolPathScope(toolInput);
+    try {
+      if (decision.miss) {
+        recordRetrievalMiss(
+          runId,
+          {
+            ...decision.miss,
+            phase: manifest.phase ?? null,
+            agent_id: agentIndex,
+          },
+          { dedupe: true },
+        );
+      }
+    } catch {
+      // miss store optional
+    }
+
+    if (READ_TOOL.test(toolName) && decision.reason === "read_not_in_packet" && scope) {
+      let root = process.cwd();
+      try {
+        root = resolveWorkspaceRoot();
+      } catch {
+        root = process.env.AAAC_WORKSPACE_ROOT || process.cwd();
+      }
+      if (pathExistsUnderRoot(scope, root)) {
+        try {
+          healPathIntoPhaseContext(runId, scope);
+        } catch {
+          // ignore
+        }
+        deny(
+          decision.user_message ?? "Read denied",
+          `${decision.message} Path ${scope} is now in the packet — retry Read of that path only.`,
+        );
+      }
+    }
+
     deny(
       decision.user_message ?? "Tool denied",
       decision.message ?? "Graph-native finding / read budget gate",

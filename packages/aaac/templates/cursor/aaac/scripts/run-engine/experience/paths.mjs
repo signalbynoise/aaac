@@ -87,8 +87,8 @@ const DEFAULT_RETRIEVAL = {
     symbol_neighbor_files: 8,
     stage1_neighbor_files: 6,
     basename_boost: 0.25,
-    max_agent_files_read: 16,
-    max_full_file_opens: 4,
+    max_agent_files_read: 6,
+    max_full_file_opens: 2,
     max_gap_search_globs: 8,
   },
   hnsw: {

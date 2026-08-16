@@ -8,8 +8,8 @@ export const FINDING_TOOLS = /^(Grep|Glob|SemanticSearch)$/i;
 export const READ_TOOL = /^Read$/i;
 
 const DEFAULT_BUDGETS = {
-  max_agent_files_read: 16,
-  max_full_file_opens: 4,
+  max_agent_files_read: 6,
+  max_full_file_opens: 2,
   max_gap_search_globs: 8,
 };
 
@@ -37,6 +37,8 @@ export function knownPathsFromPhaseContext(phaseContext) {
     if (n) out.add(n);
   };
   for (const p of rm.focus_paths ?? []) add(p);
+  for (const p of rm.healed_paths ?? []) add(p);
+  for (const p of pc.healed_paths ?? []) add(p);
   for (const n of rm.nodes ?? []) add(n?.path);
   for (const s of rm.focus_spans ?? []) add(s?.path);
   const pack = rm.read_pack;
@@ -154,7 +156,11 @@ export function evaluateFindingTool({
   }
 
   const missMsg =
-    "Finding is graph-native. Do not Glob/Grep the repo. Emit retrieval_miss / low_confidence (sought term, reason) so the index can expand, repair, or authorize fallback. Read known paths from the inlined packet with the Read tool.";
+    "Finding is graph-native. Do not Glob/Grep the repo. A retrieval_miss is recorded automatically so the index can expand, repair, or authorize fallback. Read known paths from the inlined packet with the Read tool.";
+  const sought =
+    toolPathScope(toolInput) ||
+    String(toolInput?.pattern ?? toolInput?.query ?? toolName).trim() ||
+    toolName;
 
   const fallback = getAuthorizedFallback(phaseContext);
   if (!fallback) {
@@ -162,6 +168,7 @@ export function evaluateFindingTool({
       allow: false,
       reason: "finding_requires_authorized_fallback",
       message: missMsg,
+      miss: { sought, reason: "not_in_focus" },
     };
   }
 
@@ -246,7 +253,7 @@ export function evaluateReadBudget({
     return { allow: true };
   }
 
-  if (counters.files_read >= (budgets.max_agent_files_read ?? 16)) {
+  if (counters.files_read >= (budgets.max_agent_files_read ?? 6)) {
     return {
       allow: false,
       reason: "files_read_budget",
@@ -256,7 +263,7 @@ export function evaluateReadBudget({
 
   if (
     isFullFileRead(toolName, toolInput) &&
-    counters.full_file_opens >= (budgets.max_full_file_opens ?? 4)
+    counters.full_file_opens >= (budgets.max_full_file_opens ?? 2)
   ) {
     return {
       allow: false,
@@ -269,8 +276,34 @@ export function evaluateReadBudget({
 }
 
 /**
+ * Read must target a path already in the graph packet / healed set.
+ * @returns {{ allow: boolean, reason?: string, message?: string, miss?: object }}
+ */
+export function evaluateReadScope({
+  toolName,
+  toolInput = {},
+  phaseContext = null,
+} = {}) {
+  if (!READ_TOOL.test(toolName)) {
+    return { allow: true };
+  }
+  const scope = toolPathScope(toolInput);
+  const known = knownPathsFromPhaseContext(phaseContext);
+  if (scope && pathInKnownSet(scope, known)) {
+    return { allow: true };
+  }
+  const sought = scope ?? "(none)";
+  return {
+    allow: false,
+    reason: "read_not_in_packet",
+    message: `Read is filesystem-native for packet paths only. ${sought} is not in focus_paths / read_pack / healed_paths. retrieval_miss recorded — if this path exists it is added to the packet; retry Read of that path.`,
+    miss: { sought, reason: "not_in_focus" },
+  };
+}
+
+/**
  * Combined gate decision for Read | Grep | Glob | SemanticSearch.
- * @returns {{ allow: boolean, reason?: string, message?: string, user_message?: string }}
+ * @returns {{ allow: boolean, reason?: string, message?: string, user_message?: string, miss?: object }}
  */
 export function evaluateToolAccess({
   toolName,
@@ -281,6 +314,16 @@ export function evaluateToolAccess({
 } = {}) {
   if (!READ_TOOL.test(toolName) && !FINDING_TOOLS.test(toolName)) {
     return { allow: true };
+  }
+
+  if (READ_TOOL.test(toolName)) {
+    const scope = evaluateReadScope({ toolName, toolInput, phaseContext });
+    if (!scope.allow) {
+      return {
+        ...scope,
+        user_message: "Graph-native finding: Read denied",
+      };
+    }
   }
 
   if (FINDING_TOOLS.test(toolName)) {
@@ -294,6 +337,10 @@ export function evaluateToolAccess({
       return {
         ...finding,
         user_message: "Graph-native finding: tool denied",
+        miss: finding.miss ?? {
+          sought: toolPathScope(toolInput) || toolName,
+          reason: "not_in_focus",
+        },
       };
     }
   }

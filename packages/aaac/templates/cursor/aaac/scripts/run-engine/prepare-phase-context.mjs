@@ -64,12 +64,14 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
   const priorPcPath = path.join(artifactsDir, "phase_context.json");
   let priorAuthorized = null;
   let priorHints = null;
+  let priorHealed = [];
   let healHints = null;
   try {
     if (fs.existsSync(priorPcPath)) {
       const prior = JSON.parse(fs.readFileSync(priorPcPath, "utf8"));
       priorAuthorized = prior.authorized_fallback ?? null;
       priorHints = prior.retrieval_hints ?? null;
+      priorHealed = Array.isArray(prior.healed_paths) ? prior.healed_paths : [];
     }
   } catch {
     // ignore
@@ -92,14 +94,9 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
   }
 
   const retrievalHints = {
-    paths: [
-      ...new Set([
-        ...(healHints?.paths ?? []),
-        ...(Array.isArray(priorHints)
-          ? priorHints.flatMap((h) => h.resolved_paths ?? [])
-          : []),
-      ]),
-    ],
+    paths: [...new Set([...(healHints?.paths ?? []), ...priorHealed])],
+    verified_paths: [...new Set([...(healHints?.paths ?? []), ...priorHealed])],
+    verified: true,
     sought_terms: [
       ...new Set([
         ...(healHints?.sought_terms ?? []),
@@ -146,6 +143,16 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
     // Experience stores optional on fresh installs
   }
 
+  if (priorHealed.length) {
+    if (!experience.repo_memory) experience.repo_memory = {};
+    experience.repo_memory.healed_paths = [
+      ...new Set([
+        ...(experience.repo_memory.healed_paths ?? []),
+        ...priorHealed,
+      ]),
+    ];
+  }
+
   const context = {
     prepared_at: isoNow(),
     run_id: runId,
@@ -184,6 +191,7 @@ export async function preparePhaseContext(runId, manifestOverride = null) {
         : "GRAPH-NATIVE FINDING; FILESYSTEM-NATIVE READING. Find paths/symbols only from experience.repo_memory (focus_paths, read_pack, envelopes, relations) — never Glob or repo-wide Grep. Read known paths with the Read tool (envelope → symbol → full file). If the graph misses what you need: emit retrieval_miss / low_confidence (sought, reason: not_in_focus|envelope_too_thin|stale_claim|symbol_missing|other) — do NOT silently Grep/Glob; the index layer expands, repairs, or deliberately authorizes fallback. VERIFY-AND-EXTEND: confirmed/stale/new_findings. Honor meta.read_budgets. Prefer experience.repo_facts. Cite lessons. Stay within experience.context_budget.",
     authorized_fallback: priorAuthorized,
     retrieval_hints: priorHints,
+    healed_paths: priorHealed,
   };
 
   const outPath = path.join(artifactsDir, "phase_context.json");

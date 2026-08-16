@@ -22,6 +22,10 @@ import { upsertRepoNodesIntoIndex } from "./repo-index/build.mjs";
 import { isTestPath } from "./repo-index/files.mjs";
 import { loadRetrievalConfig } from "./paths.mjs";
 import { emitRepoMemoryEvent } from "./repo-events.mjs";
+import {
+  extractPathTokensFromSought,
+  basenameMatchesSought,
+} from "../sought-paths.mjs";
 
 function shouldLearnPath(rel) {
   return (
@@ -69,23 +73,13 @@ function pathExistsInWorkspace(rel) {
 }
 
 function pathTokensFromSought(sought) {
-  const text = String(sought ?? "").trim();
-  const out = extractPathsFromText(` ${text} `);
-  const first = text.split(/\s+/)[0] ?? "";
-  if (
-    /^(?:apps|packages|src|tests?|docs|\.cursor)\//.test(first) ||
-    /^[A-Za-z0-9_./+-]+\.[A-Za-z0-9]{1,8}$/.test(first)
-  ) {
-    out.unshift(normalizeRelPath(first));
-  }
-  return [...new Set(out.filter(Boolean))];
+  const extracted = extractPathTokensFromSought(sought).map(normalizeRelPath);
+  const fromText = extractPathsFromText(` ${sought} `);
+  return [...new Set([...extracted, ...fromText].filter(Boolean))];
 }
 
 function sharesSoughtToken(sought, relPath) {
-  const tokens = tokenizeSought(sought);
-  const hay = normalizeRelPath(relPath).toLowerCase();
-  const base = path.basename(hay);
-  return tokens.some((t) => t.length > 2 && (hay.includes(t) || base.includes(t)));
+  return basenameMatchesSought(relPath, sought);
 }
 
 /**
@@ -115,6 +109,8 @@ export function harvestPathsTouched(artifactsDir, extra = []) {
     if (fs.existsSync(pcPath)) {
       const pc = JSON.parse(fs.readFileSync(pcPath, "utf8"));
       const rm = pc.experience?.repo_memory ?? pc.repo_memory ?? {};
+      for (const p of pc.healed_paths ?? []) add(p);
+      for (const p of rm.healed_paths ?? []) add(p);
       for (const p of rm.focus_paths ?? []) add(p);
       for (const s of rm.focus_spans ?? []) add(s?.path);
       const pack = rm.read_pack;
@@ -374,7 +370,10 @@ export function learnFromRetrievalMisses(graph, {
       for (const raw of bySought[sought] ?? []) {
         const p = normalizeRelPath(raw);
         if (!p) continue;
-        if (harvested.has(p) || (pathExistsInWorkspace(p) && sharesSoughtToken(sought, p))) {
+        if (
+          harvested.has(p) ||
+          (pathExistsInWorkspace(p) && sharesSoughtToken(sought, p))
+        ) {
           addVerified(p);
         }
       }
@@ -412,6 +411,8 @@ export function learnFromRetrievalMisses(graph, {
         sought,
         manifest?.intent ? String(manifest.intent).slice(0, 120) : "",
         manifest?.object ?? "",
+        manifest?.domain ?? "",
+        manifest?.verb ?? "",
       ]
         .filter(Boolean)
         .join(" ");

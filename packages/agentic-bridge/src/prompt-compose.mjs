@@ -99,9 +99,9 @@ export function formatInlineRepoMemoryPacket(phaseContext) {
     "**Finding is graph-native. Reading is filesystem-native.**",
     "- Find paths/symbols **only** from this packet — do **not** Glob or repo-wide Grep.",
     "- **Read** known paths with the Read tool (prefer envelope_text → symbol range → full file).",
-    "- If this packet is insufficient: emit **retrieval_miss** / low_confidence (`sought`, `reason`) — do **not** silently escape to Glob/Grep. The index layer expands, repairs, or deliberately authorizes fallback.",
+    "- If this packet is insufficient: a denied Read/Grep **auto-records retrieval_miss**. Retry only the path named in the deny message after it is added to the packet. Do **not** Glob or repo-wide Grep.",
     "",
-    `Budgets: max_agent_files_read=${budgets.max_agent_files_read ?? 16}, max_full_file_opens=${budgets.max_full_file_opens ?? 4}, max_gap_search_globs=${budgets.max_gap_search_globs ?? 8}`,
+    `Budgets: max_agent_files_read=${budgets.max_agent_files_read ?? 6}, max_full_file_opens=${budgets.max_full_file_opens ?? 2}, max_gap_search_globs=${budgets.max_gap_search_globs ?? 8}`,
     `authorized_fallback: ${phaseContext.authorized_fallback?.enabled ? JSON.stringify({
       paths: phaseContext.authorized_fallback.paths,
       tools: phaseContext.authorized_fallback.tools,

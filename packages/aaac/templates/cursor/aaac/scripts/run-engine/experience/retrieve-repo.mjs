@@ -214,11 +214,11 @@ function mergeStage1Neighbors(graph, active, focusPaths, picked, neighborCap) {
 /**
  * Normalize retrievalHints from prepare / heal artifacts.
  * @param {object|null|undefined} hints
- * @returns {{ paths: string[], sought: string[], recentFailures: string[] }}
+ * @returns {{ paths: string[], sought: string[], recentFailures: string[], verifiedPaths: string[] }}
  */
 export function normalizeRetrievalHints(hints = null) {
   if (!hints || typeof hints !== "object") {
-    return { paths: [], sought: [], recentFailures: [] };
+    return { paths: [], sought: [], recentFailures: [], verifiedPaths: [] };
   }
   const paths = [
     ...new Set(
@@ -254,7 +254,20 @@ export function normalizeRetrievalHints(hints = null) {
         .filter(Boolean),
     ),
   ];
-  return { paths, sought, recentFailures };
+  const verifiedFromList = [
+    ...(Array.isArray(hints.verified_paths) ? hints.verified_paths : []),
+    ...(Array.isArray(hints.retrieval_hints)
+      ? hints.retrieval_hints
+          .filter((h) => h?.verified)
+          .flatMap((h) => h.resolved_paths ?? [])
+      : []),
+  ]
+    .map((p) => String(p ?? "").replace(/\\/g, "/").trim())
+    .filter(Boolean);
+  const verifiedPaths = [
+    ...new Set(hints.verified === true ? paths : verifiedFromList),
+  ];
+  return { paths, sought, recentFailures, verifiedPaths };
 }
 
 /**
@@ -407,13 +420,13 @@ export async function retrieveRepoMemory(manifest, options = {}) {
   }
   candidates.sort((a, b) => b.score - a.score);
 
-  // Seed / boost hint paths ahead of MMR so miss-heal sticks in focus
-  if (hintNorm.paths.length) {
-    const hintSet = new Set(hintNorm.paths);
+  // Verified heal paths only — never 1e6-boost unverified lexical junk
+  const verifiedSet = new Set(hintNorm.verifiedPaths ?? []);
+  if (verifiedSet.size) {
     for (const c of candidates) {
-      if (hintSet.has(c.node.path)) c.score += 50;
+      if (verifiedSet.has(c.node.path)) c.score += 50;
     }
-    for (const p of hintNorm.paths) {
+    for (const p of verifiedSet) {
       const entry = nodeEntryForPath(active, p);
       if (!entry) continue;
       const [nodeId, node] = entry;
@@ -428,9 +441,20 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     candidates.sort((a, b) => b.score - a.score);
   }
 
+  const domain = String(manifest?.domain ?? "").trim().toLowerCase();
+  if (domain && domain !== "general") {
+    for (const c of candidates) {
+      const hay = `${c.node.path ?? ""} ${(c.node.tags ?? []).join(" ")} ${c.node.trigger ?? ""}`.toLowerCase();
+      if (hay.includes(domain) && !isBarrelPath(c.node.path)) {
+        c.score += 0.3;
+      }
+    }
+    candidates.sort((a, b) => b.score - a.score);
+  }
+
   let picked = selectMmrNodes(candidates, maxNodes, cfg.mmr_lambda ?? 0.7);
   const pickedIds = new Set(picked.map((c) => c.nodeId));
-  for (const p of hintNorm.paths) {
+  for (const p of verifiedSet) {
     const entry = nodeEntryForPath(active, p);
     if (!entry) continue;
     const [nodeId, node] = entry;
@@ -443,10 +467,10 @@ export async function retrieveRepoMemory(manifest, options = {}) {
     });
     pickedIds.add(nodeId);
   }
-  picked = picked.slice(0, Math.max(maxNodes, hintNorm.paths.length + 2));
+  picked = picked.slice(0, Math.max(maxNodes, verifiedSet.size + 2));
   let focusPaths = [
     ...new Set([
-      ...hintNorm.paths.filter((p) => pathExistsInActive(active, p)),
+      ...[...verifiedSet].filter((p) => pathExistsInActive(active, p)),
       ...picked.map((c) => c.node.path).filter(Boolean),
     ]),
   ];
@@ -568,9 +592,9 @@ export async function retrieveRepoMemory(manifest, options = {}) {
       focus_spans: focusSpans.length,
       span_candidate_files: spanPaths.length,
       retrieval_hints_applied: Boolean(
-        hintNorm.paths.length || hintNorm.sought.length,
+        hintNorm.verifiedPaths.length || hintNorm.sought.length,
       ),
-      hint_paths: hintNorm.paths.slice(0, 16),
+      hint_paths: hintNorm.verifiedPaths.slice(0, 16),
       sought_terms: hintNorm.sought.slice(0, 16),
     },
   };

@@ -1,6 +1,6 @@
 {
   "name": "@ludecker/agentic-bridge",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Agentic OS local bridge — run dispatch, phase runner, Cursor adapter",
   "type": "module",
   "license": "MIT",
@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
-    "@ludecker/aaac": "^1.2.5"
+    "@ludecker/aaac": "^1.8.0"
   },
   "optionalDependencies": {
     "@cursor/sdk": "^1.0.0"

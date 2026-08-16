@@ -253,7 +253,7 @@ export async function processRunExperience(runId, options = {}) {
 
   // V6 — heal last-phase misses, then repo vector graph learn
   try {
-    processRetrievalMisses(runId);
+    await processRetrievalMisses(runId);
   } catch {
     // soft-fail — do not block experience write
   }

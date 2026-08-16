@@ -32,8 +32,19 @@ import {
 } from "@ludecker/aaac/run-engine/evaluate-finding-tools";
 import { resolveWorkspacePaths } from "./paths.mjs";
 import { DEFAULT_AAAC_MODEL_SLUG, resolveAaacPhaseModel, toCursorCliModelSlug } from "./aaac-model.mjs";
+import { writeCliLatestSidecarAt } from "@ludecker/aaac/run-engine/resolve-run-id";
 
 const log = createLogger("agentic-bridge:cursor-adapter");
+
+function resolveAgentTimeoutMs(fallback = 900_000) {
+  const n = Number(process.env.AAAC_AGENT_TIMEOUT_MS ?? process.env.CURSOR_AGENT_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+function resolveAgentIdleMs(fallback = 180_000) {
+  const n = Number(process.env.AAAC_AGENT_IDLE_MS ?? process.env.CURSOR_AGENT_IDLE_MS);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
 
 export function formatAdapterStartedDetail(ctx) {
   const payload = {
@@ -83,7 +94,7 @@ function agentCountersFromManifest(manifest, phase, agentIndex) {
   };
 }
 
-async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_000, envExtras = {}) {
+async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = resolveAgentTimeoutMs(), envExtras = {}) {
   const bin = await resolveCursorBin();
   if (!bin) {
     throw new Error("cursor agent binary not found — install Cursor or run Sign in with Cursor");
@@ -130,7 +141,8 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = 900_00
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  return { child, timeoutMs };
+  const idleMs = resolveAgentIdleMs();
+  return { child, timeoutMs, idleMs };
 }
 
 /**
@@ -216,37 +228,68 @@ function completeChildOutput(state, code) {
   wakeOutput(state);
 }
 
-function attachChildOutputListeners(child, state, timeoutMs) {
-  const timer = setTimeout(() => {
-    clearTimeout(timer);
-    child.kill("SIGTERM");
-    state.error = new Error(`cursor agent timed out after ${timeoutMs}ms`);
+function attachChildOutputListeners(child, state, timeoutMs, idleMs = resolveAgentIdleMs()) {
+  const clearTimers = () => {
+    if (state.absoluteTimer) clearTimeout(state.absoluteTimer);
+    if (state.idleTimer) clearTimeout(state.idleTimer);
+    state.absoluteTimer = null;
+    state.idleTimer = null;
+  };
+
+  const fail = (message) => {
+    if (state.done) return;
+    clearTimers();
+    try {
+      child.kill("SIGTERM");
+    } catch {
+      // ignore
+    }
+    state.error = new Error(message);
     state.done = true;
     wakeOutput(state);
+  };
+
+  const touchIdle = () => {
+    state.lastActivityAt = Date.now();
+    if (state.idleTimer) clearTimeout(state.idleTimer);
+    if (!(idleMs > 0) || state.done) return;
+    state.idleTimer = setTimeout(() => {
+      fail(`cursor agent stalled (no response for ${idleMs}ms)`);
+    }, idleMs);
+  };
+
+  state.absoluteTimer = setTimeout(() => {
+    fail(`cursor agent timed out after ${timeoutMs}ms`);
   }, timeoutMs);
+  touchIdle();
+
   child.stdout.on("data", (chunk) => {
+    touchIdle();
     const text = String(chunk);
     state.stdout += text;
     for (const line of state.lineBuffer.push(text)) {
       handleParsedOutput(state, parseStreamJsonLine(line));
     }
   });
-  child.stderr.on("data", (chunk) => (state.stderr += String(chunk)));
+  child.stderr.on("data", (chunk) => {
+    touchIdle();
+    state.stderr += String(chunk);
+  });
   child.on("error", (err) => {
+    clearTimers();
     state.error = err;
     state.done = true;
-    clearTimeout(timer);
     wakeOutput(state);
   });
   child.on("close", (code) => {
-    clearTimeout(timer);
+    clearTimers();
     completeChildOutput(state, code);
   });
 }
 
-async function* streamChildOutput(child, timeoutMs) {
+async function* streamChildOutput(child, timeoutMs, idleMs = resolveAgentIdleMs()) {
   const state = createOutputState();
-  attachChildOutputListeners(child, state, timeoutMs);
+  attachChildOutputListeners(child, state, timeoutMs, idleMs);
   while (!state.done || state.queue.length > 0) {
     while (state.queue.length > 0) {
       yield { item: state.queue.shift(), state };
@@ -326,7 +369,7 @@ async function spawnAgentWithRetry(ctx, prompt, envExtras) {
     spawned = await runCursorAgentStreaming(
       ctx.workspaceRoot,
       prompt,
-      900_000,
+      resolveAgentTimeoutMs(),
       envExtras,
     );
   }, { maxAttempts: 2, baseBackoffMs: 2000 });
@@ -358,6 +401,19 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
       ctx.agentIndex != null && ctx.agentIndex >= 0 ? String(ctx.agentIndex) : "",
     CURSOR_MODEL: modelId,
   };
+  try {
+    writeCliLatestSidecarAt(ctx.workspaceRoot, {
+      run_id: ctx.runId,
+      session_id: envExtras.AAAC_SESSION_ID || null,
+      agent_index: ctx.agentIndex,
+      phase: ctx.phase,
+    });
+  } catch (err) {
+    log.warn("cli-sidecar", "Failed to write cli-latest.json", {
+      runId: ctx.runId,
+      error: String(err?.message ?? err),
+    });
+  }
 
   const maxAttempts = 4;
   let lastError = null;
@@ -373,7 +429,7 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
       const timeoutMs = spawned.timeoutMs;
       activeChildren.set(ctx.runId, child);
 
-      const stream = streamChildOutput(child, timeoutMs);
+      const stream = streamChildOutput(child, timeoutMs, spawned.idleMs);
       let next = await stream.next();
       while (!next.done) {
         const { item } = next.value;

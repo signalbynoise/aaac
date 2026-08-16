@@ -578,7 +578,7 @@ if (!nextPhase) {
   try {
     let healResult = null;
     try {
-      healResult = processRetrievalMisses(runId);
+      healResult = await processRetrievalMisses(runId);
       if (healResult?.processed > 0) {
         recordLog(manifest, {
           event: "retrieval_heal",

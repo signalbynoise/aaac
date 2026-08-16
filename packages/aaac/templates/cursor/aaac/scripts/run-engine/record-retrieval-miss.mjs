@@ -64,7 +64,7 @@ const raw = {
 const recorded = recordRetrievalMiss(args.runId, raw);
 let processed = null;
 if (args.process || args.authorize) {
-  processed = processRetrievalMisses(args.runId, { authorize: args.authorize });
+  processed = await processRetrievalMisses(args.runId, { authorize: args.authorize });
 }
 
 console.log(JSON.stringify({ ok: true, recorded, processed }, null, 2));

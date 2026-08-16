@@ -23,7 +23,8 @@ hnsw:
 
 embedding:
   # hash matches experience/packaged-index (ships with npm; works offline).
-  # Set AAAC_EMBEDDING_PROVIDER=local|openai and rebuild for higher-quality vectors.
+  # Repo index: prefer AAAC_EMBEDDING_PROVIDER=local when @huggingface/transformers
+  # is installed, then `node .cursor/aaac/scripts/run-engine/rebuild-repo-index.mjs --provider local`.
   default_provider: hash
   packaged_provider: hash
   local_model: Xenova/all-MiniLM-L6-v2
@@ -63,8 +64,8 @@ repo_memory:
   stage1_neighbor_files: 6
   basename_boost: 0.25
   # Progressive-read hard budgets (per agent; enforced by preToolUse gate)
-  max_agent_files_read: 16
-  max_full_file_opens: 4
+  max_agent_files_read: 6
+  max_full_file_opens: 2
   max_gap_search_globs: 8
 
 ranking:

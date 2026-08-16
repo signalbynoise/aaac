@@ -1,6 +1,6 @@
 {
   "name": "@ludecker/aaac",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "description": "Agentic Architecture as Code (AAAC) — installable Cursor agent framework",
   "type": "module",
   "license": "MIT",
@@ -30,6 +30,8 @@
     "./install": "./src/lib/install.mjs",
     "./run-engine/agent-progress-contract": "./src/run-engine/agent-progress-contract.mjs",
     "./run-engine/evaluate-finding-tools": "./src/run-engine/evaluate-finding-tools.mjs",
+    "./run-engine/resolve-run-id": "./src/run-engine/resolve-run-id.mjs",
+    "./run-engine/sought-paths": "./src/run-engine/sought-paths.mjs",
     "./run-engine/retrieval-miss": "./src/run-engine/retrieval-miss.mjs",
     "./run-engine/reconcile-run-status": "./src/run-engine/reconcile-run-status.mjs",
     "./run-engine/swarm-agent-specs": "./src/run-engine/swarm-agent-specs.mjs",

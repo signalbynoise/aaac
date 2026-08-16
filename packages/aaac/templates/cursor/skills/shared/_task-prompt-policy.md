@@ -6,7 +6,7 @@ Append this block to **every** Task sub-agent prompt the orchestrator sends.
 
 - **Readonly** unless the agent spec explicitly allows test runs or shell commands.
 - **Evidence:** every claim needs `path:line` citations the parent can spot-check.
-- **SSOT:** do not invent constants, routes, or file paths — read the repo.
+- **SSOT:** do not invent constants, routes, or file paths. **Finding is graph-native** — use the inlined repo packet (`focus_paths`, `read_pack`). **Reading is filesystem-native** — Read only those known paths. Unknown Read/Grep/Glob is denied and records a `retrieval_miss`; retry only a path the deny message added to the packet.
 - **Prime directive** (master rules): clarity beats cleverness; predictability beats shortcuts; one truth beats convenience.
 - **Layer boundaries:** `packages/ui` must not import `apps/website`; `packages/types` and `packages/utils` stay runtime-free.
 - **Errors:** never silent — state gaps explicitly in the return block.

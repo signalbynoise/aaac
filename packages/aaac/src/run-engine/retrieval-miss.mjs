@@ -6,8 +6,12 @@ import fs from "fs";
 import path from "path";
 import { isoNow, loadRunManifest, runDir, writeJson, readJson } from "./lib.mjs";
 import { normalizeRepoPath } from "./evaluate-finding-tools.mjs";
-import { loadRepoGraph, verifyRepoGraph } from "./experience/repo-graph.mjs";
-import { expandCandidatePaths } from "./experience/repo-index/span-retrieve.mjs";
+import { loadRepoGraph, verifyRepoGraph, resolveWorkspaceRoot } from "./experience/repo-graph.mjs";
+import {
+  basenameMatchesSought,
+  extractPathTokensFromSought,
+  pathExistsUnderRoot,
+} from "./sought-paths.mjs";
 
 export const RETRIEVAL_MISS_REASONS = [
   "not_in_focus",
@@ -21,6 +25,7 @@ export const RETRIEVAL_MISS_REASONS = [
 const MAX_EXPANDED_PATHS = 8;
 const MAX_HINTS = 10;
 const HEAL_VERSION = 1;
+const MAX_HEALED_PATHS = 32;
 
 /**
  * @param {object} raw
@@ -55,8 +60,9 @@ export function normalizeRetrievalMiss(raw = {}) {
  * Append miss to artifacts/retrieval_misses.json
  * @param {string} runId
  * @param {object} rawMiss
+ * @param {{ dedupe?: boolean }} [opts]
  */
-export function recordRetrievalMiss(runId, rawMiss) {
+export function recordRetrievalMiss(runId, rawMiss, opts = {}) {
   const normalized = normalizeRetrievalMiss(rawMiss);
   if (!normalized.ok) {
     const err = new Error(normalized.error);
@@ -68,10 +74,49 @@ export function recordRetrievalMiss(runId, rawMiss) {
   const storePath = path.join(artifactsDir, "retrieval_misses.json");
   const store = readJson(storePath, { version: 1, misses: [] });
   store.misses = Array.isArray(store.misses) ? store.misses : [];
+  if (opts.dedupe !== false) {
+    const sought = normalized.miss.sought;
+    const phase = normalized.miss.phase ?? null;
+    const existing = store.misses.find(
+      (m) =>
+        !m.processed_at &&
+        String(m.sought) === sought &&
+        (m.phase ?? null) === phase,
+    );
+    if (existing) {
+      return { ok: true, path: storePath, miss: existing, deduped: true };
+    }
+  }
   store.misses.push(normalized.miss);
   store.updated_at = isoNow();
   writeJson(storePath, store);
-  return { ok: true, path: storePath, miss: normalized.miss };
+  return { ok: true, path: storePath, miss: normalized.miss, deduped: false };
+}
+
+/**
+ * Add a verified path to phase_context.healed_paths so a retry Read is allowed.
+ * @param {string} runId
+ * @param {string} filePath
+ */
+export function healPathIntoPhaseContext(runId, filePath) {
+  const n = normalizeRepoPath(filePath);
+  if (!n) return null;
+  const pcPath = path.join(runDir(runId), "artifacts", "phase_context.json");
+  if (!fs.existsSync(pcPath)) return null;
+  const pc = JSON.parse(fs.readFileSync(pcPath, "utf8"));
+  const healed = [
+    ...new Set([...(pc.healed_paths ?? []), n].map(normalizeRepoPath).filter(Boolean)),
+  ].slice(0, MAX_HEALED_PATHS);
+  pc.healed_paths = healed;
+  if (!pc.experience) pc.experience = {};
+  if (!pc.experience.repo_memory) pc.experience.repo_memory = {};
+  pc.experience.repo_memory.healed_paths = healed;
+  const focus = pc.experience.repo_memory.focus_paths ?? [];
+  if (!focus.includes(n)) {
+    pc.experience.repo_memory.focus_paths = [...focus, n].slice(0, 48);
+  }
+  writeJson(pcPath, pc);
+  return { path: n, healed_paths: healed };
 }
 
 /**
@@ -110,94 +155,93 @@ export function authorizeFallback(runId, opts = {}) {
   return pc.authorized_fallback;
 }
 
-function tokenize(text) {
-  return String(text ?? "")
-    .toLowerCase()
-    .split(/[^a-z0-9_./+-]+/)
-    .filter((t) => t.length > 1);
+function workspaceRoot() {
+  try {
+    return resolveWorkspaceRoot();
+  } catch {
+    return process.env.AAAC_WORKSPACE_ROOT || process.cwd();
+  }
+}
+
+function exactPathsForSought(sought) {
+  const root = workspaceRoot();
+  const tokens = extractPathTokensFromSought(sought);
+  const hits = [];
+  for (const t of tokens) {
+    if (t.includes("/") && pathExistsUnderRoot(t, root)) {
+      hits.push(normalizeRepoPath(t));
+    }
+  }
+  return [...new Set(hits)];
 }
 
 /**
- * Resolve candidate repo paths for sought terms via sparse overlap + 1-hop expand.
- * Pure over the loaded graph (no embeddings).
+ * Resolve candidate repo paths for sought terms.
+ * Path-on-disk first, then strict basename/symbol match. No lexical spray.
  *
  * @param {string[]} soughtTerms
- * @param {{ maxPaths?: number, knownFocus?: string[] }} [opts]
- * @returns {{ paths: string[], by_sought: Record<string, string[]> }}
+ * @param {{ maxPaths?: number, knownFocus?: string[], graph?: object|null }} [opts]
+ * @returns {{ paths: string[], by_sought: Record<string, string[]>, verified: boolean }}
  */
 export function resolvePathsForSought(soughtTerms, opts = {}) {
   const maxPaths = opts.maxPaths ?? MAX_EXPANDED_PATHS;
-  const knownFocus = (opts.knownFocus ?? []).map(normalizeRepoPath).filter(Boolean);
   const terms = [...new Set((soughtTerms ?? []).map((t) => String(t).trim()).filter(Boolean))];
   if (!terms.length) {
-    return { paths: [], by_sought: {} };
+    return { paths: [], by_sought: {}, verified: true };
   }
 
-  let graph;
-  try {
-    graph = loadRepoGraph();
-    verifyRepoGraph(graph);
-  } catch {
-    return { paths: [], by_sought: {} };
+  let graph = opts.graph ?? null;
+  if (!graph) {
+    try {
+      graph = loadRepoGraph();
+      verifyRepoGraph(graph);
+    } catch {
+      graph = null;
+    }
   }
 
   const active = Object.fromEntries(
-    Object.entries(graph.nodes ?? {}).filter(([, n]) => n.valid !== false && n.path),
+    Object.entries(graph?.nodes ?? {}).filter(([, n]) => n.valid !== false && n.path),
   );
   const bySought = {};
-  const scored = new Map();
+  const resolved = [];
 
   for (const sought of terms) {
-    const qTokens = tokenize(sought);
-    const hits = [];
+    const exact = exactPathsForSought(sought);
+    if (exact.length) {
+      bySought[sought] = exact.slice(0, maxPaths);
+      resolved.push(...bySought[sought]);
+      continue;
+    }
+
+    const symbolHits = [];
     for (const node of Object.values(active)) {
-      const hay = [
-        node.path,
-        node.summary,
-        node.api,
-        node.claim,
-        node.trigger,
-        ...(node.tags ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      let score = 0;
-      for (const t of qTokens) {
-        if (hay.includes(t)) score += 1;
-        const base = String(node.path).split("/").pop()?.toLowerCase() ?? "";
-        if (base.includes(t)) score += 2;
+      const p = normalizeRepoPath(node.path);
+      if (!p) continue;
+      if (basenameMatchesSought(p, sought)) {
+        symbolHits.push(p);
+        continue;
       }
-      if (score > 0) hits.push({ path: normalizeRepoPath(node.path), score });
+      const api = String(node.api ?? "").toLowerCase();
+      const tokens = sought
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length >= 6);
+      if (tokens.some((t) => api.includes(t))) {
+        symbolHits.push(p);
+      }
     }
-    hits.sort((a, b) => b.score - a.score);
-    const top = hits.slice(0, maxPaths).map((h) => h.path);
-    bySought[sought] = top;
-    for (const p of top) {
-      scored.set(p, (scored.get(p) ?? 0) + 1);
-    }
+    bySought[sought] = [...new Set(symbolHits)].slice(0, 4);
+    resolved.push(...bySought[sought]);
   }
 
-  let seedPaths = [...scored.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([p]) => p);
-
-  // Prefer paths not already in focus when expanding
-  const known = new Set(knownFocus);
-  seedPaths = [
-    ...seedPaths.filter((p) => !known.has(p)),
-    ...seedPaths.filter((p) => known.has(p)),
-  ].slice(0, maxPaths);
-
-  const expanded = expandCandidatePaths(graph, seedPaths.length ? seedPaths : knownFocus, {
-    neighborCap: maxPaths,
-  });
-  const newOnly = expanded.filter((p) => p && !known.has(normalizeRepoPath(p)));
-  const resolved = [...new Set([...seedPaths, ...newOnly.map(normalizeRepoPath)])]
-    .filter(Boolean)
+  const known = new Set((opts.knownFocus ?? []).map(normalizeRepoPath));
+  const paths = [...new Set(resolved.map(normalizeRepoPath).filter(Boolean))]
+    .filter((p) => !known.has(p) || true)
     .slice(0, maxPaths);
 
-  return { paths: resolved, by_sought: bySought };
+  return { paths, by_sought: bySought, verified: true };
 }
 
 function loadHeal(artifactsDir) {
@@ -212,14 +256,58 @@ function loadHeal(artifactsDir) {
   });
 }
 
+async function retrieveHitsForSought(soughtTerms, runId, bySought) {
+  const unresolved = soughtTerms.filter((s) => !(bySought[s] ?? []).length);
+  if (!unresolved.length) return bySought;
+  try {
+    const { retrieveRepoMemory } = await import("./experience/retrieve-repo.mjs");
+    const manifest = loadRunManifest(runId) ?? {
+      verb: "review",
+      object: unresolved[0],
+      intent: unresolved.join(" "),
+      phase: "discover",
+    };
+    const packet = await retrieveRepoMemory(
+      {
+        ...manifest,
+        intent: `${manifest.intent ?? ""} ${unresolved.join(" ")}`.trim(),
+      },
+      {
+        emit: false,
+        maxNodes: 8,
+        retrievalHints: { sought_terms: unresolved },
+      },
+    );
+    const candidates = [
+      ...(packet.focus_paths ?? []),
+      ...(packet.nodes ?? []).map((n) => n?.path),
+    ].filter(Boolean);
+    for (const sought of unresolved) {
+      const hits = candidates
+        .filter(
+          (p) =>
+            basenameMatchesSought(p, sought) ||
+            extractPathTokensFromSought(sought).some(
+              (t) => normalizeRepoPath(t) === normalizeRepoPath(p),
+            ),
+        )
+        .slice(0, 4);
+      bySought[sought] = hits;
+    }
+  } catch {
+    // retrieve optional in unit tests / empty index
+  }
+  return bySought;
+}
+
 /**
  * Process recorded misses: expand focus via sought → retrieval_heal.json,
  * or deliberately authorize Grep when expand fails / repeats.
  *
  * @param {string} runId
- * @param {{ authorize?: boolean, maxPaths?: number }} [opts]
+ * @param {{ authorize?: boolean, maxPaths?: number, retrieve?: boolean }} [opts]
  */
-export function processRetrievalMisses(runId, opts = {}) {
+export async function processRetrievalMisses(runId, opts = {}) {
   const artifactsDir = path.join(runDir(runId), "artifacts");
   fs.mkdirSync(artifactsDir, { recursive: true });
   const storePath = path.join(artifactsDir, "retrieval_misses.json");
@@ -256,10 +344,22 @@ export function processRetrievalMisses(runId, opts = {}) {
   );
   const repeatFailed = soughtTerms.some((s) => priorFailed.has(s.toLowerCase()));
 
-  const { paths: resolvedPaths, by_sought: bySought } = resolvePathsForSought(
+  let { paths: resolvedPaths, by_sought: bySought } = resolvePathsForSought(
     soughtTerms,
     { maxPaths: opts.maxPaths ?? MAX_EXPANDED_PATHS, knownFocus },
   );
+
+  if (opts.retrieve !== false) {
+    bySought = await retrieveHitsForSought(soughtTerms, runId, bySought);
+    resolvedPaths = [
+      ...new Set(
+        Object.values(bySought)
+          .flat()
+          .map(normalizeRepoPath)
+          .filter(Boolean),
+      ),
+    ].slice(0, opts.maxPaths ?? MAX_EXPANDED_PATHS);
+  }
 
   const now = isoNow();
   for (const m of unprocessed) {
@@ -287,6 +387,7 @@ export function processRetrievalMisses(runId, opts = {}) {
     reasons,
     resolved_paths: resolvedPaths,
     by_sought: bySought,
+    verified: !expandEmpty,
     failed_sought: shouldAuthorize
       ? [...new Set([...(priorHeal.failed_sought ?? []), ...soughtTerms])]
       : priorHeal.failed_sought ?? [],
@@ -297,7 +398,6 @@ export function processRetrievalMisses(runId, opts = {}) {
   };
   writeJson(path.join(artifactsDir, "retrieval_heal.json"), heal);
 
-  // Soft-write hints onto phase_context for prepare to pick up
   if (fs.existsSync(pcPath)) {
     try {
       const pc = JSON.parse(fs.readFileSync(pcPath, "utf8"));
@@ -307,10 +407,17 @@ export function processRetrievalMisses(runId, opts = {}) {
           sought: m.sought,
           reason: m.reason,
           at: now,
-          resolved_paths: bySought[m.sought] ?? resolvedPaths,
+          resolved_paths: bySought[m.sought] ?? [],
+          verified: true,
         });
       }
       pc.retrieval_hints = hints.slice(-MAX_HINTS);
+      const extraHealed = resolvedPaths.filter(Boolean);
+      if (extraHealed.length) {
+        pc.healed_paths = [
+          ...new Set([...(pc.healed_paths ?? []), ...extraHealed]),
+        ].slice(0, MAX_HEALED_PATHS);
+      }
       writeJson(pcPath, pc);
     } catch {
       // ignore

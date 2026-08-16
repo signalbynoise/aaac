@@ -130,7 +130,7 @@ describe("processRetrievalMisses (workspace-rooted)", () => {
       sought: "MemoryGraphVisualizer",
       reason: "not_in_focus",
     });
-    const result = api.processRetrievalMisses(runId);
+    const result = await api.processRetrievalMisses(runId);
     expect(result.ok).toBe(true);
     expect(result.processed).toBe(1);
     expect(["expand", "expand_hints", "authorize_fallback"]).toContain(result.action);
@@ -155,7 +155,7 @@ describe("processRetrievalMisses (workspace-rooted)", () => {
       sought: "zzzz-no-such-symbol-xyz",
       reason: "not_in_focus",
     });
-    const result = api.processRetrievalMisses(runId, { authorize: true });
+    const result = await api.processRetrievalMisses(runId, { authorize: true });
     expect(result.action).toBe("authorize_fallback");
     expect(result.fallback?.enabled).toBe(true);
   });
@@ -165,8 +165,8 @@ describe("processRetrievalMisses (workspace-rooted)", () => {
     writeRunSkeleton(runId);
     const api = await loadMissApi();
     api.recordRetrievalMiss(runId, { sought: "x", reason: "other" });
-    api.processRetrievalMisses(runId, { authorize: true });
-    const second = api.processRetrievalMisses(runId);
+    await api.processRetrievalMisses(runId, { authorize: true });
+    const second = await api.processRetrievalMisses(runId);
     expect(second.processed).toBe(0);
     expect(second.action).toBe("noop");
   });
@@ -473,7 +473,7 @@ describe("terminal heal then learn", () => {
     const { processRetrievalMisses } = await import(
       "../src/run-engine/retrieval-miss.mjs"
     );
-    const healResult = processRetrievalMisses(runId);
+    const healResult = await processRetrievalMisses(runId);
     expect(healResult.processed).toBe(1);
     const heal = JSON.parse(
       fs.readFileSync(path.join(artifacts, "retrieval_heal.json"), "utf8"),
@@ -491,5 +491,197 @@ describe("terminal heal then learn", () => {
 
     expect(out.learned.length).toBeGreaterThanOrEqual(1);
     expect(out.learned[0].paths).toContain(rel);
+  });
+});
+
+describe("heal precision + auto-miss", () => {
+  let tmpRoot;
+  let prevWorkspace;
+
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-heal-prec-"));
+    prevWorkspace = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = tmpRoot;
+    delete process.env.AAAC_AUTHORIZE_FALLBACK;
+    const aaac = path.join(tmpRoot, ".cursor", "aaac");
+    fs.mkdirSync(path.join(aaac, "state", "runs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(aaac, "runtime-registry.json"),
+      JSON.stringify({ commands: {}, phases: {} }),
+    );
+    fs.writeFileSync(
+      path.join(aaac, "enforcement.json"),
+      JSON.stringify({ edit_phases: ["execute"], swarm_min_agents: {} }),
+    );
+  });
+
+  afterEach(() => {
+    if (prevWorkspace === undefined) delete process.env.AAAC_WORKSPACE_ROOT;
+    else process.env.AAAC_WORKSPACE_ROOT = prevWorkspace;
+    delete process.env.AAAC_AUTHORIZE_FALLBACK;
+    vi.resetModules();
+  });
+
+  function writeRun(runId) {
+    const dir = path.join(tmpRoot, ".cursor", "aaac", "state", "runs", runId);
+    const artifacts = path.join(dir, "artifacts");
+    fs.mkdirSync(artifacts, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "run.json"),
+      JSON.stringify({
+        run_id: runId,
+        command: "/check architecture",
+        verb: "check",
+        object: "architecture",
+        domain: "vector",
+        intent: "check architecture vector",
+        phase: "discover",
+        status: "active",
+      }),
+    );
+    fs.writeFileSync(
+      path.join(artifacts, "phase_context.json"),
+      JSON.stringify({
+        experience: { repo_memory: { focus_paths: [] } },
+        healed_paths: [],
+      }),
+    );
+    return { dir, artifacts };
+  }
+
+  it("path-shaped sought heals to that path only", async () => {
+    const runId = "run_path_only";
+    const { artifacts } = writeRun(runId);
+    const rel = "apps/foo/MemoryGraphPanel.tsx";
+    fs.mkdirSync(path.join(tmpRoot, "apps/foo"), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, rel), "export const Panel = 1;\n");
+    fs.mkdirSync(path.join(tmpRoot, "apps/agentic-os/tests"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpRoot, "apps/agentic-os/tests/ui-barrel-continue-banner.test.ts"),
+      "export {}\n",
+    );
+
+    vi.resetModules();
+    const api = await import("../src/run-engine/retrieval-miss.mjs");
+    api.recordRetrievalMiss(runId, {
+      sought: `${rel} (normalizeRepoMemoryGraph / barrel)`,
+      reason: "not_in_focus",
+    });
+    const result = await api.processRetrievalMisses(runId, { retrieve: false });
+    expect(result.resolved_paths).toEqual([rel]);
+    expect(result.resolved_paths).not.toContain(
+      "apps/agentic-os/tests/ui-barrel-continue-banner.test.ts",
+    );
+  });
+
+  it("sought containing barrel does not resolve ui-barrel-continue-banner", async () => {
+    const runId = "run_no_barrel_junk";
+    writeRun(runId);
+    const junk = "apps/agentic-os/tests/ui-barrel-continue-banner.test.ts";
+    const labels = "packages/ui/src/agentic-os/phase-labels.ts";
+    fs.mkdirSync(path.join(tmpRoot, "apps/agentic-os/tests"), { recursive: true });
+    fs.mkdirSync(path.join(tmpRoot, "packages/ui/src/agentic-os"), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, junk), "export {}\n");
+    fs.writeFileSync(path.join(tmpRoot, labels), "export {}\n");
+
+    const { emptyRepoGraph, upsertNode, saveRepoGraph } = await import(
+      "../src/run-engine/experience/repo-graph.mjs"
+    );
+    const graph = emptyRepoGraph();
+    upsertNode(graph, { id: "file:junk", kind: "test", path: junk, summary: "barrel banner" });
+    upsertNode(graph, { id: "file:labels", kind: "file", path: labels, summary: "phase labels" });
+    saveRepoGraph(graph);
+
+    vi.resetModules();
+    const { resolvePathsForSought } = await import("../src/run-engine/retrieval-miss.mjs");
+    const out = resolvePathsForSought(
+      ["repo-memory-graph.ts (normalizeRepoMemoryGraph / barrel)"],
+      { graph },
+    );
+    expect(out.paths).not.toContain(junk);
+    expect(out.paths).not.toContain(labels);
+  });
+
+  it("recordRetrievalMiss dedupes the same unprocessed sought", async () => {
+    const runId = "run_dedupe";
+    const { artifacts } = writeRun(runId);
+    vi.resetModules();
+    const api = await import("../src/run-engine/retrieval-miss.mjs");
+    api.recordRetrievalMiss(runId, { sought: "FooBar", reason: "not_in_focus" });
+    const second = api.recordRetrievalMiss(runId, { sought: "FooBar", reason: "not_in_focus" });
+    expect(second.deduped).toBe(true);
+    const store = JSON.parse(
+      fs.readFileSync(path.join(artifacts, "retrieval_misses.json"), "utf8"),
+    );
+    expect(store.misses).toHaveLength(1);
+  });
+
+  it("healPathIntoPhaseContext allows a retry Read", async () => {
+    const runId = "run_instant_heal";
+    writeRun(runId);
+    const rel = "apps/foo/healed.ts";
+    vi.resetModules();
+    const api = await import("../src/run-engine/retrieval-miss.mjs");
+    const { evaluateToolAccess } = await import(
+      "../src/run-engine/evaluate-finding-tools.mjs"
+    );
+    api.healPathIntoPhaseContext(runId, rel);
+    const pc = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpRoot, ".cursor/aaac/state/runs", runId, "artifacts/phase_context.json"),
+        "utf8",
+      ),
+    );
+    expect(pc.healed_paths).toContain(rel);
+    const d = evaluateToolAccess({
+      toolName: "Read",
+      toolInput: { path: rel },
+      phaseContext: pc,
+    });
+    expect(d.allow).toBe(true);
+  });
+
+  it("unverified hint paths do not 1e6-dominate normalizeRetrievalHints", () => {
+    const hints = normalizeRetrievalHints({
+      paths: ["apps/junk/format-relative-time.ts"],
+      verified: false,
+      sought_terms: ["IPC handlers"],
+    });
+    expect(hints.verifiedPaths).toEqual([]);
+    expect(hints.paths).toContain("apps/junk/format-relative-time.ts");
+  });
+
+  it("learns all path tokens from a pipe-separated sought", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aaac-pipes-"));
+    const prev = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = tmp;
+    const a = "apps/foo/repo-memory-graph.ts";
+    const b = "apps/foo/useRepoMemoryGraph.ts";
+    fs.mkdirSync(path.join(tmp, "apps/foo"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, a), "export const n = 1;\n");
+    fs.writeFileSync(path.join(tmp, b), "export const h = 1;\n");
+    const artifacts = path.join(tmp, "artifacts");
+    fs.mkdirSync(artifacts, { recursive: true });
+    fs.writeFileSync(
+      path.join(artifacts, "retrieval_misses.json"),
+      JSON.stringify({
+        misses: [
+          {
+            sought: `${a}|${b}|repo-memory.ts (full capability trace)`,
+            reason: "not_in_focus",
+          },
+        ],
+      }),
+    );
+    const graph = emptyRepoGraph();
+    const out = learnFromRetrievalMisses(graph, {
+      trajectory: { quality: { ok: true } },
+      manifest: { object: "architecture", intent: "check architecture vector", domain: "vector" },
+      artifactsDir: artifacts,
+    });
+    if (prev === undefined) delete process.env.AAAC_WORKSPACE_ROOT;
+    else process.env.AAAC_WORKSPACE_ROOT = prev;
+    expect(out.learned[0].paths).toEqual(expect.arrayContaining([a, b]));
+    expect(String(graph.nodes[nodeIdForPath(a)]?.trigger)).toMatch(/check architecture vector/);
   });
 });

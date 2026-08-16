@@ -444,6 +444,7 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
         manifest: ctx.manifest,
         capsuleDir: capsule.capsuleDir,
         agentIndex: ctx.agentIndex ?? 0,
+        phase: ctx.phase,
       });
       const { url } = await broker.listen();
       writeCapsuleMcpConfig(capsule.capsuleDir, url);

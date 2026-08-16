@@ -11,7 +11,7 @@ import {
   readGrantedContext,
   resolveContextRequest,
 } from "./request-context.mjs";
-import { markGrantConsumed } from "./worker-capsule.mjs";
+import { markGrantConsumed, snapshotCapsuleTelemetry } from "./worker-capsule.mjs";
 
 function json(res, status, body) {
   const payload = JSON.stringify(body);
@@ -96,6 +96,7 @@ export function createContextBroker({
   manifest,
   capsuleDir,
   agentIndex = 0,
+  phase = null,
 } = {}) {
   const server = http.createServer(async (req, res) => {
     try {
@@ -187,6 +188,13 @@ export function createContextBroker({
       return { url: `http://127.0.0.1:${port}`, port };
     },
     async close() {
+      snapshotCapsuleTelemetry({
+        workspaceRoot,
+        runId,
+        phase: phase ?? manifest?.phase ?? null,
+        agentIndex,
+        capsuleDir,
+      });
       await new Promise((resolve) => server.close(() => resolve()));
     },
   };

@@ -115,6 +115,15 @@ describe("materializeWorkerCapsule", () => {
     });
     expect(collected.ok).toBe(true);
     expect(fs.readFileSync(collected.dest, "utf8")).toMatch(/findings/);
+    const telemetry = JSON.parse(
+      fs.readFileSync(
+        path.join(root, ".cursor/aaac/state/runs/run_out/artifacts/capsule_telemetry.json"),
+        "utf8",
+      ),
+    );
+    expect(telemetry.totals.unique_source_files).toBe(1);
+    expect(telemetry.totals.resolver_expansions).toBe(0);
+    expect(telemetry.agents[0].paths).toEqual([src]);
   });
 });
 

@@ -245,6 +245,85 @@ export function addGrantToCapsule({
   return { ok: true, path: n, hash: fileSha256(src) };
 }
 
+export function capsuleTelemetryRecord({
+  runId,
+  phase,
+  agentIndex = 0,
+  grants = null,
+} = {}) {
+  const files = Array.isArray(grants?.files) ? grants.files : [];
+  const packetFiles = files.filter((f) => f.packet_version !== "request_context");
+  const granted = files.filter((f) => f.packet_version === "request_context");
+  return {
+    run_id: runId,
+    phase,
+    agent_index: agentIndex,
+    packet_files: packetFiles.length,
+    resolver_expansions: Number(grants?.expansions) || 0,
+    new_context_granted: granted.length,
+    unique_source_files: files.length,
+    consumed: files.filter((f) => f.consumed).length,
+    paths: files.map((f) => f.path).filter(Boolean),
+    written_at: new Date().toISOString(),
+  };
+}
+
+export function snapshotCapsuleTelemetry({
+  workspaceRoot,
+  runId,
+  phase,
+  agentIndex = 0,
+  capsuleDir,
+} = {}) {
+  if (!workspaceRoot || !runId || !capsuleDir) return null;
+  const record = capsuleTelemetryRecord({
+    runId,
+    phase,
+    agentIndex,
+    grants: readCapsuleGrants(capsuleDir),
+  });
+  const dest = path.join(
+    workspaceRoot,
+    ".cursor/aaac/state/runs",
+    String(runId),
+    "artifacts",
+    "capsule_telemetry.json",
+  );
+  let current = { agents: [] };
+  if (fs.existsSync(dest)) {
+    try {
+      current = JSON.parse(fs.readFileSync(dest, "utf8"));
+    } catch {
+      current = { agents: [] };
+    }
+  }
+  const agents = (current.agents ?? []).filter(
+    (a) => !(a.agent_index === agentIndex && a.phase === phase),
+  );
+  agents.push(record);
+  const totals = agents.reduce(
+    (acc, a) => {
+      acc.packet_files += Number(a.packet_files) || 0;
+      acc.resolver_expansions += Number(a.resolver_expansions) || 0;
+      acc.new_context_granted += Number(a.new_context_granted) || 0;
+      acc.unique_source_files += Number(a.unique_source_files) || 0;
+      acc.consumed += Number(a.consumed) || 0;
+      return acc;
+    },
+    {
+      packet_files: 0,
+      resolver_expansions: 0,
+      new_context_granted: 0,
+      unique_source_files: 0,
+      consumed: 0,
+    },
+  );
+  const out = { agents, totals, updated_at: new Date().toISOString() };
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, `${JSON.stringify(out, null, 2)}\n`);
+  return record;
+}
+
 export function collectCapsuleOutput({
   capsuleDir,
   workspaceRoot,
@@ -252,6 +331,13 @@ export function collectCapsuleOutput({
   phase,
   agentIndex = 0,
 } = {}) {
+  snapshotCapsuleTelemetry({
+    workspaceRoot,
+    runId,
+    phase,
+    agentIndex,
+    capsuleDir,
+  });
   const candidates = [
     path.join(capsuleDir, CAPSULE_OUTPUT_REL),
     path.join(capsuleDir, "OUTPUT.md"),

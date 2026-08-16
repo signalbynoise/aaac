@@ -323,7 +323,7 @@ export function evaluateReadScope({
   return {
     allow: false,
     reason: "read_not_in_packet",
-    message: `Read is filesystem-native for packet paths only. ${sought} is not in focus_paths / read_pack / healed_paths. retrieval_miss recorded — if this path exists it is added to the packet; retry Read of that path.`,
+    message: `Read is filesystem-native for granted paths only. ${sought} is not in the packet. Use request_context to ask the run engine for more SOURCE context. Existence is not disclosed.`,
     miss: { sought, reason: "not_in_focus" },
   };
 }

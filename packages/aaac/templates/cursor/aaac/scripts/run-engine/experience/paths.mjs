@@ -90,6 +90,8 @@ const DEFAULT_RETRIEVAL = {
     max_agent_files_read: 6,
     max_full_file_opens: 2,
     max_gap_search_globs: 8,
+    max_expansions: 3,
+    max_files_per_expansion: 4,
   },
   hnsw: {
     metric: "cos",
@@ -243,6 +245,8 @@ export function loadRetrievalConfig() {
       "max_agent_files_read",
       "max_full_file_opens",
       "max_gap_search_globs",
+      "max_expansions",
+      "max_files_per_expansion",
     ]) {
       cfg.repo_memory[key] = readYamlInt(content, key, cfg.repo_memory[key]);
     }

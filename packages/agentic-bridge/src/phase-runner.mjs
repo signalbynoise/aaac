@@ -105,6 +105,7 @@ export class PhaseRunner extends EventEmitter {
       initialSummary,
       agentSpec,
       subagentType,
+      workerKind: "swarm",
     })) {
       this.emit("phase-event", { runId, agentIndex, ...event });
       persistAgentPhaseEvent(event, persistence);
@@ -213,6 +214,7 @@ export class PhaseRunner extends EventEmitter {
       phase,
       manifest,
       prompt,
+      workerKind: "checkpoint",
     })) {
       this.emit("phase-event", { runId, agentIndex: null, checkpoint: true, ...event });
       if (event.type === "failed") throw new Error(event.detail);

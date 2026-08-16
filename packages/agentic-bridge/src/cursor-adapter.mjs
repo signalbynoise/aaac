@@ -33,6 +33,15 @@ import {
 import { resolveWorkspacePaths } from "./paths.mjs";
 import { DEFAULT_AAAC_MODEL_SLUG, resolveAaacPhaseModel, toCursorCliModelSlug } from "./aaac-model.mjs";
 import { writeCliLatestSidecarAt } from "@ludecker/aaac/run-engine/resolve-run-id";
+import {
+  shouldUseWorkerCapsule,
+  materializeWorkerCapsule,
+  writeCapsuleMcpConfig,
+  collectCapsuleOutput,
+  stripWorkspacePathFromText,
+} from "@ludecker/aaac/run-engine/worker-capsule";
+import { assertWorkerSandbox, sandboxSpawnArgv } from "@ludecker/aaac/run-engine/worker-sandbox";
+import { createContextBroker } from "@ludecker/aaac/run-engine/context-broker";
 
 const log = createLogger("agentic-bridge:cursor-adapter");
 
@@ -94,7 +103,20 @@ function agentCountersFromManifest(manifest, phase, agentIndex) {
   };
 }
 
-async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = resolveAgentTimeoutMs(), envExtras = {}) {
+function workerEnvForSpawn(modelId, envExtras, { capsule = false } = {}) {
+  const env = {
+    ...process.env,
+    CI: process.env.CI ?? "1",
+    CURSOR_MODEL: modelId,
+    ...envExtras,
+  };
+  if (capsule) {
+    delete env.AAAC_WORKSPACE_ROOT;
+  }
+  return env;
+}
+
+async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = resolveAgentTimeoutMs(), envExtras = {}, spawnOpts = {}) {
   const bin = await resolveCursorBin();
   if (!bin) {
     throw new Error("cursor agent binary not found — install Cursor or run Sign in with Cursor");
@@ -105,11 +127,15 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = resolv
   }
 
   const modelId = toCursorCliModelSlug(envExtras.CURSOR_MODEL?.trim() || DEFAULT_AAAC_MODEL_SLUG);
+  const cwd = spawnOpts.cwd ?? workspaceRoot;
+  const workspaceFlag = spawnOpts.workspaceDir ?? cwd;
   const agentArgs = [
     "-p",
     "-f",
     "--trust",
     "--approve-mcps",
+    "--workspace",
+    workspaceFlag,
     "--output-format",
     "stream-json",
     "--model",
@@ -121,25 +147,33 @@ async function runCursorAgentStreaming(workspaceRoot, prompt, timeoutMs = resolv
   }
   agentArgs.push(prompt);
   const args = cursorAgentArgv(bin, agentArgs);
+  const env = workerEnvForSpawn(modelId, envExtras, { capsule: Boolean(spawnOpts.capsule) });
 
   log.info("cursor-cli", "Invoking cursor agent (stream-json)", {
-    cwd: workspaceRoot,
+    cwd,
+    workspace: workspaceFlag,
+    capsule: Boolean(spawnOpts.capsule),
     model: modelId,
     api_key: Boolean(apiKey),
     bin,
     aaac_run_id: envExtras.AAAC_RUN_ID ?? null,
   });
 
-  const child = spawn(bin, args, {
-    cwd: workspaceRoot,
-    env: {
-      ...process.env,
-      CI: process.env.CI ?? "1",
-      CURSOR_MODEL: modelId,
-      ...envExtras,
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  let child;
+  if (spawnOpts.sandboxLauncher) {
+    const wrapped = sandboxSpawnArgv(spawnOpts.sandboxLauncher, bin, args);
+    child = spawn(wrapped.cmd, wrapped.args, {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } else {
+    child = spawn(bin, args, {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  }
 
   const idleMs = resolveAgentIdleMs();
   return { child, timeoutMs, idleMs };
@@ -363,7 +397,7 @@ function maybeLogUnauthorizedFinding(ctx, toolEvent) {
   });
 }
 
-async function spawnAgentWithRetry(ctx, prompt, envExtras) {
+async function spawnAgentWithRetry(ctx, prompt, envExtras, spawnOpts = {}) {
   let spawned;
   await withCursorCliRetry(async () => {
     spawned = await runCursorAgentStreaming(
@@ -371,6 +405,7 @@ async function spawnAgentWithRetry(ctx, prompt, envExtras) {
       prompt,
       resolveAgentTimeoutMs(),
       envExtras,
+      spawnOpts,
     );
   }, { maxAttempts: 2, baseBackoffMs: 2000 });
   return spawned;
@@ -388,7 +423,62 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
     agentIndex: ctx.agentIndex,
     initialSummary: validateInitialSummary(ctx.initialSummary),
   });
-  const prompt = ctx.prompt ?? composePhasePrompt(ctx.workspaceRoot, ctx.manifest, ctx.phase);
+  const useCapsule = shouldUseWorkerCapsule(ctx.manifest, ctx.workerKind ?? "swarm");
+  let prompt = ctx.prompt ?? composePhasePrompt(ctx.workspaceRoot, ctx.manifest, ctx.phase);
+  let spawnOpts = {};
+  let broker = null;
+  if (useCapsule) {
+    try {
+      const phaseContext = loadPhaseContextForRun(ctx.workspaceRoot, ctx.runId);
+      const capsule = materializeWorkerCapsule({
+        workspaceRoot: ctx.workspaceRoot,
+        runId: ctx.runId,
+        agentIndex: ctx.agentIndex ?? 0,
+        phaseContext,
+        manifest: ctx.manifest,
+        phase: ctx.phase,
+      });
+      broker = createContextBroker({
+        workspaceRoot: ctx.workspaceRoot,
+        runId: ctx.runId,
+        manifest: ctx.manifest,
+        capsuleDir: capsule.capsuleDir,
+        agentIndex: ctx.agentIndex ?? 0,
+      });
+      const { url } = await broker.listen();
+      writeCapsuleMcpConfig(capsule.capsuleDir, url);
+      const { launcher } = assertWorkerSandbox({
+        capsuleDir: capsule.capsuleDir,
+        workspaceRoot: ctx.workspaceRoot,
+      });
+      spawnOpts = {
+        cwd: capsule.capsuleDir,
+        workspaceDir: capsule.capsuleDir,
+        capsule: true,
+        sandboxLauncher: launcher,
+        capsuleDir: capsule.capsuleDir,
+      };
+      prompt = stripWorkspacePathFromText(prompt, ctx.workspaceRoot);
+      log.info("capsule", "Check worker isolated in grant capsule", {
+        runId: ctx.runId,
+        agentIndex: ctx.agentIndex,
+        capsuleDir: capsule.capsuleDir,
+        granted: capsule.copied.length,
+        skipped: capsule.skipped.length,
+        broker: url,
+      });
+    } catch (err) {
+      if (broker) {
+        try {
+          await broker.close();
+        } catch {
+          // ignore
+        }
+        broker = null;
+      }
+      throw err;
+    }
+  }
   const modelId = await resolveAaacPhaseModel(ctx.workspaceRoot, {
     phase: ctx.phase,
     agentSpecId: ctx.agentSpec?.id ?? null,
@@ -401,6 +491,9 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
       ctx.agentIndex != null && ctx.agentIndex >= 0 ? String(ctx.agentIndex) : "",
     CURSOR_MODEL: modelId,
   };
+  if (useCapsule) {
+    envExtras.AAAC_CAPSULE = "1";
+  }
   try {
     writeCliLatestSidecarAt(ctx.workspaceRoot, {
       run_id: ctx.runId,
@@ -417,76 +510,95 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
 
   const maxAttempts = 4;
   let lastError = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    if (cancelled.has(ctx.runId)) {
-      yield { type: "failed", phase: ctx.phase, detail: "cancelled" };
-      return;
-    }
-    let child = null;
-    try {
-      const spawned = await spawnAgentWithRetry(ctx, prompt, envExtras);
-      child = spawned.child;
-      const timeoutMs = spawned.timeoutMs;
-      activeChildren.set(ctx.runId, child);
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (cancelled.has(ctx.runId)) {
+        yield { type: "failed", phase: ctx.phase, detail: "cancelled" };
+        return;
+      }
+      let child = null;
+      try {
+        const spawned = await spawnAgentWithRetry(ctx, prompt, envExtras, spawnOpts);
+        child = spawned.child;
+        const timeoutMs = spawned.timeoutMs;
+        activeChildren.set(ctx.runId, child);
 
-      const stream = streamChildOutput(child, timeoutMs, spawned.idleMs);
-      let next = await stream.next();
-      while (!next.done) {
-        const { item } = next.value;
-        const event = toPhaseStreamEvent(ctx, item);
-        if (event?.type === "tool") {
-          maybeLogUnauthorizedFinding(ctx, event);
+        const stream = streamChildOutput(child, timeoutMs, spawned.idleMs);
+        let next = await stream.next();
+        while (!next.done) {
+          const { item } = next.value;
+          const event = toPhaseStreamEvent(ctx, item);
+          if (event?.type === "tool") {
+            maybeLogUnauthorizedFinding(ctx, event);
+          }
+          if (event?.type === "tool" || event?.semanticSummary) {
+            yield event;
+          }
+          next = await stream.next();
         }
-        if (event?.type === "tool" || event?.semanticSummary) {
-          yield event;
+        const result = next.value ?? {
+          cursorRunId: null,
+          output: "",
+          finalSummary: null,
+          metrics: {},
+        };
+        let collected = { ok: false };
+        if (useCapsule && spawnOpts.capsuleDir) {
+          collected = collectCapsuleOutput({
+            capsuleDir: spawnOpts.capsuleDir,
+            workspaceRoot: ctx.workspaceRoot,
+            runId: ctx.runId,
+            phase: ctx.phase,
+            agentIndex: ctx.agentIndex ?? 0,
+          });
         }
-        next = await stream.next();
+        if (!result.output && !result.finalSummary && !result.cursorRunId && !collected.ok) {
+          throw new Error("cursor agent produced no output");
+        }
+        activeChildren.delete(ctx.runId);
+        yield normalizePhaseEvent({
+          runId: ctx.runId,
+          type: "completed",
+          phase: ctx.phase,
+          agentIndex: ctx.agentIndex,
+          cursorRunId: result.cursorRunId,
+          finalSummary: validateSealedSummary(result.finalSummary),
+          metrics: result.metrics,
+        });
+        return;
+      } catch (err) {
+        activeChildren.delete(ctx.runId);
+        lastError = err;
+        if (isKeychainAuthError(err)) break;
+        const backoff = 2000 * attempt;
+        log.warn("cursor-adapter", "Agent attempt failed; retrying", {
+          runId: ctx.runId,
+          attempt,
+          error: String(err),
+          backoffMs: backoff,
+        });
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
       }
-      const result = next.value ?? {
-        cursorRunId: null,
-        output: "",
-        finalSummary: null,
-        metrics: {},
-      };
-      if (!result.output && !result.finalSummary && !result.cursorRunId) {
-        // empty — may retry
-        throw new Error("cursor agent produced no output");
-      }
-      activeChildren.delete(ctx.runId);
-      yield normalizePhaseEvent({
-        runId: ctx.runId,
-        type: "completed",
-        phase: ctx.phase,
-        agentIndex: ctx.agentIndex,
-        cursorRunId: result.cursorRunId,
-        finalSummary: validateSealedSummary(result.finalSummary),
-        metrics: result.metrics,
-      });
-      return;
-    } catch (err) {
-      activeChildren.delete(ctx.runId);
-      lastError = err;
-      if (isKeychainAuthError(err)) break;
-      const backoff = 2000 * attempt;
-      log.warn("cursor-adapter", "Agent attempt failed; retrying", {
-        runId: ctx.runId,
-        attempt,
-        error: String(err),
-        backoffMs: backoff,
-      });
-      if (attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, backoff));
-        continue;
+    }
+
+    log.error("cursor-adapter", "Phase execution failed", {
+      runId: ctx.runId,
+      phase: ctx.phase,
+      error: String(lastError),
+    });
+    yield { type: "failed", phase: ctx.phase, detail: String(lastError) };
+  } finally {
+    if (broker) {
+      try {
+        await broker.close();
+      } catch {
+        // ignore
       }
     }
   }
-
-  log.error("cursor-adapter", "Phase execution failed", {
-    runId: ctx.runId,
-    phase: ctx.phase,
-    error: String(lastError),
-  });
-  yield { type: "failed", phase: ctx.phase, detail: String(lastError) };
 }
 
 function cancelAdapterRun(runId, cancelled, activeChildren) {

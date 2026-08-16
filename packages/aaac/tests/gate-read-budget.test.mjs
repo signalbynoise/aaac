@@ -103,4 +103,27 @@ describe("gate-read-budget sidecar", () => {
     expect(parsed.permission).toBe("allow");
     expect(stderr).toMatch(/soft_allow_no_run/);
   });
+
+  it("does not existence-heal an on-disk file outside the packet", () => {
+    const { tmp, runId } = setupWorkspace();
+    const secret = path.join(tmp, "apps/foo/secret.ts");
+    fs.mkdirSync(path.dirname(secret), { recursive: true });
+    fs.writeFileSync(secret, "export const secret = 1;\n");
+    const { parsed } = runGate(tmp, {
+      tool_name: "Read",
+      tool_input: { path: "apps/foo/secret.ts" },
+    });
+    expect(parsed.permission).toBe("deny");
+    expect(String(parsed.agent_message ?? "")).not.toMatch(/now in the packet/i);
+    const pc = JSON.parse(
+      fs.readFileSync(
+        path.join(tmp, ".cursor/aaac/state/runs", runId, "artifacts/phase_context.json"),
+        "utf8",
+      ),
+    );
+    expect(pc.healed_paths ?? []).not.toContain("apps/foo/secret.ts");
+    expect(pc.experience?.repo_memory?.focus_paths ?? []).not.toContain(
+      "apps/foo/secret.ts",
+    );
+  });
 });

@@ -67,6 +67,9 @@ repo_memory:
   max_agent_files_read: 6
   max_full_file_opens: 2
   max_gap_search_globs: 8
+  # Check-swarm capsule: host resolver only
+  max_expansions: 3
+  max_files_per_expansion: 4
 
 ranking:
   semantic_similarity: 0.38

@@ -26,6 +26,12 @@ import {
   extractPathTokensFromSought,
   basenameMatchesSought,
 } from "../sought-paths.mjs";
+import {
+  CONTEXT_EVENTS,
+  classifySought,
+  isLearnableTaxonomy,
+  isSourceContextPath,
+} from "../context-taxonomy.mjs";
 
 function shouldLearnPath(rel) {
   return (
@@ -353,11 +359,50 @@ export function learnFromRetrievalMisses(graph, {
   const bySought = heal?.by_sought && typeof heal.by_sought === "object" ? heal.by_sought : {};
 
   for (const sought of soughtTerms) {
+    const missRow = misses.find((m) => String(m.sought ?? "").trim() === sought);
+    const taxonomy = missRow?.taxonomy ?? classifySought(sought);
+    const blocked = new Set([
+      CONTEXT_EVENTS.DISCOVERY_ATTEMPT,
+      CONTEXT_EVENTS.OPS_CONTEXT_REQUEST,
+      CONTEXT_EVENTS.PROCESS_CONTEXT_REQUEST,
+      CONTEXT_EVENTS.PATH_ALIAS,
+    ]);
+    const hasResolverHits = (bySought[sought] ?? []).length > 0;
+    if (
+      (blocked.has(taxonomy) && !isLearnableTaxonomy(taxonomy, sought)) ||
+      (taxonomy === CONTEXT_EVENTS.CONCEPTUAL_REQUEST &&
+        pathTokensFromSought(sought).length === 0 &&
+        !hasResolverHits)
+    ) {
+      skipped.push({
+        sought,
+        reason:
+          taxonomy === CONTEXT_EVENTS.DISCOVERY_ATTEMPT
+            ? "discovery_attempt"
+            : taxonomy === CONTEXT_EVENTS.OPS_CONTEXT_REQUEST
+              ? "ops_context"
+              : taxonomy === CONTEXT_EVENTS.PROCESS_CONTEXT_REQUEST
+                ? "process_context"
+                : taxonomy === CONTEXT_EVENTS.CONCEPTUAL_REQUEST
+                  ? "conceptual"
+                  : "path_alias",
+      });
+      continue;
+    }
+
     const verified = [];
     const seen = new Set();
-    const addVerified = (rel) => {
+    const addVerified = (rel, { requireConsumed = false } = {}) => {
       const n = normalizeRelPath(rel);
       if (!n || seen.has(n)) return;
+      if (requireConsumed) {
+        const consumed =
+          harvested.has(n) || (trajectory.paths_touched ?? []).includes(n);
+        if (!consumed) return;
+      }
+      if (taxonomy === CONTEXT_EVENTS.TRUE_RETRIEVAL_MISS && !isSourceContextPath(n)) {
+        if (!n.endsWith(".md")) return;
+      }
       seen.add(n);
       verified.push(n);
     };

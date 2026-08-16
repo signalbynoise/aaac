@@ -96,10 +96,10 @@ export function formatInlineRepoMemoryPacket(phaseContext) {
   const lines = [
     "## Repo vector graph packet (SSOT for FINDING)",
     "",
-    "**Finding is graph-native. Reading is filesystem-native.**",
-    "- Find paths/symbols **only** from this packet — do **not** Glob or repo-wide Grep.",
-    "- **Read** known paths with the Read tool (prefer envelope_text → symbol range → full file).",
-    "- If this packet is insufficient: a denied Read/Grep **auto-records retrieval_miss**. Retry only the path named in the deny message after it is added to the packet. Do **not** Glob or repo-wide Grep.",
+    "**Finding is graph-native. You can only inspect granted SOURCE context.**",
+    "- Find paths/symbols **only** from this packet — do **not** Glob, Grep, or list directories.",
+    "- **Read** granted paths only (prefer envelope_text → symbol range → full file).",
+    "- If this packet is insufficient: call **request_context** (`need`, `because`, optional granted `anchor`). Do **not** retry illegal Reads. The run engine may expand the grant set.",
     "",
     `Budgets: max_agent_files_read=${budgets.max_agent_files_read ?? 6}, max_full_file_opens=${budgets.max_full_file_opens ?? 2}, max_gap_search_globs=${budgets.max_gap_search_globs ?? 8}`,
     `authorized_fallback: ${phaseContext.authorized_fallback?.enabled ? JSON.stringify({
@@ -264,9 +264,10 @@ ${taskPolicy}
 
 ## Swarm agent ${agentIndex + 1} of ${agentTotal}
 Focus on the angle defined in the agent spec above. Write findings to:
-artifacts/${phase}_agent_${agentIndex + 1}.md
+.aaac/OUTPUT.md
 
-Return structured blocks: Findings, Evidence (path:line), Gaps, Confidence, retrieval_miss (if any).
+Return structured blocks: Findings, Evidence (path:line), Gaps, Confidence.
+If you need a source file that is not granted, call request_context — do not search the filesystem.
 
 Do **not** write phase checkpoint artifacts (e.g. discover_brief.yaml, investigation.md) — a separate orchestrator synthesis step runs after all swarm agents finish.
 `;

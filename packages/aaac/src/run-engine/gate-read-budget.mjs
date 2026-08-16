@@ -8,7 +8,6 @@ import path from "path";
 import { loadRunManifest, runDir } from "./lib.mjs";
 import { resolveRunId } from "./resolve-run-id.mjs";
 import { loadRetrievalConfig } from "./experience/paths.mjs";
-import { resolveWorkspaceRoot } from "./experience/repo-graph.mjs";
 import {
   budgetsFromPhaseContext,
   evaluateToolAccess,
@@ -16,11 +15,8 @@ import {
   FINDING_TOOLS,
   toolPathScope,
 } from "./evaluate-finding-tools.mjs";
-import {
-  healPathIntoPhaseContext,
-  recordRetrievalMiss,
-} from "./retrieval-miss.mjs";
-import { pathExistsUnderRoot } from "./sought-paths.mjs";
+import { recordRetrievalMiss } from "./retrieval-miss.mjs";
+import { classifySought, CONTEXT_EVENTS } from "./context-taxonomy.mjs";
 
 function loadPhaseContext(runId) {
   const pcPath = path.join(runDir(runId), "artifacts", "phase_context.json");
@@ -144,10 +140,16 @@ process.stdin.on("end", () => {
     const scope = toolPathScope(toolInput);
     try {
       if (decision.miss) {
+        const sought = decision.miss.sought ?? scope ?? toolName;
         recordRetrievalMiss(
           runId,
           {
             ...decision.miss,
+            taxonomy:
+              decision.miss.taxonomy ??
+              (FINDING_TOOLS.test(toolName)
+                ? CONTEXT_EVENTS.DISCOVERY_ATTEMPT
+                : classifySought(sought)),
             phase: manifest.phase ?? null,
             agent_id: agentIndex,
           },
@@ -156,26 +158,6 @@ process.stdin.on("end", () => {
       }
     } catch {
       // miss store optional
-    }
-
-    if (READ_TOOL.test(toolName) && decision.reason === "read_not_in_packet" && scope) {
-      let root = process.cwd();
-      try {
-        root = resolveWorkspaceRoot();
-      } catch {
-        root = process.env.AAAC_WORKSPACE_ROOT || process.cwd();
-      }
-      if (pathExistsUnderRoot(scope, root)) {
-        try {
-          healPathIntoPhaseContext(runId, scope);
-        } catch {
-          // ignore
-        }
-        deny(
-          decision.user_message ?? "Read denied",
-          `${decision.message} Path ${scope} is now in the packet — retry Read of that path only.`,
-        );
-      }
     }
 
     deny(

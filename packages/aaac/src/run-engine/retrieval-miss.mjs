@@ -11,6 +11,7 @@ import {
   basenameMatchesSought,
   extractPathTokensFromSought,
   pathExistsUnderRoot,
+  significantSoughtTokens,
 } from "./sought-paths.mjs";
 
 export const RETRIEVAL_MISS_REASONS = [
@@ -222,13 +223,14 @@ export function resolvePathsForSought(soughtTerms, opts = {}) {
         symbolHits.push(p);
         continue;
       }
-      const api = String(node.api ?? "").toLowerCase();
-      const tokens = sought
-        .replace(/([a-z])([A-Z])/g, "$1 $2")
-        .toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .filter((t) => t.length >= 6);
-      if (tokens.some((t) => api.includes(t))) {
+      const apiTokens = new Set(
+        String(node.api ?? "")
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter((t) => t.length >= 8),
+      );
+      const soughtTokens = significantSoughtTokens(sought).filter((t) => t.length >= 8);
+      if (soughtTokens.some((t) => apiTokens.has(t))) {
         symbolHits.push(p);
       }
     }

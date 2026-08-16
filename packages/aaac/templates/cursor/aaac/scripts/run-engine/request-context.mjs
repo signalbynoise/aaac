@@ -153,7 +153,7 @@ export async function resolveContextRequest({
               taxonomy === CONTEXT_EVENTS.ENVELOPE_TOO_THIN
                 ? "envelope_too_thin"
                 : "not_in_focus",
-            taxonomy: CONTEXT_EVENTS.TRUE_RETRIEVAL_MISS,
+            taxonomy,
             notes: because,
             phase: manifest?.phase ?? null,
           },
@@ -166,7 +166,7 @@ export async function resolveContextRequest({
     return {
       ok: false,
       status: "NOT_GRANTED",
-      taxonomy: CONTEXT_EVENTS.TRUE_RETRIEVAL_MISS,
+      taxonomy,
       message: "Resolver found no SOURCE_CONTEXT for this need",
       packet_delta: { paths: [] },
     };
@@ -194,7 +194,8 @@ export async function resolveContextRequest({
         {
           sought: needText,
           reason: "not_in_focus",
-          taxonomy: CONTEXT_EVENTS.TRUE_RETRIEVAL_MISS,
+          taxonomy,
+          granted_paths: added,
           notes: `granted:${added.join(",")}`,
           phase: manifest?.phase ?? null,
         },
@@ -208,7 +209,7 @@ export async function resolveContextRequest({
   return {
     ok: added.length > 0,
     status: added.length ? "GRANTED" : "NOT_GRANTED",
-    taxonomy: CONTEXT_EVENTS.TRUE_RETRIEVAL_MISS,
+    taxonomy,
     packet_delta: { paths: added },
     message:
       added.length > 0

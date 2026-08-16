@@ -24,14 +24,17 @@ import { loadRetrievalConfig } from "./paths.mjs";
 import { emitRepoMemoryEvent } from "./repo-events.mjs";
 import {
   extractPathTokensFromSought,
-  basenameMatchesSought,
 } from "../sought-paths.mjs";
 import {
   CONTEXT_EVENTS,
   classifySought,
   isLearnableTaxonomy,
-  isSourceContextPath,
 } from "../context-taxonomy.mjs";
+import {
+  grantedPathsFromMiss,
+  confirmLearnCandidates,
+  taxonomySkipReason,
+} from "./granted-paths.mjs";
 
 function shouldLearnPath(rel) {
   return (
@@ -82,10 +85,6 @@ function pathTokensFromSought(sought) {
   const extracted = extractPathTokensFromSought(sought).map(normalizeRelPath);
   const fromText = extractPathsFromText(` ${sought} `);
   return [...new Set([...extracted, ...fromText].filter(Boolean))];
-}
-
-function sharesSoughtToken(sought, relPath) {
-  return basenameMatchesSought(relPath, sought);
 }
 
 /**
@@ -288,8 +287,9 @@ export function learnRepoGraphFromRun(graph, {
 
 /**
  * Learn verified retrieval_miss → path mappings into the durable graph.
- * Confirms path-shaped soughts that exist on disk and by_sought hits that
- * sit in harvested paths or share a token with the sought term.
+ * Confirms path-shaped soughts, per-sought granted files named in the ask,
+ * and by_sought hits that sit in harvested paths or share a basename token.
+ * Never attaches global heal.resolved_paths.
  *
  * @param {object} graph
  * @param {{
@@ -357,76 +357,53 @@ export function learnFromRetrievalMisses(graph, {
     ]),
   ];
   const bySought = heal?.by_sought && typeof heal.by_sought === "object" ? heal.by_sought : {};
+  const blocked = new Set([
+    CONTEXT_EVENTS.DISCOVERY_ATTEMPT,
+    CONTEXT_EVENTS.OPS_CONTEXT_REQUEST,
+    CONTEXT_EVENTS.PROCESS_CONTEXT_REQUEST,
+    CONTEXT_EVENTS.PATH_ALIAS,
+  ]);
 
   for (const sought of soughtTerms) {
     const missRow = misses.find((m) => String(m.sought ?? "").trim() === sought);
     const taxonomy = missRow?.taxonomy ?? classifySought(sought);
-    const blocked = new Set([
-      CONTEXT_EVENTS.DISCOVERY_ATTEMPT,
-      CONTEXT_EVENTS.OPS_CONTEXT_REQUEST,
-      CONTEXT_EVENTS.PROCESS_CONTEXT_REQUEST,
-      CONTEXT_EVENTS.PATH_ALIAS,
-    ]);
-    const hasResolverHits = (bySought[sought] ?? []).length > 0;
-    if (
-      (blocked.has(taxonomy) && !isLearnableTaxonomy(taxonomy, sought)) ||
-      (taxonomy === CONTEXT_EVENTS.CONCEPTUAL_REQUEST &&
-        pathTokensFromSought(sought).length === 0 &&
-        !hasResolverHits)
-    ) {
+    const grantedPaths = grantedPathsFromMiss(missRow, artifactsDir);
+    const bySoughtHits = bySought[sought] ?? [];
+    const pathToks = pathTokensFromSought(sought);
+    const hasSignal = grantedPaths.length > 0 || bySoughtHits.length > 0 || pathToks.length > 0;
+
+    if (blocked.has(taxonomy) && !isLearnableTaxonomy(taxonomy, sought)) {
       skipped.push({
         sought,
-        reason:
-          taxonomy === CONTEXT_EVENTS.DISCOVERY_ATTEMPT
-            ? "discovery_attempt"
-            : taxonomy === CONTEXT_EVENTS.OPS_CONTEXT_REQUEST
-              ? "ops_context"
-              : taxonomy === CONTEXT_EVENTS.PROCESS_CONTEXT_REQUEST
-                ? "process_context"
-                : taxonomy === CONTEXT_EVENTS.CONCEPTUAL_REQUEST
-                  ? "conceptual"
-                  : "path_alias",
+        reason: taxonomySkipReason(taxonomy) ?? "path_alias",
       });
       continue;
     }
 
-    const verified = [];
-    const seen = new Set();
-    const addVerified = (rel, { requireConsumed = false } = {}) => {
-      const n = normalizeRelPath(rel);
-      if (!n || seen.has(n)) return;
-      if (requireConsumed) {
-        const consumed =
-          harvested.has(n) || (trajectory.paths_touched ?? []).includes(n);
-        if (!consumed) return;
-      }
-      if (taxonomy === CONTEXT_EVENTS.TRUE_RETRIEVAL_MISS && !isSourceContextPath(n)) {
-        if (!n.endsWith(".md")) return;
-      }
-      seen.add(n);
-      verified.push(n);
-    };
-
-    for (const p of pathTokensFromSought(sought)) {
-      if (pathExistsInWorkspace(p)) addVerified(p);
+    if (
+      taxonomy === CONTEXT_EVENTS.CONCEPTUAL_REQUEST &&
+      !hasSignal
+    ) {
+      skipped.push({ sought, reason: "conceptual" });
+      continue;
     }
 
-    if (!verified.length) {
-      for (const raw of bySought[sought] ?? []) {
-        const p = normalizeRelPath(raw);
-        if (!p) continue;
-        if (
-          harvested.has(p) ||
-          (pathExistsInWorkspace(p) && sharesSoughtToken(sought, p))
-        ) {
-          addVerified(p);
-        }
-      }
-    }
+    const { confirmed: verified, skipReason } = confirmLearnCandidates({
+      sought,
+      grantedPaths,
+      bySoughtHits,
+      harvested: [...harvested],
+      pathExists: pathExistsInWorkspace,
+    });
 
     if (!verified.length) {
-      const hadExpand = (bySought[sought] ?? []).length > 0;
-      skipped.push({ sought, reason: hadExpand ? "unconfirmed" : "empty_expand" });
+      skipped.push({
+        sought,
+        reason:
+          skipReason === "conceptual" && hasSignal
+            ? "empty_expand"
+            : skipReason ?? "empty_expand",
+      });
       continue;
     }
 

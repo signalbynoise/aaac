@@ -29,6 +29,8 @@ describe("normalizeRetrievalMiss", () => {
     expect(r.ok).toBe(true);
     expect(r.miss.sought).toBe("MemoryGraphVisualizer");
     expect(r.miss.reason).toBe("not_in_focus");
+    expect(r.miss.taxonomy).toBe(null);
+    expect(r.miss.granted_paths).toEqual([]);
   });
 });
 

@@ -1,0 +1,28 @@
+{
+  "misses": [
+    {
+      "sought": "parent screen or rail that renders MemoryGraphPanel",
+      "reason": "not_in_focus",
+      "taxonomy": "CONCEPTUAL_REQUEST",
+      "notes": "granted:apps/agentic-os/src/renderer/components/MemoryGraphPanel.tsx",
+      "granted_paths": [
+        "apps/agentic-os/src/renderer/components/MemoryGraphPanel.tsx"
+      ]
+    },
+    {
+      "sought": "IPC/preload handlers for getRepoGraph, ensureRepoMemory, pollRepoMemoryEvents",
+      "reason": "not_in_focus",
+      "taxonomy": "CONCEPTUAL_REQUEST",
+      "notes": "granted:apps/agentic-os/src/renderer/hooks/useRepoMemoryToasts.ts",
+      "granted_paths": [
+        "apps/agentic-os/src/renderer/hooks/useRepoMemoryToasts.ts"
+      ]
+    },
+    {
+      "sought": "main-process and preload handlers that implement getRepoGraph",
+      "reason": "not_in_focus",
+      "taxonomy": "CONCEPTUAL_REQUEST",
+      "notes": "Hook calls these IPC methods; without handlers the capability trace cannot confirm persistence."
+    }
+  ]
+}

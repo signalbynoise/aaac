@@ -1,6 +1,7 @@
 /**
  * Context-boundary taxonomy — emitted at the gate/broker, not after the run.
- * Only TRUE_RETRIEVAL_MISS and ENVELOPE_TOO_THIN may become graph learning.
+ * TRUE_RETRIEVAL_MISS and ENVELOPE_TOO_THIN may become graph learning.
+ * CONCEPTUAL_REQUEST may also learn when a confirmed per-sought grant exists.
  */
 import { normalizeRepoPath } from "./evaluate-finding-tools.mjs";
 

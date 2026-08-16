@@ -13,6 +13,11 @@ import {
   pathExistsUnderRoot,
   significantSoughtTokens,
 } from "./sought-paths.mjs";
+import { CONTEXT_EVENTS } from "./context-taxonomy.mjs";
+import {
+  normalizeGrantedPaths,
+  parseGrantedNotes,
+} from "./experience/granted-paths.mjs";
 
 export const RETRIEVAL_MISS_REASONS = [
   "not_in_focus",
@@ -40,6 +45,17 @@ export function normalizeRetrievalMiss(raw = {}) {
   let reason = String(raw.reason ?? "other").trim();
   if (!RETRIEVAL_MISS_REASONS.includes(reason)) reason = "other";
   const confidence = String(raw.confidence ?? "low").toLowerCase();
+  const taxonomyRaw = String(raw.taxonomy ?? "").trim();
+  const taxonomy = Object.values(CONTEXT_EVENTS).includes(taxonomyRaw)
+    ? taxonomyRaw
+    : null;
+  const notes = typeof raw.notes === "string" ? raw.notes.slice(0, 2000) : "";
+  const granted_paths = [
+    ...new Set([
+      ...normalizeGrantedPaths(raw.granted_paths),
+      ...parseGrantedNotes(notes),
+    ]),
+  ].slice(0, 8);
   const miss = {
     sought,
     reason,
@@ -49,7 +65,9 @@ export function normalizeRetrievalMiss(raw = {}) {
     packet_ids_tried: Array.isArray(raw.packet_ids_tried)
       ? raw.packet_ids_tried.map(String).slice(0, 20)
       : [],
-    notes: typeof raw.notes === "string" ? raw.notes.slice(0, 2000) : "",
+    notes,
+    taxonomy,
+    granted_paths,
     agent_id: raw.agent_id ?? raw.agentId ?? null,
     phase: raw.phase ?? null,
     recorded_at: isoNow(),
@@ -85,6 +103,20 @@ export function recordRetrievalMiss(runId, rawMiss, opts = {}) {
         (m.phase ?? null) === phase,
     );
     if (existing) {
+      const incoming = normalized.miss.granted_paths ?? [];
+      if (incoming.length) {
+        existing.granted_paths = [
+          ...new Set([...(existing.granted_paths ?? []), ...incoming]),
+        ].slice(0, 8);
+        if (!String(existing.notes ?? "").startsWith("granted:") && normalized.miss.notes) {
+          existing.notes = normalized.miss.notes;
+        }
+        if (!existing.taxonomy && normalized.miss.taxonomy) {
+          existing.taxonomy = normalized.miss.taxonomy;
+        }
+        store.updated_at = isoNow();
+        writeJson(storePath, store);
+      }
       return { ok: true, path: storePath, miss: existing, deduped: true };
     }
   }

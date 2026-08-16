@@ -303,7 +303,7 @@ describe("sandbox deny", () => {
 });
 
 describe("learn filter", () => {
-  it("ignores discovery/ops/prose misses", () => {
+  it("ignores discovery/ops/prose misses without grants", () => {
     const artifacts = tmpDir("aaac-learn-");
     fs.writeFileSync(
       path.join(artifacts, "retrieval_misses.json"),

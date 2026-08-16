@@ -1,6 +1,6 @@
 /**
  * Resolve model tier + slug for a phase/subagent launch.
- * Precedence: agent_specs > phases > subagent_types > default_tier
+ * Precedence: command/verb critical phase > agent_specs > phases > subagent_types > default_tier
  */
 import { getModelRoutingPath, loadModelRouting } from "./load-model-routing.mjs";
 
@@ -36,6 +36,40 @@ function wildcardToRegex(pattern) {
   return new RegExp(`^${escaped}$`);
 }
 
+function normalizeRouteKey(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/^\//, "").toLowerCase();
+  return trimmed || null;
+}
+
+function resolveCriticalMatch(routing, { command, verb, phase }) {
+  const criticalTier = routing.critical_tier ?? "critical";
+  if (!phase || !hasOwn(routing.tiers, criticalTier)) {
+    return { matched: false, source: null, key: null, tier: undefined };
+  }
+  const commands = routing.command_critical_phases ?? {};
+  const verbs = routing.verb_critical_phases ?? {};
+  const cmd = normalizeRouteKey(command);
+  const v = normalizeRouteKey(verb);
+
+  if (cmd && hasOwn(commands, cmd)) {
+    if (commands[cmd] === phase) {
+      return { matched: true, source: "command_critical_phases", key: cmd, tier: criticalTier };
+    }
+    return { matched: false, source: null, key: null, tier: undefined };
+  }
+  if (v && hasOwn(verbs, v) && verbs[v] === phase) {
+    return { matched: true, source: "verb_critical_phases", key: v, tier: criticalTier };
+  }
+  if (!v && cmd) {
+    const inferred = cmd.split(/[-_]/)[0];
+    if (inferred && hasOwn(verbs, inferred) && verbs[inferred] === phase) {
+      return { matched: true, source: "verb_critical_phases", key: inferred, tier: criticalTier };
+    }
+  }
+  return { matched: false, source: null, key: null, tier: undefined };
+}
+
 function resolveAgentSpecTier(agentSpecs, agentSpecId) {
   if (!agentSpecId || !agentSpecs || typeof agentSpecs !== "object") {
     return { tier: undefined, key: null };
@@ -55,9 +89,41 @@ function resolveAgentSpecTier(agentSpecs, agentSpecId) {
   return { tier: undefined, key: null };
 }
 
-export function resolveModelTierDetail({ phase, agent_spec_id, subagent_type } = {}) {
+export function resolveModelTierDetail({
+  phase,
+  agent_spec_id,
+  subagent_type,
+  verb,
+  command,
+} = {}) {
   const routing = loadModelRouting();
   const routingPath = [];
+
+  const critical = resolveCriticalMatch(routing, { command, verb, phase });
+  routingPath.push({
+    source: critical.source ?? "critical_phase",
+    key: critical.key,
+    tier: critical.tier ?? null,
+    matched: critical.matched,
+  });
+  if (critical.matched) {
+    const detail = {
+      tier: critical.tier,
+      model_slug: routing.tiers?.[critical.tier] ?? null,
+      source: critical.source,
+      routing_path: routingPath,
+    };
+    debugLog("debug", "resolve", "resolved by command/verb critical phase", {
+      phase,
+      verb,
+      command,
+      agent_spec_id,
+      tier: detail.tier,
+      model_slug: detail.model_slug,
+      source: detail.source,
+    });
+    return detail;
+  }
 
   const agentSpecResult = resolveAgentSpecTier(routing.agent_specs, agent_spec_id);
   routingPath.push({

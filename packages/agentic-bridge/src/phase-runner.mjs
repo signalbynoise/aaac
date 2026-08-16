@@ -81,6 +81,8 @@ export class PhaseRunner extends EventEmitter {
       phase,
       agentSpecId: agentSpec?.id ?? null,
       subagentType,
+      verb: manifest?.verb ?? null,
+      command: manifest?.command ?? null,
     });
     recordAgentLaunch(this.workspaceRoot, runId, {
       agentIndex,

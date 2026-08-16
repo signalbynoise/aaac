@@ -18,10 +18,10 @@ describe('resolve-model-for-phase', () => {
     resetModelRoutingCache();
   });
 
-  it('returns cursor-grok-4.6-high for execute phase', () => {
+  it('returns high-fast for execute', () => {
     const result = resolveModelForPhase({ phase: 'execute' });
-    expect(result.tier).toBe('codex');
-    expect(result.model_slug).toBe('cursor-grok-4.6-high');
+    expect(result.tier).toBe('high');
+    expect(result.model_slug).toBe('cursor-grok-4.6-high-fast');
     expect(result.source).toBe('phases');
   });
 
@@ -30,19 +30,19 @@ describe('resolve-model-for-phase', () => {
       phase: 'verify',
       agent_spec_id: 'code-author',
     });
-    expect(result.tier).toBe('codex');
-    expect(result.model_slug).toBe('cursor-grok-4.6-high');
+    expect(result.tier).toBe('high');
+    expect(result.model_slug).toBe('cursor-grok-4.6-high-fast');
     expect(result.source).toBe('agent_specs');
   });
 
-  it('falls back to fast Grok 4.6 when unmapped', () => {
+  it('falls back to low-fast when unmapped', () => {
     const result = resolveModelForPhase({
       phase: 'unmapped-phase',
       agent_spec_id: 'missing-spec',
       subagent_type: 'missing-subagent-type',
     });
-    expect(result.tier).toBe('fast');
-    expect(result.model_slug).toBe('cursor-grok-4.6-medium-fast');
+    expect(result.tier).toBe('low');
+    expect(result.model_slug).toBe('cursor-grok-4.6-low-fast');
     expect(result.source).toBe('default_tier');
   });
 
@@ -50,11 +50,13 @@ describe('resolve-model-for-phase', () => {
     const detail = resolveModelTierDetail({ phase: 'execute' });
     expect(Array.isArray(detail.routing_path)).toBe(true);
     expect(detail.routing_path.map((entry) => entry.source)).toEqual([
+      'critical_phase',
       'agent_specs',
       'phases',
     ]);
     expect(detail.routing_path[0].matched).toBe(false);
-    expect(detail.routing_path[1].matched).toBe(true);
+    expect(detail.routing_path[1].matched).toBe(false);
+    expect(detail.routing_path[2].matched).toBe(true);
   });
 
   it('wildcard agent_specs discovery-* matches discovery-inventory', () => {
@@ -62,15 +64,95 @@ describe('resolve-model-for-phase', () => {
       phase: 'plan',
       agent_spec_id: 'discovery-inventory',
     });
-    expect(result.tier).toBe('fast');
+    expect(result.tier).toBe('medium');
     expect(result.model_slug).toBe('cursor-grok-4.6-medium-fast');
     expect(result.source).toBe('agent_specs');
   });
 
-  it('returns cursor-grok-4.6-xhigh for reasoning phases', () => {
+  it('uses medium-fast for plan unless the command marks it critical', () => {
     const result = resolveModelForPhase({ phase: 'plan' });
-    expect(result.tier).toBe('reasoning');
-    expect(result.model_slug).toBe('cursor-grok-4.6-xhigh');
+    expect(result.tier).toBe('medium');
+    expect(result.model_slug).toBe('cursor-grok-4.6-medium-fast');
+  });
+
+  it('uses xhigh-fast for check discover even when discovery-* would apply', () => {
+    const result = resolveModelForPhase({
+      phase: 'discover',
+      verb: 'check',
+      command: 'check-architecture',
+      agent_spec_id: 'discovery-inventory',
+    });
+    expect(result.tier).toBe('critical');
+    expect(result.model_slug).toBe('cursor-grok-4.6-xhigh-fast');
+    expect(result.source).toBe('verb_critical_phases');
+  });
+
+  it('keeps check validate on low-fast', () => {
+    const result = resolveModelForPhase({
+      phase: 'validate',
+      verb: 'check',
+      command: '/check-architecture',
+    });
+    expect(result.tier).toBe('low');
+    expect(result.model_slug).toBe('cursor-grok-4.6-low-fast');
+  });
+
+  it('uses xhigh-fast for fix plan', () => {
+    const result = resolveModelForPhase({
+      phase: 'plan',
+      verb: 'fix',
+      command: 'fix-module',
+    });
+    expect(result.tier).toBe('critical');
+    expect(result.model_slug).toBe('cursor-grok-4.6-xhigh-fast');
+    expect(result.source).toBe('verb_critical_phases');
+  });
+
+  it('infers check from command when verb is missing', () => {
+    const result = resolveModelForPhase({
+      phase: 'discover',
+      command: '/check-architecture',
+    });
+    expect(result.source).toBe('verb_critical_phases');
+    expect(result.model_slug).toBe('cursor-grok-4.6-xhigh-fast');
+  });
+
+  it('command_critical_phases beats verb_critical_phases', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aaac-routing-cmd-'));
+    const aaacDir = path.join(dir, '.cursor', 'aaac');
+    fs.mkdirSync(aaacDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(aaacDir, 'model-routing.yaml'),
+      [
+        'version: 1',
+        'command_critical_phases:',
+        '  check-architecture: report',
+        '',
+      ].join('\n'),
+    );
+    const previous = process.env.AAAC_WORKSPACE_ROOT;
+    process.env.AAAC_WORKSPACE_ROOT = dir;
+    resetModelRoutingCache();
+    try {
+      const discover = resolveModelForPhase({
+        phase: 'discover',
+        verb: 'check',
+        command: 'check-architecture',
+      });
+      const report = resolveModelForPhase({
+        phase: 'report',
+        verb: 'check',
+        command: 'check-architecture',
+      });
+      expect(discover.model_slug).toBe('cursor-grok-4.6-medium-fast');
+      expect(report.source).toBe('command_critical_phases');
+      expect(report.model_slug).toBe('cursor-grok-4.6-xhigh-fast');
+    } finally {
+      if (previous == null) delete process.env.AAAC_WORKSPACE_ROOT;
+      else process.env.AAAC_WORKSPACE_ROOT = previous;
+      resetModelRoutingCache();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('maps AAAC shorthand onto Cursor CLI slugs', () => {
@@ -115,9 +197,11 @@ describe('resolve-model-for-phase', () => {
       expect(routing.provider).toBe(AAAC_MODEL_PROVIDER);
       expect(routing.family).toBe(AAAC_MODEL_FAMILY);
       expect(routing.tiers.fast).toBe('cursor-grok-4.6-medium-fast');
-      expect(routing.tiers.codex).toBe('cursor-grok-4.6-high');
-      expect(routing.tiers.reasoning).toBe('cursor-grok-4.6-xhigh');
-      expect(resolveModelForPhase({ phase: 'execute' }).model_slug).toBe('cursor-grok-4.6-high');
+      expect(routing.tiers.codex).toBe('cursor-grok-4.6-high-fast');
+      expect(routing.tiers.reasoning).toBe('cursor-grok-4.6-xhigh-fast');
+      expect(resolveModelForPhase({ phase: 'execute' }).model_slug).toBe(
+        'cursor-grok-4.6-high-fast',
+      );
     } finally {
       if (previous == null) delete process.env.AAAC_WORKSPACE_ROOT;
       else process.env.AAAC_WORKSPACE_ROOT = previous;

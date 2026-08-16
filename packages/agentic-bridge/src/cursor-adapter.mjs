@@ -484,6 +484,8 @@ async function* runAdapterPhase(ctx, cancelled, activeChildren) {
     phase: ctx.phase,
     agentSpecId: ctx.agentSpec?.id ?? null,
     subagentType: ctx.subagentType ?? null,
+    verb: ctx.manifest?.verb ?? null,
+    command: ctx.manifest?.command ?? null,
   });
   const envExtras = {
     AAAC_RUN_ID: ctx.runId,

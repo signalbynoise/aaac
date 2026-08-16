@@ -136,30 +136,42 @@ const DEFAULT_ROUTING = {
   provider: AAAC_MODEL_PROVIDER,
   family: AAAC_MODEL_FAMILY,
   tiers: {
+    low: "cursor-grok-4.6-low-fast",
+    medium: "cursor-grok-4.6-medium-fast",
+    high: "cursor-grok-4.6-high-fast",
+    critical: "cursor-grok-4.6-xhigh-fast",
     fast: "cursor-grok-4.6-medium-fast",
-    codex: "cursor-grok-4.6-high",
-    reasoning: "cursor-grok-4.6-xhigh",
+    codex: "cursor-grok-4.6-high-fast",
+    reasoning: "cursor-grok-4.6-xhigh-fast",
   },
-  default_tier: "fast",
+  default_tier: "low",
+  critical_tier: "critical",
+  verb_critical_phases: {
+    check: "discover",
+    fix: "plan",
+    create: "plan",
+    update: "plan",
+  },
+  command_critical_phases: {},
   phases: {
-    discover: "fast",
-    investigate_lite: "fast",
-    investigate_swarm: "fast",
-    research_swarm: "fast",
-    check_swarm: "fast",
-    verify: "fast",
-    review_swarm: "fast",
-    plan: "reasoning",
-    validate: "reasoning",
-    impact_analysis: "reasoning",
-    dependency_graph: "reasoning",
-    fitness_functions: "reasoning",
-    rollback: "reasoning",
-    root_cause: "reasoning",
-    report: "reasoning",
-    execute: "codex",
-    test_execute: "codex",
-    debt_sweep: "codex",
+    discover: "medium",
+    investigate_lite: "medium",
+    investigate_swarm: "medium",
+    research_swarm: "medium",
+    check_swarm: "medium",
+    verify: "low",
+    review_swarm: "low",
+    plan: "medium",
+    validate: "low",
+    impact_analysis: "low",
+    dependency_graph: "low",
+    fitness_functions: "low",
+    rollback: "low",
+    root_cause: "medium",
+    report: "medium",
+    execute: "high",
+    test_execute: "high",
+    debt_sweep: "high",
     scan: null,
     parse: null,
     campaign_init: null,
@@ -167,14 +179,14 @@ const DEFAULT_ROUTING = {
     satisfaction_gate: null,
   },
   agent_specs: {
-    "code-author": "codex",
-    "test-author": "codex",
-    "discovery-*": "fast",
-    "fix-*": "fast",
+    "code-author": "high",
+    "test-author": "high",
+    "discovery-*": "medium",
+    "fix-*": "low",
   },
   subagent_types: {
-    explore: "fast",
-    shell: "fast",
+    explore: "medium",
+    shell: "low",
   },
 };
 
@@ -194,13 +206,23 @@ function parseSimpleModelRoutingYaml(content) {
     version: null,
     tiers: {},
     default_tier: null,
+    critical_tier: null,
+    verb_critical_phases: {},
+    command_critical_phases: {},
     phases: {},
     agent_specs: {},
     subagent_types: {},
   };
 
   let section = null;
-  const sectionKeys = new Set(["tiers", "phases", "agent_specs", "subagent_types"]);
+  const sectionKeys = new Set([
+    "tiers",
+    "phases",
+    "agent_specs",
+    "subagent_types",
+    "verb_critical_phases",
+    "command_critical_phases",
+  ]);
 
   for (const line of content.split("\n")) {
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
@@ -219,6 +241,7 @@ function parseSimpleModelRoutingYaml(content) {
         const value = parseSimpleYamlScalar(rawValue);
         if (key === "version") out.version = value;
         if (key === "default_tier") out.default_tier = value;
+        if (key === "critical_tier") out.critical_tier = value;
       }
       continue;
     }
@@ -277,6 +300,11 @@ function normalizeRouting(parsed) {
       ? parsed.default_tier
       : DEFAULT_ROUTING.default_tier;
 
+  const criticalTier =
+    typeof parsed.critical_tier === "string" && parsed.critical_tier
+      ? parsed.critical_tier
+      : DEFAULT_ROUTING.critical_tier;
+
   const normalized = {
     ...DEFAULT_ROUTING,
     ...parsed,
@@ -284,6 +312,15 @@ function normalizeRouting(parsed) {
     family: AAAC_MODEL_FAMILY,
     tiers,
     default_tier: defaultTier,
+    critical_tier: criticalTier,
+    verb_critical_phases: {
+      ...DEFAULT_ROUTING.verb_critical_phases,
+      ...(parsed.verb_critical_phases ?? {}),
+    },
+    command_critical_phases: {
+      ...DEFAULT_ROUTING.command_critical_phases,
+      ...(parsed.command_critical_phases ?? {}),
+    },
     phases: {
       ...DEFAULT_ROUTING.phases,
       ...(parsed.phases ?? {}),

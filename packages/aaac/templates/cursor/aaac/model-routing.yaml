@@ -1,37 +1,54 @@
 # AAAC model routing SSOT.
 # Provider lock: Grok 4.6 variants only. Other providers are rejected at load time.
+# Every dispatched slug is a *-fast Grok 4.6 effort. Command/verb selects the
+# critical phase (xhigh-fast); execute is high-fast; remaining phases are low/medium-fast.
 version: 1
 provider: grok
 family: grok-4.6
 
 tiers:
+  low: cursor-grok-4.6-low-fast
+  medium: cursor-grok-4.6-medium-fast
+  high: cursor-grok-4.6-high-fast
+  critical: cursor-grok-4.6-xhigh-fast
   fast: cursor-grok-4.6-medium-fast
-  codex: cursor-grok-4.6-high
-  reasoning: cursor-grok-4.6-xhigh
+  codex: cursor-grok-4.6-high-fast
+  reasoning: cursor-grok-4.6-xhigh-fast
 
-default_tier: fast
+default_tier: low
+critical_tier: critical
+
+# If the launch phase equals this value, use critical_tier (xhigh-fast).
+# command_critical_phases beats verb_critical_phases. Both beat agent_specs.
+verb_critical_phases:
+  check: discover
+  fix: plan
+  create: plan
+  update: plan
+
+command_critical_phases:
 
 phases:
-  discover: fast
-  investigate_lite: fast
-  investigate_swarm: fast
-  research_swarm: fast
-  check_swarm: fast
-  verify: fast
-  review_swarm: fast
+  discover: medium
+  investigate_lite: medium
+  investigate_swarm: medium
+  research_swarm: medium
+  check_swarm: medium
+  verify: low
+  review_swarm: low
 
-  plan: reasoning
-  validate: reasoning
-  impact_analysis: reasoning
-  dependency_graph: reasoning
-  fitness_functions: reasoning
-  rollback: reasoning
-  root_cause: reasoning
-  report: reasoning
+  plan: medium
+  validate: low
+  impact_analysis: low
+  dependency_graph: low
+  fitness_functions: low
+  rollback: low
+  root_cause: medium
+  report: medium
 
-  execute: codex
-  test_execute: codex
-  debt_sweep: codex
+  execute: high
+  test_execute: high
+  debt_sweep: high
 
   scan: null # parent_only
   parse: null # parent_only
@@ -40,11 +57,11 @@ phases:
   satisfaction_gate: null # parent_only
 
 agent_specs:
-  code-author: codex
-  test-author: codex
-  discovery-*: fast
-  fix-*: fast
+  code-author: high
+  test-author: high
+  discovery-*: medium
+  fix-*: low
 
 subagent_types:
-  explore: fast
-  shell: fast
+  explore: medium
+  shell: low

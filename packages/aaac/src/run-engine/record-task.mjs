@@ -100,6 +100,8 @@ function createAgentEntry(manifest, hook, launchIndex, launch) {
     phase: manifest.phase,
     agent_spec_id: agentSpec.id,
     subagent_type: subagentType,
+    verb: manifest.verb ?? null,
+    command: manifest.command ?? null,
   });
   const observedModel = hook.model ?? null;
   const subagentId = hook.subagent_id ?? hook.subagentId ?? null;

@@ -19,7 +19,7 @@ export { DEFAULT_AAAC_MODEL_SLUG, isAllowedAaacModelSlug, toCursorCliModelSlug }
 
 export async function resolveAaacPhaseModel(
   workspaceRoot,
-  { phase, agentSpecId, subagentType } = {},
+  { phase, agentSpecId, subagentType, verb, command } = {},
 ) {
   const fallback = toCursorCliModelSlug(DEFAULT_AAAC_MODEL_SLUG);
   if (!workspaceRoot) {
@@ -39,11 +39,15 @@ export async function resolveAaacPhaseModel(
         phase,
         agent_spec_id: agentSpecId,
         subagent_type: subagentType,
+        verb,
+        command,
       });
       slug = resolved?.model_slug ?? null;
     } catch (error) {
       log.warn("resolve", "Workspace model routing failed; using Grok 4.6 fallback", {
         phase,
+        verb,
+        command,
         error: String(error),
         fallback,
       });
@@ -53,12 +57,20 @@ export async function resolveAaacPhaseModel(
 
   if (isAllowedAaacModelSlug(slug)) {
     const model = toCursorCliModelSlug(slug, fallback);
-    log.debug("resolve", "Resolved Grok 4.6 phase model", { phase, model, requested: slug });
+    log.debug("resolve", "Resolved Grok 4.6 phase model", {
+      phase,
+      verb,
+      command,
+      model,
+      requested: slug,
+    });
     return model;
   }
 
   log.warn("resolve", "Rejected non-Grok or missing phase model", {
     phase,
+    verb,
+    command,
     slug,
     fallback,
   });

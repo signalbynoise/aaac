@@ -13,7 +13,9 @@ import {
 } from "../src/run-engine/worker-capsule.mjs";
 import {
   buildMacosSeatbeltProfile,
+  isUsableProbeNodeBin,
   probeSandboxIsolation,
+  resolveProbeNodeBin,
   resolveSandboxLauncher,
   siblingDenyRoots,
 } from "../src/run-engine/worker-sandbox.mjs";
@@ -245,6 +247,22 @@ describe("context broker HTTP", () => {
 });
 
 describe("sandbox deny", () => {
+  it("refuses Electron/Agentic OS as the probe interpreter", () => {
+    expect(
+      isUsableProbeNodeBin(
+        "/Users/x/.build/electron/Agentic OS.app/Contents/MacOS/Agentic OS",
+      ),
+    ).toBe(false);
+    expect(isUsableProbeNodeBin("/Applications/Cursor.app/Contents/MacOS/Cursor")).toBe(
+      false,
+    );
+    const node = resolveProbeNodeBin(
+      "/Users/x/.build/electron/Agentic OS.app/Contents/MacOS/Agentic OS",
+    );
+    expect(isUsableProbeNodeBin(node)).toBe(true);
+    expect(path.basename(node)).toMatch(/^node$/);
+  });
+
   it("builds a profile that names the workspace deny and capsule allow", () => {
     const profile = buildMacosSeatbeltProfile({
       capsuleDir: "/tmp/capsule",
@@ -272,6 +290,14 @@ describe("sandbox deny", () => {
       expect(probe.ok).toBe(true);
       expect(probe.deniedWorkspace).toBe(true);
       expect(probe.allowedCapsule).toBe(true);
+      const electronish = probeSandboxIsolation({
+        launcher,
+        workspaceRoot: root,
+        capsuleDir,
+        nodeBin:
+          "/Users/eriklydecker/agentic-os-workbench/.build/electron/Agentic OS.app/Contents/MacOS/Agentic OS",
+      });
+      expect(electronish.ok).toBe(true);
     },
   );
 });

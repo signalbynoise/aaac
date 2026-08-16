@@ -46,6 +46,57 @@ ${denyRules}
 `;
 }
 
+const ELECTRON_BIN_RE =
+  /(^|\/)(Electron|Agentic OS|Code - OSS|Cursor)(\.exe)?$/i;
+
+export function isUsableProbeNodeBin(bin) {
+  if (!bin || typeof bin !== "string") return false;
+  const base = path.basename(bin);
+  if (ELECTRON_BIN_RE.test(base) || ELECTRON_BIN_RE.test(bin)) return false;
+  if (!/(^|\/)node(\.exe)?$/i.test(base)) return false;
+  try {
+    return fs.existsSync(bin);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Probe must run `node -e`. Electron/Agentic OS execPath is not Node.
+ */
+export function resolveProbeNodeBin(preferred = process.execPath) {
+  const envBin = String(process.env.AAAC_PROBE_NODE_BIN ?? "").trim();
+  const candidates = [
+    envBin,
+    preferred,
+    process.execPath,
+    process.env.NODE_BINARY,
+    process.env.npm_node_execpath,
+  ].filter(Boolean);
+  const which = spawnSync("which", ["node"], { encoding: "utf8" });
+  if (which.status === 0) {
+    candidates.push(String(which.stdout ?? "").trim());
+  }
+  for (const home of [process.env.HOME, os.homedir()].filter(Boolean)) {
+    const nvmRoot = path.join(home, ".nvm/versions/node");
+    try {
+      const versions = fs.readdirSync(nvmRoot).sort().reverse();
+      for (const v of versions) {
+        candidates.push(path.join(nvmRoot, v, "bin/node"));
+      }
+    } catch {
+      // nvm optional
+    }
+  }
+  candidates.push("/usr/local/bin/node", "/opt/homebrew/bin/node");
+  for (const cand of candidates) {
+    if (isUsableProbeNodeBin(cand)) return cand;
+  }
+  throw new Error(
+    "No real node binary for the capsule sandbox probe — will not spawn on the real repo",
+  );
+}
+
 export function resolveSandboxLauncher({
   capsuleDir,
   workspaceRoot,
@@ -102,11 +153,12 @@ export function probeSandboxIsolation({
   launcher,
   workspaceRoot,
   capsuleDir,
-  nodeBin = process.execPath,
+  nodeBin = null,
 } = {}) {
   if (!launcher?.cmd) {
     return { ok: false, reason: "no_launcher" };
   }
+  const probeNode = resolveProbeNodeBin(nodeBin ?? process.execPath);
   const secretRel = `.aaac-sandbox-probe-${Date.now()}.txt`;
   const secret = path.join(workspaceRoot, secretRel);
   const granted = path.join(capsuleDir, ".aaac", "probe-ok.txt");
@@ -118,7 +170,7 @@ export function probeSandboxIsolation({
       launcher.cmd,
       [
         ...launcher.prefixArgs,
-        nodeBin,
+        probeNode,
         "-e",
         `const fs=require("fs");try{process.stdout.write(fs.readFileSync(${JSON.stringify(secret)},"utf8"))}catch(e){process.stderr.write(String(e.message));process.exit(2)}`,
       ],
@@ -128,7 +180,7 @@ export function probeSandboxIsolation({
       launcher.cmd,
       [
         ...launcher.prefixArgs,
-        nodeBin,
+        probeNode,
         "-e",
         `const fs=require("fs");process.stdout.write(fs.readFileSync(${JSON.stringify(granted)},"utf8"))`,
       ],
